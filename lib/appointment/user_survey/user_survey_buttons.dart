@@ -181,9 +181,6 @@ class SurveyUserSelectCategoriesState
             ),
         ],
       ),
-      // bottomNavigationBar: const BottomNavigation(
-      //   initialIndex: 4,
-      // ),
     );
   }
 
