@@ -50,6 +50,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     return Scaffold(
       //drawer: NavDrawer(theme: Theme.of(context)),
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         actions: [
           buildPopupMenuButton(
             context,
