@@ -1,0 +1,53 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:survey_app_ks/settings/font_size_provider.dart';
+
+class DatenSchutzOptionsWidget extends StatefulWidget {
+  final IconData icon;
+  final String title;
+
+  const DatenSchutzOptionsWidget(
+      {super.key, required this.icon, required this.title});
+
+  @override
+  DatenSchutzOptionsWidgetState createState() =>
+      DatenSchutzOptionsWidgetState();
+}
+
+class DatenSchutzOptionsWidgetState extends State<DatenSchutzOptionsWidget> {
+  @override
+  Widget build(BuildContext context) {
+    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () {
+              setState(() {});
+            },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(widget.icon, size: fontSize + 15),
+                    const SizedBox(
+                      width: 10,
+                    ),
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                          fontSize: fontSize, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                Icon(Icons.arrow_drop_down, size: fontSize + 15),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

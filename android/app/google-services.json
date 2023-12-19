@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "913078029574",
+    "firebase_url": "https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "survey-app-ks",
+    "storage_bucket": "survey-app-ks.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:913078029574:android:60812c5ad1286c5976a287",
+        "android_client_info": {
+          "package_name": "com.example.flutter_app_ks"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBToxwVxrXDP5PazulkYibtsFe4uM19rV0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
