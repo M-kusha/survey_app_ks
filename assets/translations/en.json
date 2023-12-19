@@ -68,13 +68,7 @@
  "not_confirmed": "Not confirmed",
  "update": "Update",
 
- "EMERGENCY_STRINGS": "",
-
- "emergency_center": "Emergency center",
- "poison_control": "Poison control",
- "ecmo_hotline": "ECMO Hotline/Invasive Lung Replacement",
- "neurological":"Neurological on-call service",
- "emergency": "Emergency",
+ 
 
  "SETTINGS_STRINGS": "",
 
@@ -91,28 +85,12 @@
 
  "NOTIFICATIONS_STRINGS":"",
 
- "no_notifications": "No notifications available",
- "notification": "Notification",
- "write_notification_message": "Write notification message",
- "notification_title_0": "Select Title",
- "select_priority": "Select priority",
- "priority_low": "Low",
- "priority_high": "High",
- "priority_max": "Max",
- "notification_title_1": "Intranet ",
- "notification_title_2": "Medical ",
- "notification_title_3": "Emergency ",
- "notification_title_4": "All",
- "notifications_log": "Notifications Log",
-
- "workplace_settings": "",
-
- "enter_new_workplace_name": "Enter new workplace name",
- "edit_workplace_name": "Edit workplace name",
-
 
  "SURVEY_TEXT": "",
 
+"appointments": "Appointments",
+"appointment_status_": "Appointment status",
+"create_appointment": "Create Appointment",
  "next": "Next",
  "create_survey_step_1": "Create Survey",
  "create_survey_title": "Title",
@@ -129,7 +107,7 @@
  "finish": "Finish",
  "search": "Search",
  "surveys": "Surveys",
- "no_surveys_added_yet": "No surveys created yet",
+ "no_surveys_added_yet": "No Appointment created yet",
  "open":"Open",
  "expired":"Expired",
  "participants": "Participants",
