@@ -44,21 +44,12 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
         final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
         return Scaffold(
           appBar: AppBar(
-              title: Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 50),
-                  child: Text(
-                    'settings'.tr(),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-              )),
+            automaticallyImplyLeading: false,
+            centerTitle: true,
+            title: Text(
+              'settings'.tr(),
+            ),
+          ),
           body: Container(
             padding: const EdgeInsets.all(10),
             child: ListView(
@@ -94,6 +85,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                   title: 'datenschutz'.tr(),
                 ),
                 dividerSettings,
+                const SizedBox(height: 30),
                 Center(
                   child: OutlinedButton(
                     style: ButtonStyle(
@@ -122,9 +114,6 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               ],
             ),
           ),
-          // bottomNavigationBar: const BottomNavigation(
-          //   initialIndex: 1,
-          // ),
         );
       },
     );
