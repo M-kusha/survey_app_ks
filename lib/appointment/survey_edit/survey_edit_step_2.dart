@@ -26,13 +26,18 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
 
-    if (pickedDateRange != null) {
+    if (pickedDateRange != null && mounted) {
+      // Check if the widget is still mounted
       final TimeOfDay? pickedStartTime =
           await showTimePicker(context: context, initialTime: TimeOfDay.now());
-      if (pickedStartTime != null) {
+
+      if (pickedStartTime != null && mounted) {
+        // Check again after async gap
         final TimeOfDay? pickedEndTime = await showTimePicker(
             context: context, initialTime: pickedStartTime);
-        if (pickedEndTime != null) {
+
+        if (pickedEndTime != null && mounted) {
+          // Check again after async gap
           _updateTimeSlots(
               pickedDateRange, pickedStartTime, pickedEndTime, index);
         }

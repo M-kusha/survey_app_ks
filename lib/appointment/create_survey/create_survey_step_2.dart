@@ -64,13 +64,15 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
         firstDate: DateTime.now(),
         lastDate: DateTime(2101));
 
-    if (pickedDateRange != null) {
+    if (pickedDateRange != null && mounted) {
       final TimeOfDay? pickedStartTime =
           await showTimePicker(context: context, initialTime: TimeOfDay.now());
-      if (pickedStartTime != null) {
+
+      if (pickedStartTime != null && mounted) {
         final TimeOfDay? pickedEndTime = await showTimePicker(
             context: context, initialTime: pickedStartTime);
-        if (pickedEndTime != null) {
+
+        if (pickedEndTime != null && mounted) {
           _updateTimeSlots(
               pickedDateRange, pickedStartTime, pickedEndTime, index);
         }

@@ -145,51 +145,28 @@ class CreateSurveyStep4State extends State<CreateSurveyStep4> {
                   final String code = const Uuid().v1().substring(0, 6);
                   newSurvey.id = code;
 
-                  // Serialize the Survey object to Firestore format
                   Map<String, dynamic> surveyData = newSurvey.toFirestore();
 
-                  try {
-                    // Save the survey to Firestore
-                    await FirebaseFirestore.instance
-                        .collection('surveys')
-                        .add(surveyData);
+                  // Save the survey to Firestore
+                  await FirebaseFirestore.instance
+                      .collection('surveys')
+                      .add(surveyData);
 
-                    widget.onSurveyCreated(newSurvey);
-                    onAddSurveyToList(newSurvey);
+                  widget.onSurveyCreated(newSurvey);
+                  onAddSurveyToList(newSurvey);
+                  if (!mounted) return;
 
-                    // Navigate to the next step
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => CreateSurveyStep5(
-                          survey: newSurvey,
-                        ),
+                  // Navigate to the next step
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CreateSurveyStep5(
+                        survey: newSurvey,
                       ),
-                    );
-                  } catch (e) {
-                    // Handle any errors here
-                    print('Error saving survey: $e');
-                  }
+                    ),
+                  );
                 }
               },
-
-              // onPressed: () {
-              //   if (_formKey.currentState!.validate()) {
-              //     final String code = const Uuid().v1().substring(0, 6);
-              //     newSurvey.id = code;
-              //     widget.onSurveyCreated(newSurvey);
-              //     onAddSurveyToList(newSurvey);
-
-              //     Navigator.push(
-              //       context,
-              //       MaterialPageRoute(
-              //         builder: (context) => CreateSurveyStep5(
-              //           survey: newSurvey,
-              //         ),
-              //       ),
-              //     );
-              //   }
-              // },
             ),
             const SizedBox(height: 16.0),
           ],

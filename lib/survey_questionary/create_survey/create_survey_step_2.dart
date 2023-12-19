@@ -468,6 +468,7 @@ class _CreateTrainingSurveyStep2State extends State<CreateTrainingSurveyStep2> {
             await FirebaseFirestore.instance
                 .collection('questionary')
                 .add(surveyData);
+            if (!mounted) return;
 
             Navigator.push(
               context,

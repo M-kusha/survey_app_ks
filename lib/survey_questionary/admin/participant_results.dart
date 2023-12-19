@@ -58,24 +58,22 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
         .collection('questions')
         .get();
 
-    try {
-      var results = await Future.wait([fetchUserFuture, fetchQuestionsFuture]);
+    var results = await Future.wait([fetchUserFuture, fetchQuestionsFuture]);
 
-      DocumentSnapshot userDoc = results[0] as DocumentSnapshot;
-      QuerySnapshot questionSnapshot = results[1] as QuerySnapshot;
+    DocumentSnapshot userDoc = results[0] as DocumentSnapshot;
+    QuerySnapshot questionSnapshot = results[1] as QuerySnapshot;
 
-      if (userDoc.exists) {
-        widget.participant.name = userDoc['fullName'];
-      }
+    if (userDoc.exists) {
+      widget.participant.name = userDoc['fullName'];
+    }
 
-      List<Map<String, dynamic>> questions = questionSnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
+    List<Map<String, dynamic>> questions = questionSnapshot.docs
+        .map((doc) => doc.data() as Map<String, dynamic>)
+        .toList();
 
-      setState(() {
-        questions = questions;
-      });
-    } catch (e) {}
+    setState(() {
+      questions = questions;
+    });
   }
 
   buildScoreData() {
@@ -134,17 +132,6 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
 
   @override
   Widget build(BuildContext context) {
-    print('correctAnswers: ${widget.participant.correctAnswers}');
-    print('score: ${widget.participant.score}');
-    print('textAnswer: ${widget.participant.textAnswer}');
-    print('surveyAnswers: ${widget.participant.surveyAnswers}');
-    print('name: ${widget.participant.name}');
-    print('id: ${widget.participant.id}');
-    print('surveyName: ${widget.survey.surveyName}');
-    print('surveyDescription: ${widget.survey.surveyDescription}');
-    print('timeCreated: ${widget.survey.timeCreated}');
-    print('questions: ${widget.survey.questions}');
-
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(

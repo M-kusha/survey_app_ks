@@ -64,25 +64,23 @@ class QuestionaryTrainingUserState extends State<QuestionaryTrainingUser> {
         .collection('questions')
         .get();
 
-    try {
-      var results = await Future.wait([fetchUserFuture, fetchQuestionsFuture]);
+    var results = await Future.wait([fetchUserFuture, fetchQuestionsFuture]);
 
-      DocumentSnapshot userDoc = results[0] as DocumentSnapshot;
-      QuerySnapshot questionSnapshot = results[1] as QuerySnapshot;
+    DocumentSnapshot userDoc = results[0] as DocumentSnapshot;
+    QuerySnapshot questionSnapshot = results[1] as QuerySnapshot;
 
-      if (userDoc.exists) {
-        widget.participant.name = userDoc['fullName'];
-      }
+    if (userDoc.exists) {
+      widget.participant.name = userDoc['fullName'];
+    }
 
-      List<Map<String, dynamic>> questions = questionSnapshot.docs
-          .map((doc) => doc.data() as Map<String, dynamic>)
-          .toList();
+    List<Map<String, dynamic>> questions = questionSnapshot.docs
+        .map((doc) => doc.data() as Map<String, dynamic>)
+        .toList();
 
-      setState(() {
-        questions = questions;
-        _isLoading = false;
-      });
-    } catch (e) {}
+    setState(() {
+      questions = questions;
+      _isLoading = false;
+    });
   }
 
   @override
@@ -222,7 +220,7 @@ class QuestionaryTrainingUserState extends State<QuestionaryTrainingUser> {
         'answers': surveyAnswersMap,
         'score': score,
       });
-
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => FinieshSurveyMessage(

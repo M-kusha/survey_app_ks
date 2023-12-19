@@ -69,7 +69,6 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
 
   @override
   Widget build(BuildContext context) {
-    print('answerCounts: $_answerCounts');
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 

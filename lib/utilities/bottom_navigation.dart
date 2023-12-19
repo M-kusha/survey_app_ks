@@ -22,12 +22,6 @@ class BottomNavigationState extends State<BottomNavigation> {
     const SettingsPageUI(),
   ];
 
-  Color? _textColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF004B96)
-        : Colors.white;
-  }
-
   void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;

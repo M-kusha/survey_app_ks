@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
 import 'package:survey_app_ks/survey_questionary/utilities/survey_questionary_class.dart';
 import 'package:survey_app_ks/utilities/bottom_navigation.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';

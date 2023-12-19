@@ -45,48 +45,46 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 
   void _fetchParticipants() async {
-    try {
-      String surveyId = widget.survey.id;
-      QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-          .collection('surveyAnswers')
-          .where('surveyId', isEqualTo: surveyId)
-          .get();
+    String surveyId = widget.survey.id;
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+        .collection('surveyAnswers')
+        .where('surveyId', isEqualTo: surveyId)
+        .get();
 
-      List<Participant> fetchedParticipants = [];
-      for (var doc in querySnapshot.docs) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    List<Participant> fetchedParticipants = [];
+    for (var doc in querySnapshot.docs) {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
 
-        if (!data.containsKey('userId')) {
-          continue;
-        }
-
-        String userId = data['userId'];
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .get();
-
-        if (!userDoc.exists) {
-          continue;
-        }
-
-        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-
-        fetchedParticipants.add(
-          Participant(
-            id: userId,
-            name: userData['fullName'] ?? 'Unknown', // Accessing fullName field
-            surveyAnswers: data['surveyAnswers'] ?? {},
-            correctAnswers: data['correctAnswers'] ?? 0,
-            score: (data['score'] ?? 0.0).toDouble(),
-          ),
-        );
+      if (!data.containsKey('userId')) {
+        continue;
       }
 
-      setState(() {
-        participants = fetchedParticipants;
-      });
-    } catch (e) {}
+      String userId = data['userId'];
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+
+      if (!userDoc.exists) {
+        continue;
+      }
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+      fetchedParticipants.add(
+        Participant(
+          id: userId,
+          name: userData['fullName'] ?? 'Unknown', // Accessing fullName field
+          surveyAnswers: data['surveyAnswers'] ?? {},
+          correctAnswers: data['correctAnswers'] ?? 0,
+          score: (data['score'] ?? 0.0).toDouble(),
+        ),
+      );
+    }
+
+    setState(() {
+      participants = fetchedParticipants;
+    });
   }
 
   Map<String, dynamic> calculateTotalScoreAndCorrectAnswers(
@@ -146,10 +144,6 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 
   Widget _buildStatisticsWidget(List<Participant> participants) {
-    print('Participants: $participants');
-    print('correctAnswers: ${widget.survey.correctAnswers}');
-    print('questions: ${widget.survey.questions}');
-    print('score: ${participants[0].score}');
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Column(
