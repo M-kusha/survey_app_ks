@@ -52,7 +52,6 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
-      // drawer: NavDrawer(theme: Theme.of(context)),
       appBar: AppBar(
         actions: [
           buildPopupMenuButton(
@@ -66,9 +65,10 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
                 searchController: searchController,
                 onSearchTextChanged: _onSearchTextChanged,
               )
-            : Text('appointment'.tr(),
+            : Text('appointments'.tr(),
                 style: TextStyle(fontSize: timeFontSize + 3)),
         centerTitle: true,
+        automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
@@ -81,9 +81,6 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
           buildExpandedField(context, isSearching, searchQuery),
         ],
       ),
-      // bottomNavigationBar: const BottomNavigation(
-      //   initialIndex: 0,
-      // ),
     );
   }
 
