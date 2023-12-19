@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
 import 'package:survey_app_ks/survey_questionary/utilities/survey_questionary_class.dart';
+import 'package:survey_app_ks/utilities/bottom_navigation.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
 class FinieshSurveyMessage extends StatefulWidget {
@@ -77,7 +78,8 @@ class _FinieshSurveyMessageState extends State<FinieshSurveyMessage> {
                 Navigator.pushAndRemoveUntil(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const QuestionarySurveyPageUI(),
+                    builder: (context) =>
+                        const BottomNavigation(initialIndex: 2),
                   ),
                   (route) => false,
                 );
