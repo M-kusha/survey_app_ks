@@ -26,7 +26,7 @@ class AppRoutes {
       '/ResetPasswordVerificationPage': (context) =>
           const ResetPasswordVerificationPage(),
       '/ChangePasswordPage': (context) => const ChangePasswordPage(),
-      '/home': (BuildContext context) => const BotomNavigation(),
+      '/home': (BuildContext context) => const BottomNavigation(),
       '/survey': (BuildContext context) => const SurveyPageUI(),
       '/create_survey_1': (BuildContext context) => const CreateSurveyStep1(),
       '/create_survey_2': (BuildContext context) => const CreateSurveyStep2(),
