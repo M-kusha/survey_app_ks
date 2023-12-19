@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/survey_questionary/admin/admin_overview.dart';
 import 'package:survey_app_ks/survey_questionary/user_survey/survey_user_page.dart';
-import 'package:survey_app_ks/survey_questionary/user_survey/user_survey_step_1.dart';
 import 'package:survey_app_ks/survey_questionary/utilities/survey_questionary_class.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 import 'package:timeago/timeago.dart';
@@ -136,7 +135,7 @@ class SurveyListItem extends StatelessWidget {
                           ),
                           SizedBox(height: timeFontSize),
                           Text(
-                              'Expires: ${DateFormat('EEEE dd MMMM').format(survey.deadline ?? DateTime.now())}',
+                              'Expires: ${DateFormat('dd E y').format(survey.deadline ?? DateTime.now())}',
                               style: TextStyle(
                                 fontSize: timeFontSize,
                                 fontWeight: FontWeight.bold,
@@ -144,7 +143,6 @@ class SurveyListItem extends StatelessWidget {
                         ],
                       ),
                       Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
