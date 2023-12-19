@@ -102,7 +102,7 @@ class SurveyListItem extends StatelessWidget {
           child: Column(
             children: [
               Text(
-                '${'survey_status'.tr()}: ${isExpired ? 'expired'.tr() : 'open'.tr()}',
+                '${'appointment_status_'.tr()}: ${isExpired ? 'expired'.tr() : 'open'.tr()}',
                 style: TextStyle(
                   color: Theme.of(context).brightness == Brightness.light
                       ? _textColor(context)
