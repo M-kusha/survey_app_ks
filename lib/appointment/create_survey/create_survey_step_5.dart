@@ -5,6 +5,7 @@ import 'package:ntfy_dart/ntfy_dart.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointment/survey_class.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/bottom_navigation.dart';
 import 'package:survey_app_ks/utilities/ntfy_interface.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
@@ -133,9 +134,14 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
               ),
               onPressed: () {
                 _sendNotification();
-                Navigator.of(context) // pop until root
-                  ..popUntil((route) => route.isFirst)
-                  ..pushNamed('/survey');
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        const BottomNavigation(initialIndex: 1),
+                  ),
+                  (route) => false,
+                );
               },
               child: Text('finish'.tr(),
                   style: TextStyle(
