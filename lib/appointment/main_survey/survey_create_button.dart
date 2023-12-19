@@ -44,7 +44,7 @@ Widget buildCreateSurveyButton(BuildContext context) {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              'create_survey_step_1'.tr(),
+              'create_appointment'.tr(),
               style: TextStyle(
                 fontSize: timeFontSize,
                 color: Theme.of(context).brightness == Brightness.light
