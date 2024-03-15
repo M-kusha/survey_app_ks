@@ -2,23 +2,24 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyEditPageStep2 extends StatefulWidget {
-  final Survey survey;
+class AppointmentEditPageStep2 extends StatefulWidget {
+  final Appointment appointment;
   final Function(int) onPageChange;
 
-  const SurveyEditPageStep2(
-      {Key? key, required this.survey, required this.onPageChange})
+  const AppointmentEditPageStep2(
+      {Key? key, required this.appointment, required this.onPageChange})
       : super(key: key);
 
   @override
-  SurveyEditPageStep2State createState() => SurveyEditPageStep2State();
+  AppointmentEditPageStep2State createState() =>
+      AppointmentEditPageStep2State();
 }
 
-class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
+class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
   Future<void> _showDatePicker(int index) async {
     final DateTime? pickedDateRange = await showDatePicker(
         context: context,
@@ -47,8 +48,8 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
 
   void _deleteDate(int index) {
     setState(() {
-      widget.survey.availableDates.removeAt(index);
-      widget.survey.availableTimeSlots.removeAt(index);
+      widget.appointment.availableDates.removeAt(index);
+      widget.appointment.availableTimeSlots.removeAt(index);
     });
   }
 
@@ -59,8 +60,8 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
           start: now,
           end: now.add(const Duration(hours: 1)),
           expirationDate: now.add(const Duration(days: 7)));
-      widget.survey.availableDates.add(now);
-      widget.survey.availableTimeSlots.add(timeSlot);
+      widget.appointment.availableDates.add(now);
+      widget.appointment.availableTimeSlots.add(timeSlot);
     });
   }
 
@@ -72,8 +73,12 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
       style: OutlinedButton.styleFrom(
         minimumSize: Size.fromHeight(timeFontSize * 3.0),
         padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-        foregroundColor: Colors.white,
-        backgroundColor: const Color(0xff004B96),
+        foregroundColor: Theme.of(context).brightness == Brightness.light
+            ? Colors.grey[900]
+            : const Color.fromARGB(255, 255, 255, 255),
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Colors.grey[100]
+            : Colors.grey[900],
         shape: const CircleBorder(),
       ),
       onPressed: () {
@@ -90,9 +95,9 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
     final endDateTime = DateTime(pickedDateRange.year, pickedDateRange.month,
         pickedDateRange.day, pickedEndTime.hour, pickedEndTime.minute);
     setState(() {
-      widget.survey.availableDates[index] = pickedDateRange;
-      widget.survey.availableTimeSlots[index].start = startDateTime;
-      widget.survey.availableTimeSlots[index].end = endDateTime;
+      widget.appointment.availableDates[index] = pickedDateRange;
+      widget.appointment.availableTimeSlots[index].start = startDateTime;
+      widget.appointment.availableTimeSlots[index].end = endDateTime;
     });
   }
 
@@ -107,6 +112,13 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
     return SizedBox(
       width: buttonWidth,
       child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+            foregroundColor: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey[900]
+                : const Color.fromARGB(255, 255, 255, 255),
+            backgroundColor: Theme.of(context).brightness == Brightness.light
+                ? Colors.grey[100]
+                : Colors.grey[900]),
         onPressed: () => _showDatePicker(index),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -121,7 +133,7 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '${DateFormat.jm().format(widget.survey.availableTimeSlots[index].start)} ${widget.survey.availableTimeSlots[index].amPm}',
+                    '${DateFormat.jm().format(widget.appointment.availableTimeSlots[index].start)} ${widget.appointment.availableTimeSlots[index].amPm}',
                     style: TextStyle(
                       fontSize: timeFontSize - 2,
                     ),
@@ -129,8 +141,8 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
                   const Text(' - '),
                   Text(
                     '${DateFormat.jm().format(
-                      widget.survey.availableTimeSlots[index].end,
-                    )} ${widget.survey.availableTimeSlots[index].amPm}',
+                      widget.appointment.availableTimeSlots[index].end,
+                    )} ${widget.appointment.availableTimeSlots[index].amPm}',
                     style: TextStyle(
                       fontSize: timeFontSize - 2,
                     ),
@@ -158,7 +170,7 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
           Padding(
             padding: const EdgeInsets.only(top: 30),
             child: Text(
-              'create_survey_date_time_selection'.tr(),
+              'create_appointment_date_time_selection'.tr(),
               style: TextStyle(
                 fontSize: timeFontSize,
                 fontWeight: FontWeight.bold,
@@ -170,7 +182,7 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: widget.survey.availableDates.isEmpty
+            child: widget.appointment.availableDates.isEmpty
                 ? Center(
                     child: Text(
                     'no_dates_added'.tr(),
@@ -183,7 +195,7 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
                     ),
                   ))
                 : ListView.separated(
-                    itemCount: widget.survey.availableDates.length,
+                    itemCount: widget.appointment.availableDates.length,
                     separatorBuilder: (context, index) =>
                         const SizedBox(height: 16),
                     itemBuilder: (context, index) {
@@ -192,14 +204,18 @@ class SurveyEditPageStep2State extends State<SurveyEditPageStep2> {
                           Stack(
                             children: [
                               _buildDateButton(
-                                  widget.survey.availableDates[index], index),
+                                  widget.appointment.availableDates[index],
+                                  index),
                               Positioned(
                                 top: -13,
                                 right: -13,
                                 child: IconButton(
-                                  icon: const Icon(
+                                  icon: Icon(
                                     Icons.remove_circle,
-                                    color: Colors.white,
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.light
+                                        ? Colors.grey[700]
+                                        : Colors.white,
                                   ),
                                   onPressed: () => _deleteDate(index),
                                 ),

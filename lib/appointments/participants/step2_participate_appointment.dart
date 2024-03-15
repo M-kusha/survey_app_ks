@@ -1,35 +1,45 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyParticipate extends StatefulWidget {
-  final Survey survey;
+class AppontmentParticipate extends StatefulWidget {
+  final Appointment appointment;
   final String userName;
 
-  const SurveyParticipate({
+  const AppontmentParticipate({
     Key? key,
-    required this.survey,
+    required this.appointment,
     required this.userName,
   }) : super(key: key);
 
   @override
-  SurveyParticipateState createState() => SurveyParticipateState();
+  AppontmentParticipateState createState() => AppontmentParticipateState();
 }
 
-class SurveyParticipateState extends State<SurveyParticipate> {
+class AppontmentParticipateState extends State<AppontmentParticipate> {
+  String? userId = FirebaseAuth.instance.currentUser?.uid;
+  final AppointmentService _appointmentService = AppointmentService();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
       body: ListView.builder(
-        itemCount: widget.survey.availableDates.length,
+        itemCount: widget.appointment.availableDates.length,
         itemBuilder: (context, dateIndex) {
-          final date = widget.survey.availableDates[dateIndex];
-          final timeSlot = widget.survey.availableTimeSlots[dateIndex];
+          final date = widget.appointment.availableDates[dateIndex];
+          final timeSlot = widget.appointment.availableTimeSlots[dateIndex];
           final dayOfWeek = DateFormat.EEEE().format(date);
           final dayOfMonth = DateFormat.d().format(date);
           final monthOfYear = DateFormat.MMMM().format(date);
@@ -67,7 +77,7 @@ class SurveyParticipateState extends State<SurveyParticipate> {
                     children: [
                       buildIconButton(
                           Icons.check_circle_outline_outlined,
-                          widget.survey.participants.any((p) =>
+                          widget.appointment.participants.any((p) =>
                                   p.userName == widget.userName &&
                                   p.date == date &&
                                   p.timeSlot == timeSlot &&
@@ -81,7 +91,7 @@ class SurveyParticipateState extends State<SurveyParticipate> {
                       }, 'will_participate'.tr()),
                       buildIconButton(
                           Icons.help_outline_outlined,
-                          widget.survey.participants.any((p) =>
+                          widget.appointment.participants.any((p) =>
                                   p.userName == widget.userName &&
                                   p.date == date &&
                                   p.timeSlot == timeSlot &&
@@ -95,7 +105,7 @@ class SurveyParticipateState extends State<SurveyParticipate> {
                       }, 'maybe_participate'.tr()),
                       buildIconButton(
                           Icons.cancel_outlined,
-                          widget.survey.participants.any((p) =>
+                          widget.appointment.participants.any((p) =>
                                   p.userName == widget.userName &&
                                   p.date == date &&
                                   p.timeSlot == timeSlot &&
@@ -157,10 +167,33 @@ class SurveyParticipateState extends State<SurveyParticipate> {
   }
 
   void updateParticipantStatus(
-      String userName, DateTime date, TimeSlot timeSlot, String status) {
-    widget.survey.participants.removeWhere((p) =>
-        p.userName == userName && p.date == date && p.timeSlot == timeSlot);
-    widget.survey.participants.add(Participant(
-        userName: userName, date: date, timeSlot: timeSlot, status: status));
+      String userName, DateTime date, TimeSlot timeSlot, String status) async {
+    if (userId == null) {
+      return;
+    }
+
+    final hasParticipated = widget.appointment.participants.any((p) =>
+        p.userId == userId &&
+        p.date == date &&
+        p.timeSlot.start == timeSlot.start &&
+        p.timeSlot.end == timeSlot.end);
+
+    if (!hasParticipated) {
+      setState(() {
+        widget.appointment.participants.removeWhere((p) =>
+            p.userName == userName && p.date == date && p.timeSlot == timeSlot);
+        widget.appointment.participants.add(AppointmentParticipants(
+            userName: userName,
+            date: date,
+            timeSlot: timeSlot,
+            status: status,
+            userId: userId!,
+            participated: true));
+        widget.appointment.participationCount++;
+      });
+
+      _appointmentService.updateParticipantStatus(userId!,
+          widget.appointment.appointmentId, userName, date, timeSlot, status);
+    }
   }
 }

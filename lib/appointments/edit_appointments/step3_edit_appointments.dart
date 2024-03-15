@@ -1,29 +1,30 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyEditPage4 extends StatefulWidget {
-  final Survey survey;
+class AppointmentEditPageStep3 extends StatefulWidget {
+  final Appointment appointment;
   final Function(int) onPageChange;
-  const SurveyEditPage4(
-      {required this.survey, super.key, required this.onPageChange});
+  const AppointmentEditPageStep3(
+      {required this.appointment, super.key, required this.onPageChange});
 
   @override
-  State<SurveyEditPage4> createState() => SurveyEditPage4State();
+  State<AppointmentEditPageStep3> createState() =>
+      AppointmentEditPageStep3State();
 }
 
-class SurveyEditPage4State extends State<SurveyEditPage4> {
-  late Survey _survey;
+class AppointmentEditPageStep3State extends State<AppointmentEditPageStep3> {
+  late Appointment appointment;
   DateTime _expirationDate = DateTime.now(); // add expiration date variable
 
   @override
   void initState() {
     super.initState();
-    _survey = widget.survey;
-    _expirationDate = _survey.expirationDate;
+    appointment = widget.appointment;
+    _expirationDate = appointment.expirationDate;
   }
 
   // function to show date picker
@@ -38,7 +39,7 @@ class SurveyEditPage4State extends State<SurveyEditPage4> {
     if (pickedDate != null && pickedDate != _expirationDate) {
       setState(() {
         _expirationDate = pickedDate;
-        _survey.expirationDate = pickedDate;
+        appointment.expirationDate = pickedDate;
       });
     }
   }

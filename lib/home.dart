@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 
 class TodoList extends StatefulWidget {
   const TodoList({super.key});
@@ -63,6 +64,8 @@ class TodoListState extends State<TodoList> {
   Widget _buildNotesItem(
       String title, bool completed, DocumentReference docRef) {
     return Card(
+      elevation: 1,
+      shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
       child: ListTile(
         title: Text(
           title,
@@ -72,7 +75,10 @@ class TodoListState extends State<TodoList> {
           ),
         ),
         trailing: IconButton(
-          icon: Icon(completed ? Icons.undo : Icons.done),
+          icon: Icon(
+            completed ? Icons.undo : Icons.done,
+            color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          ),
           onPressed: () => _completeNotesItem(docRef, completed),
         ),
         onTap: () => _completeNotesItem(docRef, completed),
@@ -91,9 +97,14 @@ class TodoListState extends State<TodoList> {
       ),
       body: _buildNotesList(),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: ThemeBasedAppColors.getColor(
+            context, 'buttonColor'), // Saturated color for light theme
         onPressed: () => _displayDialog(context),
         tooltip: 'Add Item',
-        child: const Icon(Icons.add),
+        child: Icon(
+          Icons.add,
+          color: ThemeBasedAppColors.getColor(context, 'textColor'),
+        ),
       ),
     );
   }
@@ -110,18 +121,36 @@ class TodoListState extends State<TodoList> {
           ),
           actions: <Widget>[
             ElevatedButton(
-              child: const Text('Add'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeBasedAppColors.getColor(
+                    context, 'textColor'), // Saturated color for light theme
+              ),
               onPressed: () {
                 _addNotesItem(_textFieldController.text);
                 _textFieldController.clear();
                 Navigator.of(context).pop();
               },
+              child: Text(
+                'Add',
+                style: TextStyle(
+                  color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                ),
+              ),
             ),
             ElevatedButton(
-              child: const Text('Cancel'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: ThemeBasedAppColors.getColor(
+                    context, 'textColor'), // Saturated color for light theme
+              ),
               onPressed: () {
                 Navigator.of(context).pop();
               },
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                ),
+              ),
             ),
           ],
         );

@@ -1,61 +1,57 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/main_survey/survey_main.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit_step_1.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit_step_2.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit_step_3.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit_step_4.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit_step_5.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
+import 'package:survey_app_ks/appointments/edit_appointments/step1_edit_appointments.dart';
+import 'package:survey_app_ks/appointments/edit_appointments/step2_edit_appointments.dart';
+import 'package:survey_app_ks/appointments/edit_appointments/step3_edit_appointments.dart';
+import 'package:survey_app_ks/appointments/edit_appointments/step4_edit_appointments.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyEditPage extends StatefulWidget {
-  final Survey survey;
+class AppointmentEditPage extends StatefulWidget {
+  final Appointment appointment;
   final TimeSlot timeSlot;
   final String userName;
 
-  const SurveyEditPage({
+  const AppointmentEditPage({
     Key? key,
-    required this.survey,
+    required this.appointment,
     required this.userName,
     required this.timeSlot,
   }) : super(key: key);
 
   @override
-  SurveyEditPageState createState() => SurveyEditPageState();
+  AppointmentEditPageState createState() => AppointmentEditPageState();
 }
 
-class SurveyEditPageState extends State<SurveyEditPage> {
+class AppointmentEditPageState extends State<AppointmentEditPage> {
   late PageController _pageController;
   late List<Widget> _pages;
   int _currentPageIndex = 0;
+  get _appointmentService => AppointmentService();
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
     _pages = [
-      SurveyEditPageStep1(
-        survey: widget.survey,
+      AppointmentEditPageStep1(
+        appointment: widget.appointment,
         onPageChange: _handlePageChange,
       ),
-      SurveyEditPageStep2(
-        survey: widget.survey,
+      AppointmentEditPageStep2(
+        appointment: widget.appointment,
         onPageChange: _handlePageChange,
       ),
-      SurveyEditPageStep3(
-        survey: widget.survey,
+      AppointmentEditPageStep3(
+        appointment: widget.appointment,
         onPageChange: _handlePageChange,
       ),
-      SurveyEditPage4(
-        survey: widget.survey,
-        onPageChange: _handlePageChange,
-      ),
-      SurveyEditPageStep5(
-        survey: widget.survey,
+      AppointmentEditPageStep4(
+        appointment: widget.appointment,
         onPageChange: _handlePageChange,
         timeSlot: widget.timeSlot,
       ),
@@ -69,7 +65,7 @@ class SurveyEditPageState extends State<SurveyEditPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          ' ${'survey_edit'.tr()} ${widget.survey.title}',
+          ' ${'survey_edit'.tr()} ${widget.appointment.title}',
           style: TextStyle(
             fontSize: timeFontSize,
             fontWeight: FontWeight.bold,
@@ -86,41 +82,20 @@ class SurveyEditPageState extends State<SurveyEditPage> {
           });
         },
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size.fromHeight(timeFontSize * 3.0),
-                padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-              ),
-              onPressed: _handleNextButtonPressed,
-              child: Text(
-                _currentPageIndex == _pages.length - 1
-                    ? 'update_survey'.tr()
-                    : 'next'.tr(),
-                style: TextStyle(fontSize: fontSize),
-              ),
-            ),
-            const SizedBox(height: 16.0),
-          ],
-        ),
+      bottomNavigationBar: buildBottomElevatedButton(
+        context: context,
+        onPressed: _handleNextButtonPressed,
+        buttonText: _currentPageIndex == _pages.length - 1
+            ? 'update_survey'.tr()
+            : 'next'.tr(),
       ),
     );
   }
 
   Future<void> _handleNextButtonPressed() async {
     if (_currentPageIndex == _pages.length - 1) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const SurveyPageUI(),
-        ),
-      );
+      _saveAppointment();
+      Navigator.pushReplacementNamed(context, '/home');
     } else {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),
@@ -130,6 +105,10 @@ class SurveyEditPageState extends State<SurveyEditPage> {
         _currentPageIndex++;
       });
     }
+  }
+
+  void _saveAppointment() async {
+    await _appointmentService.updateAppointment(widget.appointment);
   }
 
   void _handlePageChange(int index) {

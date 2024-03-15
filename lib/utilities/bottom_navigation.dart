@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/appointment/main_survey/survey_main.dart';
+import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
 import 'package:survey_app_ks/home.dart';
 import 'package:survey_app_ks/settings/settings.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 
 class BottomNavigation extends StatefulWidget {
   final int initialIndex;
@@ -17,7 +18,7 @@ class BottomNavigationState extends State<BottomNavigation> {
 
   final List<Widget> _pages = [
     const TodoList(),
-    const SurveyPageUI(),
+    const AppointmentPageUI(),
     const QuestionarySurveyPageUI(),
     const SettingsPageUI(),
   ];
@@ -49,9 +50,8 @@ class BottomNavigationState extends State<BottomNavigation> {
         showUnselectedLabels: true,
         selectedFontSize: 12, // Adjust font size if necessary
         unselectedFontSize: 12,
-        selectedItemColor: Theme.of(context).brightness == Brightness.dark
-            ? Colors.tealAccent // Bright color for dark theme
-            : Colors.lightBlue, // Saturated color for light theme
+        selectedItemColor: ThemeBasedAppColors.getColor(
+            context, 'buttonColor'), // Saturated color for light theme
         unselectedItemColor: Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[600] // Muted for dark theme
             : Colors.grey[500],

@@ -1,8 +1,10 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
 
 class LoginPage extends StatefulWidget {
@@ -73,15 +75,21 @@ class LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.calendar_month_outlined,
-                        size: 35, color: Colors.blueGrey),
-                    const SizedBox(width: 10),
+                    Icon(
+                      Icons.calendar_month_outlined,
+                      size: 35,
+                      color:
+                          ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                    ),
+                    // ignore: prefer_const_constructors
+                    SizedBox(width: 10),
                     Text(
                       'app_title'.tr(),
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.blueGrey[700],
+                        color: ThemeBasedAppColors.getColor(
+                            context, 'buttonColor'),
                         fontFamily: 'CustomFont', // Use your custom font
                       ),
                     ),
@@ -157,8 +165,10 @@ class LoginPageState extends State<LoginPage> {
               Row(
                 children: [
                   Checkbox(
-                    checkColor: Colors.white,
-                    activeColor: Colors.blueGrey,
+                    checkColor:
+                        ThemeBasedAppColors.getColor(context, 'textColor'),
+                    activeColor:
+                        ThemeBasedAppColors.getColor(context, 'buttonColor'),
                     value: _rememberMe,
                     onChanged: (value) {
                       setState(() {
@@ -237,8 +247,8 @@ class LoginPageState extends State<LoginPage> {
   Widget _buildLoginButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: Colors.blueGrey,
+        foregroundColor: ThemeBasedAppColors.getColor(context, 'textColor'),
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30.0),
         ),
@@ -261,7 +271,8 @@ class LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              icon: const Icon(Icons.g_mobiledata),
+              icon: Icon(Icons.g_mobiledata,
+                  color: ThemeBasedAppColors.getColor(context, 'buttonColor')),
               onPressed: () {
                 // Handle Google login
               },
@@ -269,7 +280,10 @@ class LoginPageState extends State<LoginPage> {
             const Text('google_login').tr(),
             const SizedBox(width: 20),
             IconButton(
-              icon: const Icon(Icons.facebook),
+              icon: Icon(
+                Icons.facebook,
+                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              ),
               onPressed: () {
                 // Handle Facebook login
               },
@@ -309,7 +323,28 @@ class LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _handleLoginSuccess() {
-    Navigator.pushNamed(context, '/home');
+  void _handleLoginSuccess() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+      String? companyId = userData['companyId'];
+      String? role = userData['role'];
+
+      final prefs = await SharedPreferences.getInstance();
+      if (companyId != null) {
+        prefs.setString('companyId', companyId);
+      }
+      if (role != null) {
+        prefs.setString('userRole', role);
+      }
+
+      if (!context.mounted) return;
+
+      Navigator.pushReplacementNamed(context, '/home');
+    }
   }
 }

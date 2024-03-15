@@ -1,60 +1,114 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
-import 'package:survey_app_ks/appointment/survey_edit/survey_edit.dart';
-import 'package:survey_app_ks/appointment/user_survey/user_survey_step_2.dart';
-import 'package:survey_app_ks/appointment/user_survey/user_survey_step_3.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
+import 'package:survey_app_ks/appointments/edit_appointments/appointment_edit.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
+import 'package:survey_app_ks/appointments/participants/step2_participate_appointment.dart';
+import 'package:survey_app_ks/appointments/participants/step3_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyUserSelectCategories extends StatefulWidget {
-  final Survey survey;
+class UserSelectCategories extends StatefulWidget {
+  final Appointment appointment;
   final TimeSlot timeSlot;
   final String userName;
-  const SurveyUserSelectCategories(
+  const UserSelectCategories(
       {super.key,
-      required this.survey,
+      required this.appointment,
       required this.userName,
       required this.timeSlot});
 
   @override
-  SurveyUserSelectCategoriesState createState() =>
-      SurveyUserSelectCategoriesState();
+  UserSelectCategoriesState createState() => UserSelectCategoriesState();
 }
 
-class SurveyUserSelectCategoriesState
-    extends State<SurveyUserSelectCategories> {
+class UserSelectCategoriesState extends State<UserSelectCategories> {
   bool participateSelected = true;
   bool overviewSelected = false;
-  String? _password = '';
-  Survey? numberOfParticipants;
+  bool _isAdmin = false;
+  Appointment? numberOfParticipants;
+  late AppointmentService appointmentService;
+  bool _userHasParticipated = false;
+  bool _isLoading = true;
+
+  bool _isTimeSlotConfirmed = false;
 
   @override
   void initState() {
     super.initState();
-    overviewSelected = widget.survey.disableIfYouParticipated;
-    if (overviewSelected) {
-      participateSelected = false;
+    appointmentService = AppointmentService();
+    _checkParticipationAndAdminStatus();
+  }
+
+  void _checkParticipationAndAdminStatus() async {
+    final isAdmin = await appointmentService.fetchAdminStatus();
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    bool userHasParticipated = false;
+    bool isTimeSlotConfirmed = await appointmentService
+        .isAnyTimeSlotConfirmed(widget.appointment.appointmentId);
+
+    if (userId != null) {
+      userHasParticipated = await appointmentService.hasCurrentUserParticipated(
+          widget.appointment.appointmentId, userId);
     }
+
+    setState(() {
+      _isAdmin = isAdmin;
+      _userHasParticipated = userHasParticipated;
+      _isTimeSlotConfirmed = isTimeSlotConfirmed;
+
+      overviewSelected = userHasParticipated || _isTimeSlotConfirmed;
+      participateSelected = !(userHasParticipated || _isTimeSlotConfirmed);
+      _isLoading = false;
+    });
+  }
+
+  void _navigateToHomePage() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
+    final isButtonDisabled = _userHasParticipated || _isTimeSlotConfirmed;
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('Loading...', style: TextStyle(fontSize: timeFontSize)),
+          centerTitle: true,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(widget.survey.title, style: TextStyle(fontSize: timeFontSize)),
+            Text(widget.appointment.title,
+                style: TextStyle(fontSize: timeFontSize)),
             const SizedBox(width: 8),
           ],
         ),
         centerTitle: true,
-        actions: [buildEditSection()],
+        actions: [
+          if (_isAdmin) buildEditButton(),
+        ],
+        leading: _userHasParticipated
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: _navigateToHomePage,
+              )
+            : Navigator.canPop(context)
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).pop(),
+                  )
+                : null,
       ),
       body: Stack(
         children: [
@@ -70,7 +124,7 @@ class SurveyUserSelectCategoriesState
                   children: [
                     TextButton(
                       onPressed: () {
-                        if (!widget.survey.disableIfYouParticipated) {
+                        if (!isButtonDisabled) {
                           setState(() {
                             participateSelected = true;
                             overviewSelected = false;
@@ -79,7 +133,7 @@ class SurveyUserSelectCategoriesState
                       },
                       style: ButtonStyle(
                         overlayColor: MaterialStateColor.resolveWith(
-                          (states) => widget.survey.disableIfYouParticipated
+                          (states) => isButtonDisabled
                               ? Colors
                                   .transparent // set to transparent to disable ripple effect
                               : Colors.grey.withOpacity(
@@ -104,7 +158,7 @@ class SurveyUserSelectCategoriesState
                       },
                       style: ButtonStyle(
                         overlayColor: MaterialStateColor.resolveWith(
-                          (states) => widget.survey.disableIfYouParticipated
+                          (states) => isButtonDisabled
                               ? Colors
                                   .transparent // set to transparent to disable ripple effect
                               : Colors.grey.withOpacity(
@@ -157,8 +211,8 @@ class SurveyUserSelectCategoriesState
               left: 0.0,
               right: 0.0,
               bottom: 100.0,
-              child: SurveyParticipate(
-                survey: widget.survey,
+              child: AppontmentParticipate(
+                appointment: widget.appointment,
                 userName: widget.userName,
               ),
             ),
@@ -168,8 +222,15 @@ class SurveyUserSelectCategoriesState
               left: 0.0,
               right: 0.0,
               bottom: 100.0,
-              child: ParticipantOverviewPage(
-                survey: widget.survey,
+              child: MultiProvider(
+                providers: [
+                  StreamProvider<List<TimeSlot>>.value(
+                    value: appointmentService.streamConfirmedTimeSlots(
+                        widget.appointment.appointmentId),
+                    initialData: const [],
+                  ),
+                ],
+                child: ParticipantOverviewPage(appointment: widget.appointment),
               ),
             ),
           if (participateSelected)
@@ -187,28 +248,29 @@ class SurveyUserSelectCategoriesState
   Widget buildParticipateButton(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
-    final screenWidth = MediaQuery.of(context).size.width;
-    return SizedBox(
-      width: double.infinity,
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          SizedBox(
-            width: screenWidth * 0.4,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size.fromHeight(timeFontSize * 1.0),
-                padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-              ),
-              onPressed: () async {
-                setState(() {
-                  overviewSelected = true;
-                  participateSelected = false;
-                  widget.survey.disableIfYouParticipated = true;
-                });
-              },
-              child:
-                  Text('next'.tr(), style: TextStyle(fontSize: timeFontSize)),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              minimumSize: Size.fromHeight(timeFontSize * 4.0),
+              padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
             ),
+            onPressed: () async {
+              appointmentService
+                  .updateParticipationCount(widget.appointment.appointmentId);
+              setState(() {
+                overviewSelected = true;
+                participateSelected = false;
+                _userHasParticipated = true;
+              });
+            },
+            child: Text('next'.tr(), style: TextStyle(fontSize: timeFontSize)),
           ),
           const SizedBox(height: 16.0),
         ],
@@ -216,76 +278,18 @@ class SurveyUserSelectCategoriesState
     );
   }
 
-  Widget buildEditSection() {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+  Widget buildEditButton() {
     return IconButton(
       icon: const Icon(Icons.edit),
       onPressed: () {
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            shape: const RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(10.0))),
-            title: Row(
-              children: [
-                Text('enter_edit_password'.tr(),
-                    style: TextStyle(fontSize: timeFontSize)),
-                SizedBox(
-                  width: timeFontSize * 2.0,
-                ),
-                Icon(
-                  Icons.lock,
-                  size: timeFontSize,
-                ),
-              ],
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AppointmentEditPage(
+              appointment: widget.appointment,
+              userName: '',
+              timeSlot: widget.timeSlot,
             ),
-            content: TextFormField(
-              onChanged: (value) {
-                _password = value;
-              },
-              obscureText: true,
-              decoration: InputDecoration(
-                hintText: 'enter_edit_password_hint'.tr(),
-                hintStyle: TextStyle(fontSize: timeFontSize),
-              ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () {
-                    if (_password == widget.survey.password) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => SurveyEditPage(
-                            survey: widget.survey,
-                            userName: '',
-                            timeSlot: widget.timeSlot,
-                          ),
-                        ),
-                      ).then((_) => Navigator.pop(context));
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('invalid_password'.tr(),
-                              textAlign: TextAlign.center),
-                          duration: const Duration(seconds: 2),
-                        ),
-                      );
-                    }
-                  },
-                  child: Text(
-                    'confirm'.tr(),
-                    style: TextStyle(fontSize: timeFontSize),
-                  )),
-
-              // close the dialog
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: Text('cancel'.tr(),
-                    style: TextStyle(fontSize: timeFontSize)),
-              ),
-            ],
           ),
         );
       },

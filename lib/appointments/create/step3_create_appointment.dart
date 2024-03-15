@@ -1,35 +1,58 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/create/step4_create_appointment.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class CreateSurveyStep3 extends StatefulWidget {
-  const CreateSurveyStep3({super.key});
+class Step3CreateAppointment extends StatefulWidget {
+  const Step3CreateAppointment({super.key});
 
   @override
-  State<CreateSurveyStep3> createState() => CreateSurveyStep3State();
+  State<Step3CreateAppointment> createState() => Step3CreateAppointmentState();
 }
 
-class CreateSurveyStep3State extends State<CreateSurveyStep3> {
-  late Survey _newSurvey;
-  bool _expirationDatePressed = false;
+class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
+  late Appointment _newAppointment;
+  final AppointmentService _appointmentService = AppointmentService();
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 1));
+
+  Future<void> _onNextPressed() async {
+    if (_newAppointment.isValid()) {
+      await _appointmentService.createAppointment(_newAppointment);
+
+      if (!context.mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Step4CreateAppointment(
+            appointment: _newAppointment,
+          ),
+        ),
+      );
+    } else {}
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _newSurvey = ModalRoute.of(context)!.settings.arguments as Survey? ??
-        Survey(
-          title: '',
-          description: '',
-          availableDates: [],
-          availableTimeSlots: [],
-          password: '',
-          id: '',
-          expirationDate: DateTime.now(),
-        );
+    _newAppointment =
+        ModalRoute.of(context)!.settings.arguments as Appointment? ??
+            Appointment(
+              title: '',
+              description: '',
+              availableDates: [],
+              availableTimeSlots: [],
+              appointmentId: '',
+              confirmedTimeSlots: [],
+              expirationDate: DateTime.now(),
+              participationCount: 0,
+              participants: [],
+            );
   }
 
   // function to show date picker
@@ -44,7 +67,7 @@ class CreateSurveyStep3State extends State<CreateSurveyStep3> {
     if (pickedDate != null && pickedDate != _expirationDate) {
       setState(() {
         _expirationDate = pickedDate;
-        _newSurvey.expirationDate = pickedDate;
+        _newAppointment.expirationDate = pickedDate;
       });
     }
   }
@@ -56,7 +79,7 @@ class CreateSurveyStep3State extends State<CreateSurveyStep3> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('create_survey_step_1'.tr(),
+        title: Text('create_appointment'.tr(),
             style: TextStyle(fontSize: timeFontSize)),
         centerTitle: true,
       ),
@@ -94,30 +117,10 @@ class CreateSurveyStep3State extends State<CreateSurveyStep3> {
           ),
         ],
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size.fromHeight(timeFontSize * 3.0),
-                padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-              ),
-              onPressed: _expirationDatePressed == false
-                  ? null
-                  : () {
-                      Navigator.pushNamed(context, '/create_survey_4',
-                          arguments: _newSurvey);
-                    },
-              child:
-                  Text('next'.tr(), style: TextStyle(fontSize: timeFontSize)),
-            ),
-            const SizedBox(height: 16.0),
-          ],
-        ),
+      bottomNavigationBar: buildBottomElevatedButton(
+        context: context,
+        onPressed: _onNextPressed,
+        buttonText: 'next',
       ),
     );
   }
@@ -133,7 +136,6 @@ class CreateSurveyStep3State extends State<CreateSurveyStep3> {
       ),
       onPressed: () {
         setState(() {
-          _expirationDatePressed = true;
           _selectExpirationDate(context);
         });
       },

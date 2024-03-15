@@ -1,18 +1,19 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/create_survey/create_survey_step_4.dart';
-import 'package:survey_app_ks/appointment/main_survey/survey_action_field.dart';
-import 'package:survey_app_ks/appointment/main_survey/survey_create_button.dart';
-import 'package:survey_app_ks/appointment/main_survey/survey_list.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
+import 'package:survey_app_ks/appointments/main_screen/appointment_search_field.dart';
+import 'package:survey_app_ks/appointments/main_screen/create_appointment_button.dart';
+import 'package:survey_app_ks/appointments/main_screen/appointment_list.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyPageUI extends StatefulWidget {
-  const SurveyPageUI({super.key});
+class AppointmentPageUI extends StatefulWidget {
+  const AppointmentPageUI({super.key});
 
   @override
-  State<SurveyPageUI> createState() => _SurveyPageUIState();
+  State<AppointmentPageUI> createState() => AppointmentPageUIState();
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 80);
 }
 
@@ -21,14 +22,29 @@ enum SortingOption {
   leastParticipants,
 }
 
-class _SurveyPageUIState extends State<SurveyPageUI> {
+class AppointmentPageUIState extends State<AppointmentPageUI> {
   int focusIndex = -1;
   bool isSearching = false;
   String searchQuery = '';
+  bool _isAdmin = false;
+  late List<Appointment> appointmentList;
+  late AppointmentService _appointmentService;
 
   @override
   void initState() {
     super.initState();
+    _appointmentService = AppointmentService();
+    _initPage();
+  }
+
+  void _initPage() async {
+    final isAdmin = await _appointmentService.fetchAdminStatus();
+
+    if (!mounted) return;
+
+    setState(() {
+      _isAdmin = isAdmin;
+    });
   }
 
   @override
@@ -53,12 +69,7 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
       appBar: AppBar(
-        actions: [
-          buildPopupMenuButton(
-            context,
-          ),
-          buildSearchBar(),
-        ],
+        leading: buildPopupMenuButton(context), // PopupMenuButton on the left
         title: _isSearching
             ? ActionField(
                 isSearching: _isSearching,
@@ -68,19 +79,19 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
             : Text('appointments'.tr(),
                 style: TextStyle(fontSize: timeFontSize + 3)),
         centerTitle: true,
+        actions: [
+          buildSearchBar(), // Search bar on the right
+        ],
         automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
           const SizedBox(height: 22.0),
-          Column(
-            children: [
-              buildCreateSurveyButton(context),
-            ],
-          ),
           buildExpandedField(context, isSearching, searchQuery),
         ],
       ),
+      floatingActionButton:
+          _isAdmin ? buildCreateAppointmentButton(context) : null,
     );
   }
 
@@ -96,7 +107,7 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
           context,
           () {
             setState(() {
-              surveyList.sort((a, b) =>
+              appointmentList.sort((a, b) =>
                   b.participants.length.compareTo(a.participants.length));
             });
             Navigator.pop(context);
@@ -108,7 +119,7 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
           context,
           () {
             setState(() {
-              surveyList.sort((a, b) =>
+              appointmentList.sort((a, b) =>
                   a.participants.length.compareTo(b.participants.length));
             });
             Navigator.pop(context);
@@ -120,7 +131,7 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
           context,
           () {
             setState(() {
-              surveyList
+              appointmentList
                   .sort((a, b) => a.expirationDate.compareTo(b.expirationDate));
             });
             Navigator.pop(context);
@@ -132,7 +143,7 @@ class _SurveyPageUIState extends State<SurveyPageUI> {
           context,
           () {
             setState(() {
-              surveyList
+              appointmentList
                   .sort((a, b) => b.expirationDate.compareTo(a.expirationDate));
             });
             Navigator.pop(context);

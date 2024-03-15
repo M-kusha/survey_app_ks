@@ -4,6 +4,7 @@ import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_action_field.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_create_button.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_list.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 import 'package:provider/provider.dart';
 
@@ -70,15 +71,11 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
       body: Column(
         children: [
           const SizedBox(height: 22.0),
-          Column(
-            children: [
-              buildCreateQuestionarySurveyButton(context),
-            ],
-          ),
           buildExpandedField(
               context, _isSearching, searchQuery, selectedSortOption),
         ],
       ),
+      floatingActionButton: buildCreateQuestionarySurveyButton(context),
     );
   }
 
@@ -145,6 +142,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
             icon: Icon(
               Icons.close,
               size: timeFontSize * 1.5,
+              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
             ),
             onPressed: () {
               setState(() {
@@ -157,6 +155,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
             icon: Icon(
               Icons.search,
               size: timeFontSize * 1.5,
+              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
             ),
             onPressed: () {
               setState(() {

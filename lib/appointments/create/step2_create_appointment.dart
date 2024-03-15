@@ -1,35 +1,44 @@
-// ignore_for_file: unnecessary_null_comparison
-
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class CreateSurveyStep2 extends StatefulWidget {
-  const CreateSurveyStep2({Key? key}) : super(key: key);
+class Step2CreateAppointment extends StatefulWidget {
+  const Step2CreateAppointment({Key? key}) : super(key: key);
 
   @override
-  CreateSurveyStep2State createState() => CreateSurveyStep2State();
+  Step2CreateAppointmentState createState() => Step2CreateAppointmentState();
 }
 
-class CreateSurveyStep2State extends State<CreateSurveyStep2> {
-  late Survey _newSurvey;
+class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
+  late Appointment _newAppointment;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _newSurvey = ModalRoute.of(context)!.settings.arguments as Survey? ??
-        Survey(
-          title: '',
-          description: '',
-          availableDates: [],
-          availableTimeSlots: [],
-          password: '',
-          id: '',
-          expirationDate: DateTime.now(),
-        );
+    _newAppointment =
+        ModalRoute.of(context)!.settings.arguments as Appointment? ??
+            Appointment(
+              title: '',
+              description: '',
+              participants: [],
+              availableDates: [],
+              availableTimeSlots: [],
+              appointmentId: '',
+              confirmedTimeSlots: [],
+              expirationDate: DateTime.now(),
+              participationCount: 0,
+            );
+  }
+
+  void _onNextPressed() async {
+    if (_newAppointment.availableDates.isNotEmpty) {
+      Navigator.pushNamed(context, '/create_appointment_step_3',
+          arguments: _newAppointment);
+    }
   }
 
   void _addDate() {
@@ -39,8 +48,8 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
           start: now,
           end: now.add(const Duration(hours: 1)),
           expirationDate: now.add(const Duration(days: 7)));
-      _newSurvey.availableDates.add(now);
-      _newSurvey.availableTimeSlots.add(timeSlot);
+      _newAppointment.availableDates.add(now);
+      _newAppointment.availableTimeSlots.add(timeSlot);
     });
   }
 
@@ -51,9 +60,9 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
     final endDateTime = DateTime(pickedDateRange.year, pickedDateRange.month,
         pickedDateRange.day, pickedEndTime.hour, pickedEndTime.minute);
     setState(() {
-      _newSurvey.availableDates[index] = pickedDateRange;
-      _newSurvey.availableTimeSlots[index].start = startDateTime;
-      _newSurvey.availableTimeSlots[index].end = endDateTime;
+      _newAppointment.availableDates[index] = pickedDateRange;
+      _newAppointment.availableTimeSlots[index].start = startDateTime;
+      _newAppointment.availableTimeSlots[index].end = endDateTime;
     });
   }
 
@@ -106,66 +115,23 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    _newSurvey.availableTimeSlots[index].start != null
-                        ? '${DateFormat.jm().format(
-                            _newSurvey.availableTimeSlots[index].start,
-                          )} ${_newSurvey.availableTimeSlots[index].amPm}'
-                        : 'Start Time',
+                    '${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].start)} ${_newAppointment.availableTimeSlots[index].amPm}',
                     style: TextStyle(
                       fontSize: timeFontSize,
                     ),
                   ),
                   const Text(' - '),
                   Text(
-                    _newSurvey.availableTimeSlots[index].end != null
-                        ? '${DateFormat.jm().format(
-                            _newSurvey.availableTimeSlots[index].end,
-                          )} ${_newSurvey.availableTimeSlots[index].amPm}'
-                        : 'End Time',
+                    '${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].end)} ${_newAppointment.availableTimeSlots[index].amPm}',
                     style: TextStyle(
                       fontSize: timeFontSize,
                     ),
                   ),
                 ],
-              ),
+              )
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget buildNextButton(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          ElevatedButton(
-            onPressed: _newSurvey.availableDates.isEmpty
-                ? null
-                : () {
-                    Navigator.pushNamed(context, '/create_survey_3',
-                        arguments: _newSurvey);
-                  },
-            style: ElevatedButton.styleFrom(
-              minimumSize: Size.fromHeight(timeFontSize * 3.0),
-              padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-            ),
-            child: Text(
-              'next'.tr(),
-              style: TextStyle(
-                fontSize: timeFontSize,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16.0),
-        ],
       ),
     );
   }
@@ -194,7 +160,7 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('create_survey_step_1'.tr(),
+        title: Text('create_appointment'.tr(),
             style: TextStyle(
               fontSize: timeFontSize,
             )),
@@ -208,7 +174,7 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
               Padding(
                 padding: EdgeInsets.only(top: timeFontSize * 2.0),
                 child: Text(
-                  'create_survey_date_time_selection'.tr(),
+                  'create_appointment_date_time_selection'.tr(),
                   style: TextStyle(
                     fontSize: timeFontSize,
                     fontWeight: FontWeight.bold,
@@ -220,7 +186,7 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: _newSurvey.availableDates.isEmpty
+                child: _newAppointment.availableDates.isEmpty
                     ? Center(
                         child: Text(
                         'no_dates_added'.tr(),
@@ -234,14 +200,13 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
                         ),
                       ))
                     : ListView.builder(
-                        itemCount: _newSurvey.availableDates.length,
+                        itemCount: _newAppointment.availableDates.length,
                         itemBuilder: (context, index) {
                           return Column(
                             children: [
                               _buildDateButton(
-                                  _newSurvey.availableDates[index], index),
-                              SizedBox(
-                                  height: verticalSpacing), // Use SizedBox here
+                                  _newAppointment.availableDates[index], index),
+                              SizedBox(height: verticalSpacing),
                             ],
                           );
                         },
@@ -254,7 +219,11 @@ class CreateSurveyStep2State extends State<CreateSurveyStep2> {
           );
         },
       ),
-      bottomNavigationBar: buildNextButton(context),
+      bottomNavigationBar: buildBottomElevatedButton(
+        context: context,
+        onPressed: _onNextPressed,
+        buttonText: 'next',
+      ),
     );
   }
 }

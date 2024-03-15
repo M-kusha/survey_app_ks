@@ -6,6 +6,7 @@ import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/survey_questionary/admin/admin_overview.dart';
 import 'package:survey_app_ks/survey_questionary/user_survey/survey_user_page.dart';
 import 'package:survey_app_ks/survey_questionary/utilities/survey_questionary_class.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 import 'package:timeago/timeago.dart';
 
@@ -67,9 +68,7 @@ class SurveyListItem extends StatelessWidget {
             child: IconButton(
               icon: Icon(
                 Icons.admin_panel_settings,
-                color: Theme.of(context).brightness == Brightness.light
-                    ? _textColor(context)
-                    : Colors.white,
+                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
               ),
               onPressed: () {
                 Navigator.push(
@@ -94,24 +93,54 @@ class SurveyListItem extends StatelessWidget {
                     ? Colors.grey[200]
                     : Colors.grey[900],
                 boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
-                    spreadRadius: 0,
-                    blurRadius: 4,
-                    offset: const Offset(0, 4),
-                  ),
+                  if (Theme.of(context).brightness == Brightness.light)
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.25),
+                      spreadRadius: 0,
+                      blurRadius: 4,
+                      offset: const Offset(0, 4),
+                    )
+                  else ...[
+                    BoxShadow(
+                      color:
+                          ThemeBasedAppColors.getColor(context, 'buttonColor')
+                              .withOpacity(0.5),
+                      spreadRadius: 1,
+                      blurRadius: 2,
+                      offset: const Offset(0, 0.1),
+                    ),
+                  ],
                 ],
               ),
               child: Column(
                 children: [
-                  Text(
-                    '${'survey_status'.tr()}: ${isExpired ? 'expired'.tr() : 'open'.tr()}',
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? _textColor(context)
-                          : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: timeFontSize,
+                  RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${'survey_status'.tr()}: ',
+                          style: TextStyle(
+                            color:
+                                Theme.of(context).brightness == Brightness.light
+                                    ? _textColor(context)
+                                    : Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: timeFontSize,
+                          ),
+                        ),
+                        TextSpan(
+                          text: isExpired ? 'expired'.tr() : 'open'.tr(),
+                          style: TextStyle(
+                            // Define a different color here if you want
+                            color: isExpired
+                                ? Colors.red
+                                : ThemeBasedAppColors // Define a different color here if you want
+                                    .getColor(context, 'buttonColor'),
+                            fontWeight: FontWeight.bold,
+                            fontSize: timeFontSize,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 8.0),

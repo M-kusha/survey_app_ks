@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/firebase_options.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/routes.dart';
@@ -22,11 +23,15 @@ Future<void> main() async {
   // });
 
   await EasyLocalization.ensureInitialized();
+
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<FontSizeProvider>(
           create: (context) => FontSizeProvider(),
+        ),
+        Provider<AppointmentService>(
+          create: (_) => AppointmentService(),
         ),
       ],
       child: EasyLocalization(

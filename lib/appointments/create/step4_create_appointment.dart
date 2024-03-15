@@ -1,35 +1,32 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:ntfy_dart/ntfy_dart.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/bottom_navigation.dart';
-import 'package:survey_app_ks/utilities/ntfy_interface.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class CreateSurveyStep5 extends StatefulWidget {
-  final Survey survey;
+class Step4CreateAppointment extends StatefulWidget {
+  final Appointment appointment;
 
-  const CreateSurveyStep5({Key? key, required this.survey}) : super(key: key);
+  const Step4CreateAppointment({Key? key, required this.appointment})
+      : super(key: key);
 
   @override
-  State<CreateSurveyStep5> createState() => _CreateSurveyStep5State();
+  State<Step4CreateAppointment> createState() => Step4CreateAppointmentState();
 }
 
-class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
-  final _ntfy = NtfyInterface();
-
-  Future<void> _sendNotification() async {
-    final message = PublishableMessage(
-      topic: 'Intranet',
-      title: 'new_survey'.tr(),
-      message:
-          '${'a_new_survey'.tr()} ${widget.survey.title} ${'is_available'.tr()}\n${'go_to_survey'.tr()}\n ${'survey_id_is'.tr()} ${widget.survey.id}',
+class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
+  void _onNextPressed() async {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const BottomNavigation(initialIndex: 1),
+      ),
+      (route) => false,
     );
-
-    await _ntfy.publish(message);
   }
 
   @override
@@ -51,7 +48,7 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('create_survey_step_1'.tr(),
+        title: Text('create_appointment'.tr(),
             style: TextStyle(fontSize: timeFontSize * 1.5)),
         centerTitle: true,
       ),
@@ -64,7 +61,7 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'survey_created_successfully'.tr(),
+                    'appointment_created_successfully'.tr(),
                     style: TextStyle(
                         fontSize: textFontSize + 2,
                         fontWeight: FontWeight.bold,
@@ -95,10 +92,11 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
           SizedBox(
             child: GestureDetector(
               onTap: () {
-                Clipboard.setData(ClipboardData(text: widget.survey.id));
+                Clipboard.setData(
+                    ClipboardData(text: widget.appointment.appointmentId));
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text(
-                    'survey_id_copied'.tr(),
+                    'appointment_id_copied'.tr(),
                     style: TextStyle(
                       fontSize: textFontSize,
                     ),
@@ -109,7 +107,7 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
               child: Align(
                 alignment: Alignment.center, // Align text to the center
                 child: Text(
-                  '${'survey_id'.tr()} ${widget.survey.id}',
+                  '${'appointment_id'.tr()} ${widget.appointment.appointmentId}',
                   style: TextStyle(
                       fontSize: textFontSize,
                       fontWeight: FontWeight.bold,
@@ -120,37 +118,10 @@ class _CreateSurveyStep5State extends State<CreateSurveyStep5> {
           ),
         ],
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size.fromHeight(timeFontSize * 3.0),
-                padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-              ),
-              onPressed: () {
-                _sendNotification();
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const BottomNavigation(initialIndex: 1),
-                  ),
-                  (route) => false,
-                );
-              },
-              child: Text('finish'.tr(),
-                  style: TextStyle(
-                    fontSize: textFontSize,
-                  )),
-            ),
-            const SizedBox(height: 16.0),
-          ],
-        ),
+      bottomNavigationBar: buildBottomElevatedButton(
+        context: context,
+        onPressed: _onNextPressed,
+        buttonText: 'finish',
       ),
     );
   }

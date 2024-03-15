@@ -1,32 +1,33 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointment/survey_class.dart';
+import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
-class SurveyEditPageStep5 extends StatefulWidget {
-  final Survey survey;
+class AppointmentEditPageStep4 extends StatefulWidget {
+  final Appointment appointment;
   final TimeSlot timeSlot;
   final Function(int) onPageChange;
 
-  const SurveyEditPageStep5({
+  const AppointmentEditPageStep4({
     Key? key,
-    required this.survey,
+    required this.appointment,
     required this.onPageChange,
     required this.timeSlot,
   }) : super(key: key);
 
   @override
-  SurveyEditPageStep5State createState() => SurveyEditPageStep5State();
+  AppointmentEditPageStep4State createState() =>
+      AppointmentEditPageStep4State();
 }
 
-class SurveyEditPageStep5State extends State<SurveyEditPageStep5> {
+class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
   bool isChecked = false;
   @override
   void initState() {
     super.initState();
-    isChecked = widget.survey.confirmedTimeSlots.isNotEmpty;
+    isChecked = widget.appointment.confirmedTimeSlots.isNotEmpty;
   }
 
   @override
@@ -71,7 +72,7 @@ class SurveyEditPageStep5State extends State<SurveyEditPageStep5> {
             value: isChecked,
             onChanged: (value) {
               if (value == false &&
-                  widget.survey.confirmedTimeSlots.isNotEmpty) {
+                  widget.appointment.confirmedTimeSlots.isNotEmpty) {
                 showDialog(
                   context: context,
                   builder: (BuildContext context) {
@@ -100,7 +101,7 @@ class SurveyEditPageStep5State extends State<SurveyEditPageStep5> {
                         TextButton(
                           onPressed: () {
                             setState(() {
-                              widget.survey.confirmedTimeSlots.clear();
+                              widget.appointment.confirmedTimeSlots.clear();
                             });
 
                             Navigator.of(context).pop();
