@@ -110,9 +110,6 @@ class AppointmentService {
     return participantsSnapshot.docs.isNotEmpty;
   }
 
-  Future<void> markUserParticipation(
-      String appointmentId, String userId, bool participated) async {}
-
   Stream<List<TimeSlot>> streamConfirmedTimeSlots(String appointmentId) {
     return _db.collection('appointments').doc(appointmentId).snapshots().map(
       (snapshot) {
@@ -127,20 +124,6 @@ class AppointmentService {
         }
       },
     );
-  }
-
-  Stream<List<AppointmentParticipants>> streamParticipants(
-      String appointmentId, TimeSlot timeSlot) {
-    return _db
-        .collection('appointments')
-        .doc(appointmentId)
-        .collection('participants')
-        .where('timeSlot.start', isEqualTo: timeSlot.start.toIso8601String())
-        .where('timeSlot.end', isEqualTo: timeSlot.end.toIso8601String())
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => AppointmentParticipants.fromFirestore(doc.data()))
-            .toList());
   }
 
   Future<bool> fetchAdminStatus() async {
