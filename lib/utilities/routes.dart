@@ -3,15 +3,17 @@ import 'package:survey_app_ks/appointments/create/step1_create_appointment.dart'
 import 'package:survey_app_ks/appointments/create/step2_create_appointment.dart';
 import 'package:survey_app_ks/appointments/create/step3_create_appointment.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
-import 'package:survey_app_ks/login/change_password.dart';
+import 'package:survey_app_ks/reset_password/change_password.dart';
 import 'package:survey_app_ks/login/login.dart';
-import 'package:survey_app_ks/login/register.dart';
-import 'package:survey_app_ks/login/reset_password.dart';
-import 'package:survey_app_ks/login/reset_verification.dart';
+import 'package:survey_app_ks/register/register_1step.dart';
+import 'package:survey_app_ks/register/registered_sucesfully.dart';
+import 'package:survey_app_ks/reset_password/reset_password.dart';
+import 'package:survey_app_ks/reset_password/reset_verification.dart';
 import 'package:survey_app_ks/settings/settings.dart';
 import 'package:survey_app_ks/survey_questionary/create_survey/create_survey_step_1.dart';
 import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
 import 'package:survey_app_ks/utilities/bottom_navigation.dart';
+import 'package:survey_app_ks/register/register_logics.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes() {
@@ -20,7 +22,9 @@ class AppRoutes {
       '/login': (BuildContext context) => const LoginPage(
             message: '',
           ),
-      '/register': (context) => const RegisterPage(),
+      '/register': (context) => Register1step(
+            registerLogic: RegisterLogic(),
+          ),
       '/reset_password': (context) => const ResetPasswordPage(),
       '/ResetPasswordVerificationPage': (context) =>
           const ResetPasswordVerificationPage(),
@@ -35,6 +39,10 @@ class AppRoutes {
           const Step3CreateAppointment(),
       // '/create_appointment_step_4': (BuildContext context) =>
       //      Step4CreateAppointment(survey: ),
+
+      // registerred successfully
+      '/registered_successfully': (BuildContext context) =>
+          const RegistrationSuccessPage(),
 
       '/questionary_survey': (BuildContext context) =>
           const QuestionarySurveyPageUI(),
