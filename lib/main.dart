@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/firebase_options.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/register/register_logics.dart';
 import 'package:survey_app_ks/utilities/routes.dart';
 import 'package:survey_app_ks/login/login.dart';
 
@@ -14,13 +15,6 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
-
-  // final ntfy = NtfyInterface();
-  // ntfy.getMessageStream(['Intranet']).then((Stream<MessageResponse> stream) {
-  //   stream.listen((MessageResponse message) {
-  //     SettingsController().showNotification(message.title, message.message);
-  //   });
-  // });
 
   await EasyLocalization.ensureInitialized();
 
@@ -32,6 +26,9 @@ Future<void> main() async {
         ),
         Provider<AppointmentService>(
           create: (_) => AppointmentService(),
+        ),
+        Provider<RegisterLogic>(
+          create: (_) => RegisterLogic(),
         ),
       ],
       child: EasyLocalization(
@@ -81,19 +78,5 @@ class MyApp extends StatelessWidget {
         ),
       ),
     );
-    // return MaterialApp(
-    //   title: 'Flutter Demo',
-    //   locale: context.locale,
-    //   localizationsDelegates: context.localizationDelegates,
-    //   supportedLocales: context.supportedLocales,
-    //   theme: ThemeData(
-    //     primarySwatch: Colors.blue,
-    //   ),
-    //   routes: AppRoutes.routes(),
-    //   home: const LoginPage(
-    //     message: '',
-    //   ),
-    //   debugShowCheckedModeBanner: false,
-    // );
   }
 }
