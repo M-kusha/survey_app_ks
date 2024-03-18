@@ -149,6 +149,17 @@ class AppointmentService {
     return '';
   }
 
+  Future<String> fetchProfileImage(String userId) async {
+    if (userId.isNotEmpty) {
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      return (userDoc.data() as Map<String, dynamic>)['profileImage'] ?? '';
+    }
+    return '';
+  }
+
   Future<void> confirmTimeSlot(
       String appointmentId, TimeSlot timeSlotToConfirm) async {
     final DocumentReference docRef =
@@ -216,5 +227,24 @@ class AppointmentService {
   Future<String?> getCompanyId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('companyId');
+  }
+
+  Future<Map<String, bool>> fetchParticipationStatusesForUser(
+      List<String> appointmentIds, String userId) async {
+    Map<String, bool> participationStatuses = {};
+
+    for (String appointmentId in appointmentIds) {
+      final participantsSnapshot = await _db
+          .collection('appointments')
+          .doc(appointmentId)
+          .collection('participants')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      participationStatuses[appointmentId] =
+          participantsSnapshot.docs.isNotEmpty;
+    }
+
+    return participationStatuses;
   }
 }
