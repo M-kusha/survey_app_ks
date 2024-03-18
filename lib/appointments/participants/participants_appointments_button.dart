@@ -1,38 +1,39 @@
-import 'package:easy_localization/easy_localization.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/appointments/edit_appointments/appointment_edit.dart';
+import 'package:survey_app_ks/appointments/edit/appointment_edit.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/step2_participate_appointment.dart';
 import 'package:survey_app_ks/appointments/participants/step3_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
 class UserSelectCategories extends StatefulWidget {
   final Appointment appointment;
   final TimeSlot timeSlot;
   final String userName;
-  const UserSelectCategories(
-      {super.key,
-      required this.appointment,
-      required this.userName,
-      required this.timeSlot});
+
+  const UserSelectCategories({
+    Key? key,
+    required this.appointment,
+    required this.userName,
+    required this.timeSlot,
+  }) : super(key: key);
 
   @override
   UserSelectCategoriesState createState() => UserSelectCategoriesState();
 }
 
 class UserSelectCategoriesState extends State<UserSelectCategories> {
+  late AppointmentService appointmentService;
   bool participateSelected = true;
   bool overviewSelected = false;
   bool _isAdmin = false;
-  Appointment? numberOfParticipants;
-  late AppointmentService appointmentService;
   bool _userHasParticipated = false;
   bool _isLoading = true;
-
   bool _isTimeSlotConfirmed = false;
 
   @override
@@ -65,184 +66,199 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     });
   }
 
-  void _navigateToHomePage() {
-    Navigator.of(context).popUntil((route) => route.isFirst);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    final fontSizeProvider = Provider.of<FontSizeProvider>(context);
+    final fontSize = fontSizeProvider.fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     final isButtonDisabled = _userHasParticipated || _isTimeSlotConfirmed;
+
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text('Loading...', style: TextStyle(fontSize: timeFontSize)),
-          centerTitle: true,
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
+      return _buildLoadingScreen(timeFontSize);
     }
 
     return Scaffold(
+      appBar: _buildAppBar(context, timeFontSize),
+      body: _buildBody(context, isButtonDisabled, timeFontSize),
+      bottomNavigationBar: participateSelected
+          ? buildParticipateButton(context)
+          : const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildLoadingScreen(double fontSize) {
+    return Scaffold(
       appBar: AppBar(
-        title: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        title: Text('Loading...', style: TextStyle(fontSize: fontSize)),
+        centerTitle: true,
+      ),
+      body: const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  AppBar _buildAppBar(BuildContext context, double fontSize) {
+    bool canPop = Navigator.canPop(context);
+    return AppBar(
+      title: _buildTitle(fontSize),
+      centerTitle: true,
+      actions: _isAdmin ? [buildEditButton()] : [],
+      leading: _userHasParticipated
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _navigateToHomePage)
+          : canPop
+              ? IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).pop())
+              : null,
+    );
+  }
+
+  Widget _buildTitle(double fontSize) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(widget.appointment.title,
+            style: TextStyle(fontSize: fontSize * 1.5)),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  Widget _buildBody(
+      BuildContext context, bool isButtonDisabled, double fontSize) {
+    return Stack(
+      children: [
+        Column(
           children: [
-            Text(widget.appointment.title,
-                style: TextStyle(fontSize: timeFontSize)),
-            const SizedBox(width: 8),
+            _buildTabBar(context, isButtonDisabled, fontSize),
+            _buildIndicator(),
+            const SizedBox(height: 16),
           ],
         ),
-        centerTitle: true,
-        actions: [
-          if (_isAdmin) buildEditButton(),
-        ],
-        leading: _userHasParticipated
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                onPressed: _navigateToHomePage,
-              )
-            : Navigator.canPop(context)
-                ? IconButton(
-                    icon: const Icon(Icons.arrow_back),
-                    onPressed: () => Navigator.of(context).pop(),
-                  )
-                : null,
-      ),
-      body: Stack(
+        if (participateSelected) _buildParticipateView(),
+        if (overviewSelected) _buildOverviewView(),
+      ],
+    );
+  }
+
+  Widget _buildTabBar(
+      BuildContext context, bool isButtonDisabled, double fontSize) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 25.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  left: 25.0,
-                  right: 25.0,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    TextButton(
-                      onPressed: () {
-                        if (!isButtonDisabled) {
-                          setState(() {
-                            participateSelected = true;
-                            overviewSelected = false;
-                          });
-                        }
-                      },
-                      style: ButtonStyle(
-                        overlayColor: MaterialStateColor.resolveWith(
-                          (states) => isButtonDisabled
-                              ? Colors
-                                  .transparent // set to transparent to disable ripple effect
-                              : Colors.grey.withOpacity(
-                                  0.1), // set overlay color for normal state
-                        ),
-                      ),
-                      child: Text(
-                        'participate'.tr(),
-                        style: TextStyle(
-                          color:
-                              participateSelected ? Colors.green : Colors.grey,
-                          fontSize: timeFontSize,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          participateSelected = false;
-                          overviewSelected = true;
-                        });
-                      },
-                      style: ButtonStyle(
-                        overlayColor: MaterialStateColor.resolveWith(
-                          (states) => isButtonDisabled
-                              ? Colors
-                                  .transparent // set to transparent to disable ripple effect
-                              : Colors.grey.withOpacity(
-                                  0.1), // set overlay color for normal state
-                        ),
-                      ),
-                      child: Text(
-                        'overview'.tr(),
-                        style: TextStyle(
-                          color: overviewSelected ? Colors.green : Colors.grey,
-                          fontSize: timeFontSize,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      height: 2,
-                      color: participateSelected ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 0,
-                    child: Container(
-                      height: 2,
-                      color: Colors.black,
-                    ),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Container(
-                      height: 2,
-                      color: overviewSelected ? Colors.green : Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
+          _buildTabButton(
+            context: context,
+            label: 'participate',
+            isSelected: participateSelected,
+            isButtonDisabled: isButtonDisabled,
+            fontSize: fontSize,
+            onTap: () => _onTabSelected(true, false),
           ),
-          if (participateSelected)
-            Positioned(
-              top: 70.0,
-              left: 0.0,
-              right: 0.0,
-              bottom: 100.0,
-              child: AppontmentParticipate(
-                appointment: widget.appointment,
-                userName: widget.userName,
-              ),
-            ),
-          if (overviewSelected)
-            Positioned(
-              top: 70.0,
-              left: 0.0,
-              right: 0.0,
-              bottom: 100.0,
-              child: MultiProvider(
-                providers: [
-                  StreamProvider<List<TimeSlot>>.value(
-                    value: appointmentService.streamConfirmedTimeSlots(
-                        widget.appointment.appointmentId),
-                    initialData: const [],
-                  ),
-                ],
-                child: ParticipantOverviewPage(appointment: widget.appointment),
-              ),
-            ),
-          if (participateSelected)
-            Positioned(
-              bottom: 0.0,
-              left: 0.0,
-              right: 0.0,
-              child: buildParticipateButton(context),
-            ),
+          _buildTabButton(
+            context: context,
+            label: 'overview',
+            isSelected: overviewSelected,
+            isButtonDisabled: isButtonDisabled,
+            fontSize: fontSize,
+            onTap: () => _onTabSelected(false, true),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildTabButton({
+    required BuildContext context,
+    required String label,
+    required bool isSelected,
+    required bool isButtonDisabled,
+    required double fontSize,
+    required VoidCallback onTap,
+  }) {
+    return TextButton(
+      onPressed: isButtonDisabled ? null : onTap,
+      style: ButtonStyle(
+        overlayColor: MaterialStateColor.resolveWith(
+          (states) => isButtonDisabled
+              ? Colors.transparent
+              : Colors.grey.withOpacity(0.1),
+        ),
+      ),
+      child: Text(
+        label.tr(),
+        style: TextStyle(
+          color: isSelected
+              ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+              : Colors.grey,
+          fontSize: fontSize * 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+            flex: 2,
+            child: Container(
+                height: 2,
+                color: participateSelected
+                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                    : Colors.grey)),
+        Expanded(flex: 0, child: Container(height: 2, color: Colors.black)),
+        Expanded(
+            flex: 2,
+            child: Container(
+                height: 2,
+                color: overviewSelected
+                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                    : Colors.grey)),
+      ],
+    );
+  }
+
+  Widget _buildParticipateView() {
+    return Positioned(
+      top: 70.0,
+      left: 0.0,
+      right: 0.0,
+      bottom: 100.0,
+      child: AppontmentParticipate(
+        appointment: widget.appointment,
+        userName: widget.userName,
+      ),
+    );
+  }
+
+  Widget _buildOverviewView() {
+    return Positioned(
+      top: 70.0,
+      left: 0.0,
+      right: 0.0,
+      bottom: 100.0,
+      child: MultiProvider(
+        providers: [
+          StreamProvider<List<TimeSlot>>.value(
+            value: appointmentService
+                .streamConfirmedTimeSlots(widget.appointment.appointmentId),
+            initialData: const [],
+          ),
+        ],
+        child: ParticipantOverviewPage(appointment: widget.appointment),
+      ),
+    );
+  }
+
+  void _onTabSelected(bool participate, bool overview) {
+    setState(() {
+      participateSelected = participate;
+      overviewSelected = overview;
+    });
   }
 
   Widget buildParticipateButton(BuildContext context) {
@@ -268,6 +284,7 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
                 overviewSelected = true;
                 participateSelected = false;
                 _userHasParticipated = true;
+                widget.appointment.participationCount += 1;
               });
             },
             child: Text('next'.tr(), style: TextStyle(fontSize: timeFontSize)),
@@ -294,5 +311,9 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
         );
       },
     );
+  }
+
+  void _navigateToHomePage() {
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }

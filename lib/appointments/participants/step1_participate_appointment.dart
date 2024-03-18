@@ -5,6 +5,7 @@ import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/participants_appointments_button.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
@@ -34,6 +35,7 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
 
   void _initPage() async {
     String name = await _appointmentService.fetchUserName();
+
     setState(() {
       _userName = name;
     });
@@ -66,6 +68,7 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
           style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -74,13 +77,12 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Card(
-                elevation: 5, // Adds shadow under the card
+                elevation: 5,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15), // Rounded corners
+                  borderRadius: BorderRadius.circular(15),
                 ),
                 child: Padding(
-                  padding:
-                      EdgeInsets.all(timeFontSize), // Inner padding for content
+                  padding: EdgeInsets.all(timeFontSize),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: MediaQuery.of(context).size.height * 0.7,
