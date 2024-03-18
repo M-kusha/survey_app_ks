@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
@@ -92,64 +93,82 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
   Widget _buildDateButton(DateTime date, int index) {
     final dayOfWeek = DateFormat.EEEE().format(date);
     final dayOfMonth = DateFormat.d().format(date);
+    final month = DateFormat.MMM().format(date);
     final year = DateFormat.y().format(date);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
-    final buttonWidth = MediaQuery.of(context).size.width *
-        (MediaQuery.of(context).size.shortestSide >= 600 ? 0.7 : 0.9);
 
-    return SizedBox(
-      width: buttonWidth,
-      child: ElevatedButton(
-        onPressed: () => _showDatePicker(index),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Text('$dayOfWeek $dayOfMonth $year',
-                  style: TextStyle(
-                    fontSize: timeFontSize,
-                  )),
-              const SizedBox(height: 16),
-              Row(
+    return InkWell(
+      onTap: () => _showDatePicker(index),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        decoration: BoxDecoration(
+          color: ThemeBasedAppColors.getColor(context, 'dateColor'),
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.5),
+              spreadRadius: 1,
+              blurRadius: 7,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Icon(Icons.calendar_today,
+                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                size: timeFontSize * 1.5),
+            Expanded(
+              child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    '${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].start)} ${_newAppointment.availableTimeSlots[index].amPm}',
+                    '$dayOfWeek, $month $dayOfMonth, $year',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: timeFontSize,
-                    ),
+                        fontSize: timeFontSize * 1.2,
+                        fontWeight: FontWeight.bold),
                   ),
-                  const Text(' - '),
+                  const SizedBox(height: 5),
                   Text(
-                    '${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].end)} ${_newAppointment.availableTimeSlots[index].amPm}',
+                    '${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].start)} - ${DateFormat.jm().format(_newAppointment.availableTimeSlots[index].end)}',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: timeFontSize,
-                    ),
+                        fontSize: timeFontSize,
+                        color: ThemeBasedAppColors.getColor(
+                            context, 'listTileColor')),
                   ),
                 ],
-              )
-            ],
-          ),
+              ),
+            ),
+            InkWell(
+              onTap: () => _removeDate(index),
+              child: Icon(Icons.close,
+                  color: Colors.redAccent, size: timeFontSize * 1.5),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget buildAddDatesButton(BuildContext context) {
-    final timeFontSize = getTimeFontSize(context, 13);
+  void _removeDate(int index) {
+    setState(() {
+      _newAppointment.availableDates.removeAt(index);
+      _newAppointment.availableTimeSlots.removeAt(index);
+    });
+  }
 
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: const Color(0xff004B96),
-        shape: const CircleBorder(),
-        padding: EdgeInsets.all(timeFontSize),
-      ),
-      onPressed: () {
-        _addDate();
-      },
-      child: Icon(Icons.add, size: timeFontSize * 2.0),
+  Widget buildAddDatesButton(BuildContext context) {
+    final timeFontSize = getTimeFontSize(context, 14);
+
+    return FloatingActionButton(
+      onPressed: _addDate,
+      backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      child: Icon(Icons.add, size: timeFontSize * 2),
     );
   }
 
@@ -165,10 +184,11 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
               fontSize: timeFontSize,
             )),
         centerTitle: true,
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final verticalSpacing = constraints.maxHeight * 0.03;
+          final verticalSpacing = constraints.maxHeight * 0.02;
           return Column(
             children: [
               Padding(
@@ -176,12 +196,10 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
                 child: Text(
                   'create_appointment_date_time_selection'.tr(),
                   style: TextStyle(
-                    fontSize: timeFontSize,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).brightness == Brightness.light
-                        ? const Color(0xff004B96)
-                        : Colors.white,
-                  ),
+                      fontSize: timeFontSize * 1.3,
+                      fontWeight: FontWeight.bold,
+                      color: ThemeBasedAppColors.getColor(
+                          context, "listTileColor")),
                 ),
               ),
               const SizedBox(height: 16),
@@ -193,10 +211,8 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
                         style: TextStyle(
                           fontSize: timeFontSize,
                           fontWeight: FontWeight.bold,
-                          color:
-                              Theme.of(context).brightness == Brightness.light
-                                  ? const Color(0xff004B96)
-                                  : Colors.white,
+                          color: ThemeBasedAppColors.getColor(
+                              context, 'listTileColor'),
                         ),
                       ))
                     : ListView.builder(

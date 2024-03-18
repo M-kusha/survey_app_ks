@@ -41,13 +41,10 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
   }
 
   void _onNextPressed() async {
-    final fontSize =
-        Provider.of<FontSizeProvider>(context, listen: false).fontSize;
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      showCustomSnackBar(
+      UIUtils.showSnackBar(
         context,
         'create_appointment_error_snackbar'.tr(),
-        fontSize: fontSize,
       );
     } else if (_formKey.currentState!.validate()) {
       Navigator.pushNamed(
@@ -71,110 +68,118 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
         ),
         centerTitle: true,
       ),
-      body: LayoutBuilder(
-        builder: (BuildContext context, BoxConstraints constraints) {
-          return SingleChildScrollView(
-            child: Padding(
-              padding: EdgeInsets.all(timeFontSize * 1.5),
-              child: Form(
-                key: _formKey,
-                child: GestureDetector(
-                  onTap: () {
-                    FocusScope.of(context).requestFocus(FocusNode());
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 20.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(
-                          'create_appointment_title'.tr(),
-                          style: TextStyle(
-                            fontSize: timeFontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
+      body: Center(
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return SingleChildScrollView(
+              child: Padding(
+                padding: EdgeInsets.all(timeFontSize * 1.5),
+                child: Card(
+                  child: Form(
+                    key: _formKey,
+                    child: GestureDetector(
+                      onTap: () {
+                        FocusScope.of(context).requestFocus(FocusNode());
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const SizedBox(height: 20.0),
+                            Text(
+                              'create_appointment_title'.tr(),
+                              style: TextStyle(
+                                fontSize: timeFontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextFormField(
+                              style: TextStyle(fontSize: timeFontSize),
+                              controller: _titleController,
+                              decoration: InputDecoration(
+                                hintText: 'create_appointment_hint'.tr(),
+                                hintStyle: TextStyle(fontSize: timeFontSize),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'create_appointment_title_error'.tr();
+                                }
+                                return null;
+                              },
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              onChanged: (value) {
+                                _newAppointment.title = value;
+                              },
+                            ),
+                            const SizedBox(height: 20.0),
+                            Text(
+                              'create_appointment_description'.tr(),
+                              style: TextStyle(
+                                fontSize: timeFontSize,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            TextFormField(
+                              style: TextStyle(fontSize: timeFontSize),
+                              strutStyle: const StrutStyle(
+                                forceStrutHeight: true,
+                                height: 1.5,
+                              ),
+                              controller: _descriptionController,
+                              maxLength: 256,
+                              maxLines: maxLines,
+                              decoration: InputDecoration(
+                                hintText:
+                                    'create_appointment_description_hint'.tr(),
+                                hintStyle:
+                                    TextStyle(fontSize: timeFontSize * 1.2),
+                                counterText:
+                                    '${_descriptionController.text.length}/256',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'create_appointment_description_error'
+                                      .tr();
+                                }
+                                return null;
+                              },
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              onChanged: (value) {
+                                setState(() {
+                                  _newAppointment.description = value;
+                                });
+                              },
+                              onTap: () {
+                                setState(() {
+                                  maxLines = null;
+                                });
+                              },
+                              onEditingComplete: () {
+                                setState(() {
+                                  maxLines = 1;
+                                });
+                              },
+                            ),
+                            SizedBox(
+                              height: constraints.maxHeight * 0.4,
+                              child: Text(
+                                '',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
+                            ),
+                          ],
                         ),
-                        TextFormField(
-                          style: TextStyle(fontSize: timeFontSize),
-                          controller: _titleController,
-                          decoration: InputDecoration(
-                            hintText: 'create_appointment_hint'.tr(),
-                            hintStyle: TextStyle(fontSize: timeFontSize),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'create_appointment_title_error'.tr();
-                            }
-                            return null;
-                          },
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          onChanged: (value) {
-                            _newAppointment.title = value;
-                          },
-                        ),
-                        const SizedBox(height: 20.0),
-                        Text(
-                          'create_appointment_description'.tr(),
-                          style: TextStyle(
-                            fontSize: timeFontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        TextFormField(
-                          style: TextStyle(fontSize: timeFontSize),
-                          strutStyle: const StrutStyle(
-                            forceStrutHeight: true,
-                            height: 1.5,
-                          ),
-                          controller: _descriptionController,
-                          maxLength: 256,
-                          maxLines: maxLines,
-                          decoration: InputDecoration(
-                            hintText:
-                                'create_appointment_description_hint'.tr(),
-                            hintStyle: TextStyle(fontSize: timeFontSize * 1.2),
-                            counterText:
-                                '${_descriptionController.text.length}/256',
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'create_appointment_description_error'
-                                  .tr();
-                            }
-                            return null;
-                          },
-                          autovalidateMode: AutovalidateMode.onUserInteraction,
-                          onChanged: (value) {
-                            setState(() {
-                              _newAppointment.description = value;
-                            });
-                          },
-                          onTap: () {
-                            setState(() {
-                              maxLines = null;
-                            });
-                          },
-                          onEditingComplete: () {
-                            setState(() {
-                              maxLines = 1;
-                            });
-                          },
-                        ),
-                        SizedBox(
-                          height: constraints.maxHeight * 0.4,
-                          child: Text(
-                            '',
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
       bottomNavigationBar: buildBottomElevatedButton(
         context: context,
