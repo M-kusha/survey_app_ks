@@ -1,6 +1,7 @@
 class AppointmentParticipants {
   String userId;
   String userName;
+  String profileImageUrl;
   DateTime date;
   TimeSlot timeSlot;
   String status;
@@ -9,6 +10,7 @@ class AppointmentParticipants {
   AppointmentParticipants({
     required this.userId,
     required this.userName,
+    required this.profileImageUrl,
     required this.date,
     required this.timeSlot,
     required this.status,
@@ -27,6 +29,7 @@ class AppointmentParticipants {
       'timeSlot': timeSlot.toFirestore(),
       'status': status,
       'participated': participated,
+      'profileImageUrl': profileImageUrl,
     };
   }
 
@@ -39,6 +42,7 @@ class AppointmentParticipants {
           map['timeSlot'] as Map<String, dynamic>? ?? {}),
       status: map['status'] as String? ?? 'Unknown',
       participated: map['participated'] as bool? ?? false,
+      profileImageUrl: map['profileImageUrl'] as String? ?? '',
     );
   }
 }
