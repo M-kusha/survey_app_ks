@@ -7,6 +7,7 @@ import 'package:survey_app_ks/appointments/main_screen/appointment_search_field.
 import 'package:survey_app_ks/appointments/main_screen/create_appointment_button.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointment_list.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
 class AppointmentPageUI extends StatefulWidget {
@@ -69,7 +70,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
       appBar: AppBar(
-        leading: buildPopupMenuButton(context), // PopupMenuButton on the left
+        leading: buildPopupMenuButton(context),
         title: _isSearching
             ? ActionField(
                 isSearching: _isSearching,
@@ -79,8 +80,9 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             : Text('appointments'.tr(),
                 style: TextStyle(fontSize: timeFontSize + 3)),
         centerTitle: true,
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
         actions: [
-          buildSearchBar(), // Search bar on the right
+          buildSearchBar(),
         ],
         automaticallyImplyLeading: false,
       ),
@@ -99,7 +101,11 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return PopupMenuButton(
-      icon: Icon(Icons.sort_by_alpha_sharp, size: timeFontSize * 1.5),
+      icon: Icon(
+        Icons.sort_by_alpha_sharp,
+        size: timeFontSize * 1.8,
+        color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      ),
       itemBuilder: (BuildContext context) => [
         buildPopupMenuItem(
           'Most participants',
@@ -159,7 +165,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
       child: RadioListTile(
         title: Text(text),
         value: value,
-        activeColor: Colors.blue,
+        activeColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
         groupValue: selectedSortOption,
         controlAffinity: ListTileControlAffinity.trailing,
         onChanged: (value) {
@@ -179,7 +185,8 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
         ? IconButton(
             icon: Icon(
               Icons.close,
-              size: timeFontSize * 1.5,
+              size: timeFontSize * 1.8,
+              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
             ),
             onPressed: () {
               setState(() {
@@ -191,7 +198,8 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
         : IconButton(
             icon: Icon(
               Icons.search,
-              size: timeFontSize * 1.5,
+              size: timeFontSize * 1.8,
+              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
             ),
             onPressed: () {
               setState(() {

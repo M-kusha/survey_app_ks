@@ -8,7 +8,7 @@ import 'package:survey_app_ks/appointments/participants/participants_appointment
 import 'package:survey_app_ks/appointments/participants/step1_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/tablet_size.dart'; // Ensure you have this import for DateFormat
 
 class AppintmentListItem extends StatelessWidget {
   final Appointment appointment;
@@ -28,226 +28,209 @@ class AppintmentListItem extends StatelessWidget {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final screenWidth = MediaQuery.of(context).size.width;
     final timeFontSize = screenWidth < 600
-        ? fontSize.clamp(00.0, 15.0)
-        : fontSize.clamp(00.0, 30.0);
+        ? fontSize.clamp(0.0, 15.0)
+        : fontSize.clamp(0.0, 30.0);
     final isExpired = appointment.expirationDate.isBefore(DateTime.now());
 
     return FutureBuilder<bool>(
-      future: AppointmentService().hasCurrentUserParticipated(
+      future: appointmentService.hasCurrentUserParticipated(
           appointment.appointmentId, FirebaseAuth.instance.currentUser!.uid),
       builder: (context, snapshot) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(),
-                const SizedBox(height: 10),
-                Text(
-                  'Loading...'.tr(),
-                  style: TextStyle(
-                    fontSize: timeFontSize,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }
-
         final participated = snapshot.data ?? false;
         final count = appointment.participationCount;
-        final isTimeSlotConfirmed =
-            appointment.availableTimeSlots.any((ts) => ts.isConfirmed);
 
-        void navigateToCorrectPage() {
-          if (participated || isTimeSlotConfirmed) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => UserSelectCategories(
-                  appointment: appointment,
-                  userName: '',
-                  timeSlot: TimeSlot(
-                    start: DateTime.now(),
-                    end: DateTime.now(),
-                    expirationDate: DateTime.now(),
-                  ),
-                ),
-              ),
-            );
-          } else {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AppointmentNamePage(
-                    appointment: appointment,
-                    participant: AppointmentParticipants(
-                      userId: '',
-                      userName: '',
-                      status: '',
-                      participated: false,
-                      date: DateTime.now(),
-                      timeSlot: TimeSlot(
-                        start: DateTime.now(),
-                        end: DateTime.now(),
-                        expirationDate: DateTime.now(),
-                      ),
-                    )),
-              ),
-            );
-          }
-        }
-
-        return GestureDetector(
-          onTap: isExpired ? null : navigateToCorrectPage,
-          child: Opacity(
-            opacity: isExpired ? 0.5 : 1.0,
-            child: Container(
-              padding: EdgeInsets.all(timeFontSize * 1.5),
-              margin: EdgeInsets.symmetric(
-                  vertical: timeFontSize, horizontal: timeFontSize * 1.5),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12.0),
-                color: ThemeBasedAppColors.getColor(context, 'textColor'),
-                boxShadow: [
-                  if (Theme.of(context).brightness == Brightness.light)
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
-                      spreadRadius: 0,
-                      blurRadius: 4,
-                      offset: const Offset(0, 4),
-                    )
-                  else
-                    BoxShadow(
-                      color:
-                          ThemeBasedAppColors.getColor(context, 'buttonColor')
-                              .withOpacity(0.5),
-                      spreadRadius: 1,
-                      blurRadius: 2,
-                      offset: const Offset(0, 0.1),
-                    ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  if (participated)
-                    Positioned(
-                      top: 0,
-                      right: -1,
-                      child: Icon(
-                        Icons.check_circle_outline,
-                        size: timeFontSize * 1.3,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'buttonColor'),
-                      ),
-                    ),
-                  Column(
-                    children: [
-                      Column(
-                        children: [
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: '${'appointment_status_'.tr()}: ',
-                                  style: TextStyle(
-                                    color: Theme.of(context).brightness ==
-                                            Brightness.light
-                                        ? _textColor(context)
-                                        : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: timeFontSize,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text:
-                                      isExpired ? 'expired'.tr() : 'open'.tr(),
-                                  style: TextStyle(
-                                    color: isExpired
-                                        ? Colors.red
-                                        : ThemeBasedAppColors.getColor(
-                                            context, 'buttonColor'),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: timeFontSize,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 8.0),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    appointment.title,
-                                    style: TextStyle(
-                                      color: Theme.of(context).brightness ==
-                                              Brightness.light
-                                          ? _textColor(context)
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: timeFontSize,
-                                    ),
-                                  ),
-                                  SizedBox(height: timeFontSize),
-                                  Text(
-                                      '${'voting_expiration_date'.tr()}: ${DateFormat("dd E y").format(appointment.expirationDate)}',
-                                      style: TextStyle(
-                                        fontSize: timeFontSize,
-                                        fontWeight: FontWeight.bold,
-                                      )),
-                                ],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'ID: ${appointment.appointmentId}',
-                                    style: TextStyle(
-                                      color: Theme.of(context).brightness ==
-                                              Brightness.light
-                                          ? _textColor(context)
-                                          : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: timeFontSize,
-                                    ),
-                                  ),
-                                  SizedBox(height: timeFontSize),
-                                  Text(
-                                    '${'participants'.tr()}: $count',
-                                    style: TextStyle(
-                                      fontSize: timeFontSize,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        return _listItems(
+            context, isExpired, participated, timeFontSize, count);
       },
     );
+  }
+
+  GestureDetector _listItems(BuildContext context, bool isExpired,
+      bool participated, double timeFontSize, int count) {
+    return GestureDetector(
+      onTap:
+          isExpired ? null : () => navigateToCorrectPage(context, participated),
+      child: Opacity(
+        opacity: isExpired ? 0.5 : 1.0,
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child:
+              _buildCard(context, timeFontSize, isExpired, count, participated),
+        ),
+      ),
+    );
+  }
+
+  Card _buildCard(BuildContext context, double timeFontSize, bool isExpired,
+      int count, bool participated) {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(
+          color: participated
+              ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+              : Colors.red
+                  .withOpacity(0.2), //onditional color based on participation
+          width: 2,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                _buildRichText(context, timeFontSize, isExpired),
+                const SizedBox(height: 8.0),
+                _buildInfoRow(context, timeFontSize, count),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  RichText _buildRichText(
+      BuildContext context, double timeFontSize, bool isExpired) {
+    return RichText(
+      text: TextSpan(
+        children: [
+          TextSpan(
+            text: '${'appointment_status_'.tr()}: ',
+            style: TextStyle(
+              color: Theme.of(context).brightness == Brightness.light
+                  ? _textColor(context)
+                  : Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: timeFontSize,
+            ),
+          ),
+          TextSpan(
+            text: isExpired ? 'expired'.tr() : 'open'.tr(),
+            style: TextStyle(
+              color: isExpired
+                  ? Colors.red
+                  : ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              fontWeight: FontWeight.bold,
+              fontSize: timeFontSize,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Row _buildInfoRow(BuildContext context, double timeFontSize, int count) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildColumnLeft(context, timeFontSize),
+        _buildColumnRight(context, timeFontSize, count),
+      ],
+    );
+  }
+
+  Column _buildColumnLeft(BuildContext context, double timeFontSize) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          appointment.title,
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.light
+                ? _textColor(context)
+                : Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: timeFontSize,
+          ),
+        ),
+        SizedBox(height: timeFontSize),
+        Text(
+            '${'voting_expiration_date'.tr()}: ${DateFormat("dd E y").format(appointment.expirationDate)}',
+            style: TextStyle(
+              fontSize: timeFontSize,
+              fontWeight: FontWeight.bold,
+            )),
+      ],
+    );
+  }
+
+  Column _buildColumnRight(
+      BuildContext context, double timeFontSize, int count) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'ID: ${appointment.appointmentId}',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.light
+                ? _textColor(context)
+                : Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: timeFontSize,
+          ),
+        ),
+        SizedBox(height: timeFontSize),
+        Text(
+          '${'participants'.tr()}: $count',
+          style: TextStyle(
+            fontSize: timeFontSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void navigateToCorrectPage(BuildContext context, bool participated) {
+    final isTimeSlotConfirmed =
+        appointment.availableTimeSlots.any((ts) => ts.isConfirmed);
+
+    if (participated || isTimeSlotConfirmed) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserSelectCategories(
+            appointment: appointment,
+            userName: '',
+            timeSlot: TimeSlot(
+              start: DateTime.now(),
+              end: DateTime.now(),
+              expirationDate: DateTime.now(),
+            ),
+          ),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AppointmentNamePage(
+              appointment: appointment,
+              participant: AppointmentParticipants(
+                userId: '',
+                userName: '',
+                status: '',
+                participated: false,
+                date: DateTime.now(),
+                timeSlot: TimeSlot(
+                  start: DateTime.now(),
+                  end: DateTime.now(),
+                  expirationDate: DateTime.now(),
+                ),
+                profileImageUrl: '',
+              )),
+        ),
+      );
+    }
   }
 }
 
