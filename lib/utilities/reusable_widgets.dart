@@ -2,31 +2,37 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 
-void showCustomSnackBar(BuildContext context, String message,
-    {Color? backgroundColor, double? fontSize}) {
-  final ThemeData theme = Theme.of(context);
-  final Color defaultBackgroundColor = theme.brightness == Brightness.light
-      ? const Color(0xff004B96)
-      : Colors.white;
-  final double defaultFontSize = fontSize ?? 16.0;
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Text(
-        message.tr(),
-        style: TextStyle(
-          fontSize: defaultFontSize,
-          fontWeight: FontWeight.bold,
-          color: theme.brightness == Brightness.light
-              ? Colors.white
-              : Colors.black, // Adjust text color based on theme
+class UIUtils {
+  static void showSnackBar(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.5,
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              message.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: ThemeBasedAppColors.getColor(context, 'errorColor')),
+            ),
+          ),
         ),
-        textAlign: TextAlign.center,
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'snackBarColor'),
+        padding: EdgeInsets.symmetric(
+          horizontal: (MediaQuery.of(context).size.width -
+                  (MediaQuery.of(context).size.width * 0.8)) /
+              2,
+        ),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
       ),
-      backgroundColor: backgroundColor ?? defaultBackgroundColor,
-    ),
-  );
+    );
+  }
 }
 
 Widget buildBottomElevatedButton({
