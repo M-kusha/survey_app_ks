@@ -44,6 +44,8 @@
       "search_company": "Search for a company",
       "company_not_found": "No companies found",
       "select_company": "Select a company",
+      "email_already_exists": "The email address is already used by someone else. Please try another one or login.",
+      "saving_regisration":"Please hang tight! We're securely storing your details.",
       "finish_registration": "Finish Registration",
     
   
@@ -90,7 +92,10 @@
       "confirm": "Confirm",
       "confirmed": "Confirmed",
       "not_confirmed": "Not confirmed",
+      "confirm_time_slot": "Confirm time slot",
+      "confirm_time_slot_tip": "Are you sure you want to confirm this time slot?",
       "update": "Update",
+      "loading": "Loading...",
     
   
     "SETTINGS_STRINGS": "",
@@ -104,6 +109,16 @@
       "datenschutz": "Privacy policy",
       "log_out": "Log out",
       "enter_setID": "Enter SetID",
+
+    "SORTING_STRING":"",
+      "newest":"Newest Appointments",
+      "oldest":"Oldest Appointments",
+      "most_participated":"Most participants'",
+      "least_participated":"Least participants",
+      "exp_date_asc":"Expiration Date (Ascending)",
+      "exp_date_des":"Expiration Date (Descending)",
+
+
     
   
     
