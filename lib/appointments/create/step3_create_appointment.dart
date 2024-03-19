@@ -53,6 +53,7 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
               expirationDate: DateTime.now(),
               participationCount: 0,
               participants: [],
+              creationDate: DateTime.now(),
             );
   }
 
@@ -108,6 +109,8 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
               width: MediaQuery.of(context).size.width * 0.8,
               child: Card(
                 elevation: 5,
+                shadowColor:
+                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15)),
                 child: InkWell(

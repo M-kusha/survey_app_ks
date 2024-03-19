@@ -50,8 +50,8 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Card(
-              elevation: 8,
-              shadowColor: Theme.of(context).shadowColor,
+              elevation: 5,
+              shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15)),
               child: Padding(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
@@ -25,6 +26,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
     confirmedTimeSlots: [],
     expirationDate: DateTime.now(),
     participationCount: 0,
+    creationDate: DateTime.now(),
   );
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -75,6 +77,9 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
               child: Padding(
                 padding: EdgeInsets.all(timeFontSize * 1.5),
                 child: Card(
+                  elevation: 5,
+                  shadowColor:
+                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
                   child: Form(
                     key: _formKey,
                     child: GestureDetector(

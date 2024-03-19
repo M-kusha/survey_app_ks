@@ -32,6 +32,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
               confirmedTimeSlots: [],
               expirationDate: DateTime.now(),
               participationCount: 0,
+              creationDate: DateTime.now(),
             );
   }
 
