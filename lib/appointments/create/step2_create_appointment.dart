@@ -180,10 +180,12 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('create_appointment'.tr(),
-            style: TextStyle(
-              fontSize: timeFontSize,
-            )),
+        title: Text(
+          'create_appointment'.tr(),
+          style: TextStyle(
+            fontSize: timeFontSize * 1.5,
+          ),
+        ),
         centerTitle: true,
         backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
       ),

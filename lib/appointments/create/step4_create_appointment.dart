@@ -40,7 +40,9 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
       appBar: AppBar(
         title: Text(
           'create_appointment'.tr(),
-          style: TextStyle(fontSize: timeFontSize),
+          style: TextStyle(
+            fontSize: timeFontSize * 1.5,
+          ),
         ),
         centerTitle: true,
         backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),

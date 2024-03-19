@@ -138,11 +138,9 @@ class AppointmentService {
   }
 
   Future<String> fetchUserNameById(String userId) async {
-    // Assuming you have a collection 'users' where each documentID is a userId
     var userDoc =
         await FirebaseFirestore.instance.collection('users').doc(userId).get();
     if (userDoc.exists) {
-      // Adjust 'name' based on your Firestore structure
       return userDoc.data()?['fullName'] ?? 'Unknown';
     } else {
       return 'Unknown';

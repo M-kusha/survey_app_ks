@@ -98,7 +98,7 @@ class Register3stepState extends State<Register3step> {
 
     final passwordStrength = estimatePasswordStrength(password);
     if (passwordStrength < _minPasswordStrength) {
-      UIUtils.showSnackBar(context, 'set_secure_password'.tr());
+      UIUtils.showSnackBar(context, 'validate_password_strong'.tr());
 
       return;
     }

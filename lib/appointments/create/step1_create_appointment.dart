@@ -66,7 +66,9 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
       appBar: AppBar(
         title: Text(
           'create_appointment'.tr(),
-          style: TextStyle(fontSize: timeFontSize + 3),
+          style: TextStyle(
+            fontSize: timeFontSize * 1.5,
+          ),
         ),
         centerTitle: true,
       ),

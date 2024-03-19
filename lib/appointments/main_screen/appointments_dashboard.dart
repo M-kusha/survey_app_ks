@@ -79,7 +79,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
                 onSearchTextChanged: _onSearchTextChanged,
               )
             : Text('appointments'.tr(),
-                style: TextStyle(fontSize: timeFontSize + 3)),
+                style: TextStyle(fontSize: timeFontSize * 1.5)),
         centerTitle: true,
         backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
         actions: [
@@ -130,11 +130,13 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
   }
 
   PopupMenuButton<int> buildPopupMenuButton(BuildContext context) {
+    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    final timeFontSize = getTimeFontSize(context, fontSize);
     return PopupMenuButton<int>(
       icon: Icon(
         Icons.sort_by_alpha_sharp,
         color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
-        size: 24.0,
+        size: timeFontSize * 1.8,
       ),
       offset: const Offset(0, 60),
       onSelected: (int result) {
@@ -266,7 +268,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             if (filteredAppointments.isEmpty) {
               return Expanded(
                 child: Center(
-                    child: Text('no_surveys_added_yet'.tr(),
+                    child: Text('no_appointments_added_yet'.tr(),
                         style: TextStyle(fontSize: timeFontSize * 1.2))),
               );
             }

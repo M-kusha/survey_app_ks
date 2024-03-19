@@ -124,7 +124,8 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
         title: Text(
           widget.appointment.title,
           style: TextStyle(
-              fontSize: timeFontSize * 1.3, fontWeight: FontWeight.bold),
+            fontSize: timeFontSize * 1.5,
+          ),
         ),
         backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
         centerTitle: true,

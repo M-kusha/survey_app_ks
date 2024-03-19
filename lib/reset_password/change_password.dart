@@ -78,8 +78,7 @@ class ChangePasswordPageState extends State<ChangePasswordPage> {
                             return 'please_enter_new_password'.tr();
                           }
                           if (value.length < 6) {
-                            return 'password_must_be_at_least_6_characters'
-                                .tr();
+                            return 'validate_password_strong'.tr();
                           }
                           return null;
                         },

@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
@@ -25,7 +26,7 @@ class AppointmentNamePage extends StatefulWidget {
 
 class AppointmentNamePageState extends State<AppointmentNamePage> {
   final AppointmentService _appointmentService = AppointmentService();
-  String _userName = "";
+  String _userName = '';
 
   @override
   void initState() {
@@ -34,12 +35,17 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
   }
 
   void _initPage() async {
-    String name =
-        await _appointmentService.fetchUserNameById(widget.participant.userId);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      final userId = currentUser.uid;
 
-    setState(() {
-      _userName = name;
-    });
+      if (userId.isNotEmpty) {
+        String name = await _appointmentService.fetchUserNameById(userId);
+        setState(() {
+          _userName = name;
+        });
+      }
+    }
   }
 
   void _onNextPressed() async {
@@ -66,7 +72,9 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
       appBar: AppBar(
         title: Text(
           widget.appointment.title,
-          style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            fontSize: timeFontSize * 1.5,
+          ),
         ),
         centerTitle: true,
         backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),

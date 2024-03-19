@@ -67,8 +67,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
         title: Text(
           ' ${'survey_edit'.tr()} ${widget.appointment.title}',
           style: TextStyle(
-            fontSize: timeFontSize,
-            fontWeight: FontWeight.bold,
+            fontSize: timeFontSize * 1.2,
           ),
         ),
         centerTitle: true,
