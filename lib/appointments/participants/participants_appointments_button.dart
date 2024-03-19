@@ -9,6 +9,7 @@ import 'package:survey_app_ks/appointments/participants/step2_participate_appoin
 import 'package:survey_app_ks/appointments/participants/step3_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
 class UserSelectCategories extends StatefulWidget {
@@ -87,12 +88,11 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   }
 
   Widget _buildLoadingScreen(double fontSize) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Loading...', style: TextStyle(fontSize: fontSize)),
-        centerTitle: true,
-      ),
-      body: const Center(child: CircularProgressIndicator()),
+    return const Scaffold(
+      body: Center(
+          child: CustomLoadingWidget(
+        loadingText: 'loading',
+      )),
     );
   }
 
