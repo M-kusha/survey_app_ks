@@ -42,6 +42,7 @@ class Register1stepState extends State<Register1step> {
       ),
       body: Center(
         child: Card(
+          shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
           margin: const EdgeInsets.all(20),
           elevation: 5,
           child: Column(

@@ -95,14 +95,14 @@ class _Register2stepState extends State<Register2step> {
       onTap: _pickImage,
       child: CircleAvatar(
         radius: 50,
-        backgroundColor: Colors.grey[400],
+        backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
         backgroundImage: widget.registerLogic.profileImage != null
             ? FileImage(widget.registerLogic.profileImage!) as ImageProvider
             : null,
         child: widget.registerLogic.profileImage == null
             ? Icon(Icons.camera_alt,
                 size: 40,
-                color: ThemeBasedAppColors.getColor(context, 'buttonColor'))
+                color: ThemeBasedAppColors.getColor(context, 'textColor'))
             : null,
       ),
     );
@@ -118,6 +118,7 @@ class _Register2stepState extends State<Register2step> {
       ),
       body: Center(
         child: Card(
+          shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
           margin: const EdgeInsets.all(20),
           elevation: 5,
           child: SingleChildScrollView(
@@ -207,7 +208,7 @@ class _Register2stepState extends State<Register2step> {
                       ),
                     ),
                   ),
-                const SizedBox(height: 70),
+                const SizedBox(height: 30),
               ],
             ),
           ),
