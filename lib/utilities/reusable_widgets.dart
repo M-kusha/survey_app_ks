@@ -33,6 +33,41 @@ class UIUtils {
       ),
     );
   }
+
+  static void showLoadingIndicator(BuildContext context,
+      {String loadingText = "Loading..."}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          backgroundColor:
+              ThemeBasedAppColors.getColor(context, 'snackBarColor'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                loadingText,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: ThemeBasedAppColors.getColor(context, 'textColor'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 Widget buildBottomElevatedButton({
@@ -54,19 +89,40 @@ Widget buildBottomElevatedButton({
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         ElevatedButton(
-          style: ElevatedButton.styleFrom(
-              minimumSize: Size.fromHeight(defaultButtonHeight),
-              padding: EdgeInsets.symmetric(vertical: defaultFontSize * 0.5),
-              foregroundColor: Theme.of(context).brightness == Brightness.light
-                  ? Colors.grey[900]
-                  : const Color.fromARGB(255, 255, 255, 255),
-              backgroundColor: Theme.of(context).brightness == Brightness.light
-                  ? Colors.grey[100]
-                  : Colors.grey[900]),
+          style: ButtonStyle(
+            minimumSize:
+                MaterialStateProperty.all(Size.fromHeight(defaultButtonHeight)),
+            padding: MaterialStateProperty.all(
+                EdgeInsets.symmetric(vertical: defaultFontSize * 0.5)),
+            backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                (Set<MaterialState> states) {
+              if (Theme.of(context).brightness == Brightness.light) {
+                return Colors.grey[100]!;
+              } else {
+                return Colors.grey[900]!;
+              }
+            }),
+            foregroundColor: MaterialStateProperty.resolveWith<Color>(
+                (Set<MaterialState> states) {
+              if (Theme.of(context).brightness == Brightness.light) {
+                return Colors.grey[900]!;
+              } else {
+                return const Color.fromARGB(255, 255, 255, 255);
+              }
+            }),
+            shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(32),
+                side: BorderSide(
+                  color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  width: 1.0,
+                ),
+              ),
+            ),
+          ),
           onPressed: onPressed,
           child: Text(
-            buttonText
-                .tr(), // Assuming you are using easy_localization for i18n
+            buttonText.tr(),
             style: TextStyle(fontSize: defaultFontSize),
           ),
         ),
@@ -74,4 +130,44 @@ Widget buildBottomElevatedButton({
       ],
     ),
   );
+}
+
+class CustomLoadingWidget extends StatelessWidget {
+  final double height;
+  final String loadingText;
+
+  const CustomLoadingWidget({
+    Key? key,
+    this.height = 160.0,
+    this.loadingText = "",
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        height: height,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              ),
+            ),
+            const SizedBox(height: 8.0),
+            Text(
+              loadingText.tr(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
