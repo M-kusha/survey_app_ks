@@ -8,14 +8,13 @@ import 'package:survey_app_ks/appointments/participants/participants_appointment
 import 'package:survey_app_ks/appointments/participants/step1_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart'; // Ensure you have this import for DateFormat
 
-class AppintmentListItem extends StatelessWidget {
+class AppointmentListItem extends StatelessWidget {
   final Appointment appointment;
   final bool hasUserParticipated;
   final AppointmentService appointmentService = AppointmentService();
 
-  AppintmentListItem({
+  AppointmentListItem({
     Key? key,
     required this.appointment,
     required this.hasUserParticipated,
@@ -74,8 +73,7 @@ class AppintmentListItem extends StatelessWidget {
         side: BorderSide(
           color: participated
               ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-              : Colors.red
-                  .withOpacity(0.2), //onditional color based on participation
+              : Colors.grey.withOpacity(0.2),
           width: 2,
         ),
       ),
@@ -232,81 +230,4 @@ class AppintmentListItem extends StatelessWidget {
       );
     }
   }
-}
-
-Widget buildExpandedField(
-    BuildContext context, bool isSearching, String searchQuery) {
-  final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-  final timeFontSize = getTimeFontSize(context, fontSize);
-  final appointmentService =
-      Provider.of<AppointmentService>(context, listen: false);
-
-  return FutureBuilder<String?>(
-    future: appointmentService.getCompanyId(),
-    builder: (context, snapshot) {
-      if (!snapshot.hasData || snapshot.data == null) {
-        return const Center(child: CircularProgressIndicator());
-      }
-
-      String companyId = snapshot.data!;
-
-      return StreamBuilder<List<Appointment>>(
-        stream: appointmentService.getAppointmentList(companyId),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          List<Appointment> appointments = snapshot.data ?? [];
-          final filteredAppointments = appointments
-              .where((appointment) =>
-                  appointment.title
-                      .toLowerCase()
-                      .contains(searchQuery.toLowerCase()) ||
-                  appointment.appointmentId
-                      .toLowerCase()
-                      .contains(searchQuery.toLowerCase()))
-              .toList();
-
-          if (filteredAppointments.isEmpty && !isSearching) {
-            return Expanded(
-              child: Center(
-                child: Text(
-                  'no_surveys_added_yet'.tr(),
-                  style: TextStyle(fontSize: timeFontSize * 1.2),
-                ),
-              ),
-            );
-          } else if (filteredAppointments.isEmpty && isSearching) {
-            return Expanded(
-              child: Center(
-                child: Text(
-                  'no_matching_surveys'.tr(),
-                  style: TextStyle(fontSize: timeFontSize * 1.2),
-                ),
-              ),
-            );
-          }
-
-          return Expanded(
-            child: ListView.separated(
-              separatorBuilder: (context, index) =>
-                  const SizedBox(height: 20.0),
-              itemCount: filteredAppointments.length,
-              itemBuilder: (context, index) {
-                return AppintmentListItem(
-                  appointment: filteredAppointments[index],
-                  hasUserParticipated: false,
-                );
-              },
-            ),
-          );
-        },
-      );
-    },
-  );
 }

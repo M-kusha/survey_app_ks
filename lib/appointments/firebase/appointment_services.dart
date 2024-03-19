@@ -137,16 +137,16 @@ class AppointmentService {
     return role == 'admin';
   }
 
-  Future<String> fetchUserName() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      return userDoc['fullName'] ?? '';
+  Future<String> fetchUserNameById(String userId) async {
+    // Assuming you have a collection 'users' where each documentID is a userId
+    var userDoc =
+        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    if (userDoc.exists) {
+      // Adjust 'name' based on your Firestore structure
+      return userDoc.data()?['fullName'] ?? 'Unknown';
+    } else {
+      return 'Unknown';
     }
-    return '';
   }
 
   Future<String> fetchProfileImage(String userId) async {
@@ -194,7 +194,6 @@ class AppointmentService {
         'end': timeSlotToConfirm.end.toIso8601String(),
         'expirationDate': timeSlotToConfirm.expirationDate.toIso8601String(),
         'isConfirmed': true,
-        'amPm': timeSlotToConfirm.amPm,
       });
     }
 

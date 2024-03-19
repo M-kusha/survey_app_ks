@@ -51,24 +51,20 @@ class TimeSlot {
   DateTime start;
   DateTime end;
   DateTime expirationDate;
-  String amPm;
   bool isConfirmed;
 
-  TimeSlot(
-      {required this.start,
-      required this.end,
-      required this.expirationDate,
-      this.isConfirmed = false,
-      this.amPm = ''}) {
-    amPm;
-  }
+  TimeSlot({
+    required this.start,
+    required this.end,
+    required this.expirationDate,
+    this.isConfirmed = false,
+  });
 
   Map<String, dynamic> toFirestore() {
     return {
       'start': start.toIso8601String(),
       'end': end.toIso8601String(),
       'expirationDate': expirationDate.toIso8601String(),
-      'amPm': amPm,
       'isConfirmed': isConfirmed,
     };
   }
@@ -79,7 +75,6 @@ class TimeSlot {
       end: DateTime.parse(map['end'] as String? ?? '1970-01-01T00:00:00Z'),
       expirationDate: DateTime.parse(
           map['expirationDate'] as String? ?? '1970-01-01T00:00:00Z'),
-      amPm: map['amPm'] as String? ?? '',
       isConfirmed: map['isConfirmed'] as bool? ?? false,
     );
   }
@@ -96,6 +91,7 @@ class Appointment {
   DateTime expirationDate;
   List<TimeSlot> confirmedTimeSlots = [];
   int participationCount = 0;
+  DateTime creationDate;
 
   Appointment({
     this.companyId,
@@ -108,6 +104,7 @@ class Appointment {
     required this.confirmedTimeSlots,
     required this.expirationDate,
     required this.participationCount,
+    required this.creationDate,
   });
 
   static Appointment fromFirestore(Map<String, dynamic> map) {
@@ -132,6 +129,7 @@ class Appointment {
       }).toList(),
       expirationDate: DateTime.parse(map['expirationDate']),
       participationCount: map['participationCount'],
+      creationDate: map['creationDate'].toDate(),
     );
   }
 
@@ -149,6 +147,7 @@ class Appointment {
       'confirmedTimeSlots':
           confirmedTimeSlots.map((ts) => ts.toFirestore()).toList(),
       'participationCount': participationCount,
+      'creationDate': creationDate,
     };
 
     if (companyId != null) data['companyId'] = companyId;
