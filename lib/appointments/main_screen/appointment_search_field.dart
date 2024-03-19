@@ -26,7 +26,7 @@ class ActionFieldState extends State<ActionField> {
 
   @override
   void dispose() {
-    widget.onSearchTextChanged(""); // clear the search query
+    widget.onSearchTextChanged("");
     super.dispose();
   }
 
