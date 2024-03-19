@@ -11,8 +11,8 @@ Future<dynamic> userProfile(
     context: context,
     builder: (BuildContext context) {
       return Dialog(
-        shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0)), // Rounded corners
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
         child: Container(
           padding: const EdgeInsets.all(20.0),
           child: FutureBuilder<DocumentSnapshot>(
@@ -23,7 +23,9 @@ Future<dynamic> userProfile(
             builder: (BuildContext context,
                 AsyncSnapshot<DocumentSnapshot> snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const CustomLoadingWidget(
+                  loadingText: 'loading',
+                );
               }
 
               if (!snapshot.hasData || snapshot.data!.data() == null) {
