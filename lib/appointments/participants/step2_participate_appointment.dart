@@ -72,7 +72,8 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
     String endTimeString,
   ) {
     return Card(
-      elevation: 4.0,
+      elevation: 2,
+      shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
       margin: const EdgeInsets.all(8.0),
       child: ListTile(
         leading: Icon(

@@ -34,7 +34,8 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
   }
 
   void _initPage() async {
-    String name = await _appointmentService.fetchUserName();
+    String name =
+        await _appointmentService.fetchUserNameById(widget.participant.userId);
 
     setState(() {
       _userName = name;
@@ -78,6 +79,8 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
             children: [
               Card(
                 elevation: 5,
+                shadowColor:
+                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),

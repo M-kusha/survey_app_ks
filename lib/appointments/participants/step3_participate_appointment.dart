@@ -66,7 +66,8 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
   ) {
     return Card(
       margin: const EdgeInsets.all(8),
-      elevation: 4,
+      elevation: 3,
+      shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: isConfirmed
