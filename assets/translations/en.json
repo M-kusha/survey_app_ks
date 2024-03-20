@@ -55,6 +55,8 @@
       "you_will_be_redirected": "You will be returned to the login page in",
       "registration_seconds": "seconds.",
       "back_to_login": "Back to Login",
+      "profile_image_uploaded": "Your profile image has been uploaded successfully!",
+      "error_updating_profile_image": "An error occurred while updating your profile image. Please try again later.",
     
   
     "Reset Password Page":"",
@@ -83,6 +85,12 @@
       "please_enter_new_password": "Please enter your new password",
       "passwords_dont_match": "Passwords do not match. Please try again.",
       "change_password": "Change Password",
+      "old_password": "Old Password",
+      "change_password_title": "Change Password",
+      "invalid_old_password": "Invalid old password",
+      "password_updated_successfully": "Your password has been changed successfully!",
+      "check_your_input": "Please check your inputs and try again.",
+      "saving_password": "Please hang tight! We're securely storing your new password.",
     
   
     "REUSABLE_STRINGS": "",
