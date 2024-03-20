@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class NotificationsOptions extends StatelessWidget {
   final IconData icon;
@@ -16,6 +17,7 @@ class NotificationsOptions extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    Color buttonColor = getButtonColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: Row(
@@ -39,7 +41,7 @@ class NotificationsOptions extends StatelessWidget {
           Transform.scale(
             scale: 0.7,
             child: CupertinoSwitch(
-              activeColor: Colors.blue,
+              activeColor: buttonColor,
               trackColor: Colors.grey,
               value: true,
               onChanged: (bool newValue) {},
