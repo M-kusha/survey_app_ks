@@ -14,6 +14,7 @@ class ThemeBasedAppColors {
     'dateColor': Colors.white,
     'listparticipatedColor': Colors.green,
     'listnotparticipatedColor': Colors.white,
+    "cameraIconColor": Colors.blueGrey,
   };
 
   static final Map<String, Color> _darkThemeColors = {
@@ -29,6 +30,7 @@ class ThemeBasedAppColors {
     'dateColor': Colors.grey[900] ?? Colors.black,
     'listparticipatedColor': Colors.green,
     'listnotparticipatedColor': Colors.white,
+    "cameraIconColor": Colors.blueGrey,
   };
 
   static Color getColor(BuildContext context, String colorKey) {

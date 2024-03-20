@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class SizeOptions extends StatefulWidget {
   final IconData icon;
@@ -34,6 +35,7 @@ class SizeOptionsState extends State<SizeOptions> {
 
   @override
   Widget build(BuildContext context) {
+    Color buttonColor = getButtonColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: Column(
@@ -74,7 +76,7 @@ class SizeOptionsState extends State<SizeOptions> {
               ),
               child: Slider(
                 value: _fontSize,
-                activeColor: Colors.blue,
+                activeColor: buttonColor,
                 min: 12,
                 max: 22,
                 label: _fontSize.round().toString(),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class ThemeOptionsWidget extends StatefulWidget {
   final IconData icon;
@@ -32,6 +33,7 @@ class ThemeOptionsWidgetState extends State<ThemeOptionsWidget> {
   @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    Color buttonColor = getButtonColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -52,7 +54,7 @@ class ThemeOptionsWidgetState extends State<ThemeOptionsWidget> {
           child: Transform.scale(
             scale: 0.7,
             child: CupertinoSwitch(
-              activeColor: Colors.blue,
+              activeColor: buttonColor,
               trackColor: Colors.grey,
               value: _light,
               onChanged: (value) {
