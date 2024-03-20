@@ -284,6 +284,10 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
               Text(
                 "confirm_time_slot".tr(),
                 textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(width: 10),
               const Icon(Icons.alarm, color: Colors.blueGrey),

@@ -51,8 +51,11 @@ class Register1stepState extends State<Register1step> {
               const SizedBox(height: 40),
               Text(
                 'chose_registration_type'.tr(),
-                style:
-                    const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
               UserTypeCard(
@@ -128,7 +131,7 @@ class UserTypeCard extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       child: ListTile(
         leading: Icon(icon, size: 30),
-        title: Text(userType, style: const TextStyle(fontSize: 16)),
+        title: Text(userType, style: const TextStyle(fontSize: 15)),
         onTap: onTap,
       ),
     );

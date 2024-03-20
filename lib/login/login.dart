@@ -176,7 +176,12 @@ class LoginPageState extends State<LoginPage> {
                       });
                     },
                   ),
-                  const Text('remember_me').tr(),
+                  Text(
+                    'remember_me'.tr(),
+                    style: const TextStyle(
+                      fontSize: 12.0, // Specify your desired font size here
+                    ),
+                  ),
                 ],
               ),
               Align(
@@ -216,11 +221,9 @@ class LoginPageState extends State<LoginPage> {
         labelText: tr("password_label"),
         suffixIcon: IconButton(
           icon: Icon(
-            // Based on passwordVisible state choose the icon
             _passwordVisible ? Icons.visibility : Icons.visibility_off,
           ),
           onPressed: () {
-            // Update the state i.e. toogle the state of passwordVisible variable
             setState(() {
               _passwordVisible = !_passwordVisible;
             });
@@ -284,11 +287,14 @@ class LoginPageState extends State<LoginPage> {
                 Icons.facebook,
                 color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
               ),
-              onPressed: () {
-                // Handle Facebook login
-              },
+              onPressed: () {},
             ),
-            const Text('facebook_login').tr(),
+            Text(
+              'facebook_login'.tr(),
+              style: const TextStyle(
+                fontSize: 12.0,
+              ),
+            ),
           ],
         ),
       ],

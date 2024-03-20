@@ -100,7 +100,7 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
                             const SizedBox(width: 10),
                             Text(
                               '${'appointment_id'.tr()} ${widget.appointment.appointmentId}',
-                              style: TextStyle(fontSize: timeFontSize),
+                              style: TextStyle(fontSize: timeFontSize - 1),
                             ),
                           ],
                         ),

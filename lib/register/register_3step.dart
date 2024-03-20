@@ -197,6 +197,9 @@ class Register3stepState extends State<Register3step> {
                         obscureText: !_isPasswordVisible,
                         decoration: InputDecoration(
                           labelText: 'set_your_password'.tr(),
+                          hintStyle: const TextStyle(
+                            fontSize: 10,
+                          ),
                           border: const OutlineInputBorder(
                             borderRadius: BorderRadius.all(Radius.circular(12)),
                           ),
