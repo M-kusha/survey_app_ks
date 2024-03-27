@@ -14,6 +14,7 @@ import 'package:survey_app_ks/settings/profile_section.dart';
 import 'package:survey_app_ks/settings/text_to_speach_options.dart';
 import 'package:survey_app_ks/settings/theme_options.dart';
 import 'package:survey_app_ks/settings/user_menagment.dart';
+import 'package:survey_app_ks/utilities/firebase_services.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
 import 'package:survey_app_ks/utilities/text_style.dart';
@@ -28,17 +29,32 @@ class SettingsPageUI extends StatefulWidget {
 
 class _SettingsPageUIState extends State<SettingsPageUI> {
   String userID = '';
+  bool _isSuperAdmin = false;
+  bool _isLoadingSuperAdminCheck = true;
+  late FirebaseServices _firebaseServices;
 
   @override
   void initState() {
     super.initState();
     SettingsController settingsController = SettingsController();
     _initPage();
+    _firebaseServices =
+        FirebaseServices(); // Ensure you have an instance of FirebaseServices
+    _checkSuperAdminStatus();
 
     settingsController.getFontSize().then((value) {
       setState(() {
         EasyLocalization.of(context)!.setLocale(context.locale);
       });
+    });
+  }
+
+  Future<void> _checkSuperAdminStatus() async {
+    final isSuperAdmin = await _firebaseServices.isSuperAdminUser();
+    if (!mounted) return;
+    setState(() {
+      _isSuperAdmin = isSuperAdmin;
+      _isLoadingSuperAdminCheck = false; // Update after check is complete
     });
   }
 
@@ -61,6 +77,14 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
     return Builder(
       builder: (context) {
+        if (_isLoadingSuperAdminCheck) {
+          return const Scaffold(
+            body: Center(
+                child: CustomLoadingWidget(
+              loadingText: 'loading',
+            )),
+          );
+        }
         return Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
@@ -104,37 +128,38 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                     ],
                   ),
                 ),
-                Card(
-                  shadowColor: getButtonColor(context),
-                  margin: const EdgeInsets.symmetric(vertical: 8),
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: ListTile(
-                      leading: const Icon(
-                        Icons.group,
-                      ),
-                      title: Text(
-                        'user_management'.tr(),
-                        style: TextStyle(
-                          fontSize: fontSize,
-                          fontWeight: FontWeight.bold,
+                if (_isSuperAdmin)
+                  Card(
+                    shadowColor: getButtonColor(context),
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.group,
                         ),
+                        title: Text(
+                          'user_management'.tr(),
+                          style: TextStyle(
+                            fontSize: fontSize,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        trailing: Icon(
+                          Icons.chevron_right_outlined,
+                          color: getButtonColor(context),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) =>
+                                    UserManagementPage(userId: userID)),
+                          );
+                        },
                       ),
-                      trailing: Icon(
-                        Icons.chevron_right_outlined,
-                        color: getButtonColor(context),
-                      ),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  UserManagementPage(userId: userID)),
-                        );
-                      },
                     ),
                   ),
-                ),
                 Card(
                   shadowColor: getButtonColor(context),
                   margin: const EdgeInsets.symmetric(vertical: 8),

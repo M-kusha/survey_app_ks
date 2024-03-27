@@ -56,7 +56,7 @@ class PasswordChangertate extends State<PasswordChanger> {
 
   Color _getBorderColorBasedOnStrength(double strength) {
     if (strength <= 0.2) {
-      return Colors.red;
+      return _newPasswordController.text.isEmpty ? Colors.grey : Colors.red;
     } else if (strength <= 0.4) {
       return Colors.yellow;
     } else if (strength <= 0.6) {
@@ -213,10 +213,6 @@ class PasswordChangertate extends State<PasswordChanger> {
                               fontSize: 10,
                             ),
                             border: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                            ),
-                            enabledBorder: const OutlineInputBorder(
                               borderRadius:
                                   BorderRadius.all(Radius.circular(12)),
                             ),

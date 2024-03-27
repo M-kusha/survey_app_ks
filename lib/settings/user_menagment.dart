@@ -43,6 +43,7 @@ class UserManagementPageState extends State<UserManagementPage> {
   @override
   void initState() {
     super.initState();
+
     loadUsers();
   }
 
@@ -65,6 +66,11 @@ class UserManagementPageState extends State<UserManagementPage> {
         isLoading = false;
       });
     }
+  }
+
+  String capitalize(String input) {
+    if (input.isEmpty) return "";
+    return input[0].toUpperCase() + input.substring(1);
   }
 
   @override
@@ -199,6 +205,10 @@ class UserManagementPageState extends State<UserManagementPage> {
   }
 
   Widget buildUserRoleDropdown(UserModel user) {
+    if (user.id == widget.userId) {
+      return Text(capitalize(user.role),
+          style: TextStyle(color: getListTileColor(context), fontSize: 16));
+    }
     String currentRoleLabel = roleLabelsToValues.entries
         .firstWhere((entry) => entry.value == user.role,
             orElse: () => roleLabelsToValues.entries.first)

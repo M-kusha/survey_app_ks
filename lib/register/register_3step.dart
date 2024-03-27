@@ -64,7 +64,7 @@ class Register3stepState extends State<Register3step> {
 
   Color _getBorderColorBasedOnStrength(double strength) {
     if (strength <= 0.2) {
-      return Colors.red;
+      return _passwordController.text.isEmpty ? Colors.grey : Colors.red;
     } else if (strength <= 0.4) {
       return Colors.yellow;
     } else if (strength <= 0.6) {
@@ -200,11 +200,13 @@ class Register3stepState extends State<Register3step> {
                           hintStyle: const TextStyle(
                             fontSize: 10,
                           ),
-                          border: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
-                          ),
-                          enabledBorder: const OutlineInputBorder(
-                            borderRadius: BorderRadius.all(Radius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius:
+                                const BorderRadius.all(Radius.circular(12)),
+                            borderSide: BorderSide(
+                              color: _getConfirmPasswordBorderColor(),
+                              width: 1.0,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius:

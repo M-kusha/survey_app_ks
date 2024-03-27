@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class RegistrationSuccessPage extends StatefulWidget {
   const RegistrationSuccessPage({Key? key}) : super(key: key);
@@ -42,45 +43,49 @@ class RegistrationSuccessPageState extends State<RegistrationSuccessPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(
-                Icons.check_circle_outline,
-                size: 120,
-                color: Colors.green,
-              ),
-              const SizedBox(height: 30),
-              Text(
-                "registration_success".tr(),
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ), // Change as needed
-              ),
-              const SizedBox(height: 20),
-              Text(
-                "${tr("you_will_be_redirected")} $_counter ${tr("registration_seconds")}.",
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 18,
+      body: Card(
+        elevation: 5,
+        shadowColor: getButtonColor(context),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 40,
+                  color: getButtonColor(context),
                 ),
-              ),
-              const SizedBox(height: 40),
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pushNamedAndRemoveUntil(
-                      context, '/login', (Route<dynamic> route) => false);
-                },
-                child: Text(
-                  tr("back_to_login"),
+                const SizedBox(height: 30),
+                Text(
+                  "registration_success".tr(),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ), // Change as needed
                 ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Text(
+                  "${tr("you_will_be_redirected")} $_counter ${tr("registration_seconds")}.",
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 40),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamedAndRemoveUntil(
+                        context, '/login', (Route<dynamic> route) => false);
+                  },
+                  child: Text(
+                    tr("back_to_login"),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

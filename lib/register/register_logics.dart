@@ -40,7 +40,7 @@ class RegisterLogic {
       'fullName': fullnameController.text.trim(),
       'birthdate': birthdateController.text.trim(),
       'email': emailController.text.trim(),
-      'role': profileType == ProfileType.company ? 'admin' : 'user',
+      'role': profileType == ProfileType.company ? 'superadmin' : 'user',
       'createdAt': FieldValue.serverTimestamp(),
       if (profileType == ProfileType.company && selectedCompanyName != null)
         'companyName': selectedCompanyName,

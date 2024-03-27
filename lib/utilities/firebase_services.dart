@@ -12,7 +12,18 @@ class FirebaseServices {
     final userId = user.uid;
     final doc = await _db.collection('users').doc(userId).get();
     final role = doc.data()?['role'] as String?;
-    return role == 'admin';
+    return role == 'admin' || role == 'moderator' || role == 'superadmin';
+  }
+
+  Future<bool> isSuperAdminUser() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return false;
+    }
+    final userId = user.uid;
+    final doc = await _db.collection('users').doc(userId).get();
+    final role = doc.data()?['role'] as String?;
+    return role == 'superadmin';
   }
 
   Future<String> fetchUserNameById(String userId) async {
