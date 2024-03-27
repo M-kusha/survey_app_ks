@@ -1,14 +1,19 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_provider.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointment_search_field.dart';
 import 'package:survey_app_ks/appointments/main_screen/create_appointment_button.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointment_list.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
+import 'package:survey_app_ks/utilities/firebase_services.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
+import 'package:timeago/timeago.dart';
 
 class AppointmentPageUI extends StatefulWidget {
   const AppointmentPageUI({super.key});
@@ -18,34 +23,48 @@ class AppointmentPageUI extends StatefulWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 80);
 }
 
-enum SortingOption {
-  mostParticipants,
-  leastParticipants,
-}
-
 class AppointmentPageUIState extends State<AppointmentPageUI> {
   int focusIndex = -1;
   bool isSearching = false;
   String searchQuery = '';
   bool _isAdmin = false;
-  int currentPage = 0;
+  int _currentPage = 0;
+  final int _appointmentsPerPage = 4;
+  bool _isLoading = false;
 
-  late AppointmentService _appointmentService;
-
+  late FirebaseServices _firebaseServices;
   @override
   void initState() {
     super.initState();
-    _appointmentService = AppointmentService();
-    _initPage();
+    _firebaseServices = Provider.of<FirebaseServices>(context, listen: false);
+    _loadUserAndSurveys();
   }
 
-  void _initPage() async {
-    final isAdmin = await _appointmentService.fetchAdminStatus();
+  void _loadUserAndSurveys() async {
+    setState(() => _isLoading = true);
 
-    if (!mounted) return;
+    final provider =
+        Provider.of<AppointmentDataProvider>(context, listen: false);
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
+    await Provider.of<UserDataProvider>(context, listen: false)
+        .loadCurrentUser();
+    if (!context.mounted) return;
+    final companyId = Provider.of<UserDataProvider>(context, listen: false)
+            .currentUser
+            ?.companyId ??
+        '';
+
+    if (companyId.isNotEmpty) {
+      await provider.loadAppointments(companyId);
+      await provider.preloadUserParticipationStatus(userId);
+    }
+
+    final isAdmin = await _firebaseServices.fetchAdminStatus();
 
     setState(() {
       _isAdmin = isAdmin;
+      _isLoading = false;
     });
   }
 
@@ -81,7 +100,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             : Text('appointments'.tr(),
                 style: TextStyle(fontSize: timeFontSize * 1.5)),
         centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
+        backgroundColor: getAppbarColor(context),
         actions: [
           buildSearchBar(),
         ],
@@ -107,21 +126,21 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
       child: ListTile(
         leading: Icon(icon,
             color: isSelected
-                ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-                : ThemeBasedAppColors.getColor(context, 'listTileColor')),
+                ? getButtonColor(context)
+                : getListTileColor(context)),
         title: Text(
           text.tr(),
           style: TextStyle(
             color: isSelected
-                ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-                : ThemeBasedAppColors.getColor(context, 'listTileColor'),
+                ? getButtonColor(context)
+                : getListTileColor(context),
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         trailing: isSelected
             ? Icon(
                 Icons.check,
-                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                color: getButtonColor(context),
                 size: 17.0,
               )
             : null,
@@ -135,7 +154,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     return PopupMenuButton<int>(
       icon: Icon(
         Icons.sort_by_alpha_sharp,
-        color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+        color: getButtonColor(context),
         size: timeFontSize * 1.8,
       ),
       offset: const Offset(0, 60),
@@ -163,7 +182,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             icon: Icon(
               Icons.close,
               size: timeFontSize * 1.8,
-              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: getButtonColor(context),
             ),
             onPressed: () {
               setState(() {
@@ -176,7 +195,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             icon: Icon(
               Icons.search,
               size: timeFontSize * 1.8,
-              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: getButtonColor(context),
             ),
             onPressed: () {
               setState(() {
@@ -188,153 +207,129 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
 
   Widget buildExpandedField(
       BuildContext context, bool isSearching, String searchQuery) {
-    final appointmentService =
-        Provider.of<AppointmentService>(context, listen: false);
+    final appointmentListProvider =
+        Provider.of<AppointmentDataProvider>(context);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
-    const int appointmentsPerPage = 4;
+    if (_isLoading) {
+      return const Expanded(
+        child: Center(child: CustomLoadingWidget(loadingText: 'loading')),
+      );
+    }
 
-    return FutureBuilder<String?>(
-      future: appointmentService.getCompanyId(),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData || snapshot.data == null) {
-          return const Center(child: CircularProgressIndicator());
-        }
+    List<Appointment> filteredAppointments =
+        appointmentListProvider.appointments.where((appoinments) {
+      final lowerCaseQuery = searchQuery.toLowerCase();
+      return appoinments.title.toLowerCase().contains(lowerCaseQuery) ||
+          appoinments.appointmentId.toLowerCase().contains(lowerCaseQuery) ||
+          format(appoinments.creationDate)
+              .toLowerCase()
+              .contains(lowerCaseQuery);
+    }).toList();
+    switch (selectedSortOption) {
+      case 0:
+        filteredAppointments
+            .sort((a, b) => b.creationDate.compareTo(a.creationDate));
 
-        String companyId = snapshot.data!;
+        break;
+      case 1:
+        filteredAppointments
+            .sort((a, b) => a.creationDate.compareTo(b.creationDate));
+        break;
+      case 2:
+        filteredAppointments.sort(
+            (a, b) => b.participationCount.compareTo(a.participationCount));
+        break;
+      case 3:
+        filteredAppointments.sort(
+            (a, b) => a.participationCount.compareTo(b.participationCount));
+        break;
+      case 4:
+        filteredAppointments
+            .sort((a, b) => a.expirationDate.compareTo(b.expirationDate));
+        break;
+      case 5:
+        filteredAppointments
+            .sort((a, b) => b.expirationDate.compareTo(a.expirationDate));
+        break;
+    }
 
-        return StreamBuilder<List<Appointment>>(
-          stream: appointmentService.getAppointmentList(companyId),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(child: Text('Error: ${snapshot.error}'));
-            }
-
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(child: CircularProgressIndicator());
-            }
-
-            List<Appointment> appointments = snapshot.data ?? [];
-            final filteredAppointments = appointments
-                .where((appointment) =>
-                    appointment.title
-                        .toLowerCase()
-                        .contains(searchQuery.toLowerCase()) ||
-                    appointment.appointmentId
-                        .toLowerCase()
-                        .contains(searchQuery.toLowerCase()))
-                .toList();
-
-            switch (selectedSortOption) {
-              case 0:
-                filteredAppointments
-                    .sort((a, b) => b.creationDate.compareTo(a.creationDate));
-
-                break;
-              case 1:
-                filteredAppointments
-                    .sort((a, b) => a.creationDate.compareTo(b.creationDate));
-                break;
-              case 2:
-                filteredAppointments.sort((a, b) =>
-                    b.participationCount.compareTo(a.participationCount));
-                break;
-              case 3:
-                filteredAppointments.sort((a, b) =>
-                    a.participationCount.compareTo(b.participationCount));
-                break;
-              case 4:
-                filteredAppointments.sort(
-                    (a, b) => a.expirationDate.compareTo(b.expirationDate));
-                break;
-              case 5:
-                filteredAppointments.sort(
-                    (a, b) => b.expirationDate.compareTo(a.expirationDate));
-                break;
-            }
-
-            final int totalPages =
-                (filteredAppointments.length / appointmentsPerPage).ceil();
-
-            int start = currentPage * appointmentsPerPage;
-            int end = start + appointmentsPerPage;
-            end = end > filteredAppointments.length
-                ? filteredAppointments.length
-                : end;
-
-            final appointmentsForCurrentPage =
-                filteredAppointments.sublist(start, end);
-            if (filteredAppointments.isEmpty) {
-              return Expanded(
-                child: Center(
-                    child: Text('no_appointments_added_yet'.tr(),
-                        style: TextStyle(fontSize: timeFontSize * 1.2))),
-              );
-            }
-            return Expanded(
-              child: Column(
+    final totalPages =
+        (filteredAppointments.length / _appointmentsPerPage).ceil();
+    final startIndex = _currentPage * _appointmentsPerPage;
+    final endIndex =
+        startIndex + _appointmentsPerPage > filteredAppointments.length
+            ? filteredAppointments.length
+            : startIndex + _appointmentsPerPage;
+    final appointmentsForCurrentPage =
+        filteredAppointments.sublist(startIndex, endIndex);
+    if (filteredAppointments.isEmpty) {
+      return Expanded(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              isSearching
+                  ? 'search_survey_or_test_not_found'.tr()
+                  : 'no_appointments_added_yet'.tr(),
+              style: TextStyle(fontSize: timeFontSize * 1.2),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    } else {
+      return Expanded(
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.separated(
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 20.0),
+                itemCount: appointmentsForCurrentPage.length,
+                itemBuilder: (context, index) {
+                  final appointment = filteredAppointments[index];
+                  bool hasParticipated = appointmentListProvider
+                          .userParticipationStatus[appointment.appointmentId] ??
+                      false;
+                  return AppointmentListItem(
+                      appointment: appointmentsForCurrentPage[index],
+                      hasUserParticipated: hasParticipated,
+                      isAdmin: _isAdmin);
+                },
+              ),
+            ),
+            if (totalPages > 1)
+              Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Expanded(
-                    child: ListView.separated(
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 20.0),
-                      itemCount: appointmentsForCurrentPage.length,
-                      itemBuilder: (context, index) {
-                        return AppointmentListItem(
-                          appointment: appointmentsForCurrentPage[index],
-                          hasUserParticipated: false,
-                        );
-                      },
-                    ),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_left_outlined),
+                    onPressed: _currentPage > 0
+                        ? () {
+                            setState(() {
+                              _currentPage--;
+                            });
+                          }
+                        : null,
                   ),
-                  // Navigation controls
-                  if (totalPages > 1)
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: Icon(
-                            Icons.chevron_left_outlined,
-                            color: currentPage > 0
-                                ? ThemeBasedAppColors.getColor(
-                                    context, 'buttonColor')
-                                : Colors.grey,
-                          ),
-                          onPressed: currentPage > 0
-                              ? () {
-                                  setState(() {
-                                    currentPage--;
-                                  });
-                                }
-                              : null,
-                        ),
-                        Text('${currentPage + 1} of $totalPages'),
-                        IconButton(
-                          icon: Icon(
-                            Icons.chevron_right_outlined,
-                            color: currentPage < totalPages - 1
-                                ? ThemeBasedAppColors.getColor(
-                                    context, 'buttonColor')
-                                : Colors.grey,
-                          ),
-                          onPressed: currentPage < totalPages - 1
-                              ? () {
-                                  setState(() {
-                                    currentPage++;
-                                  });
-                                }
-                              : null,
-                        ),
-                      ],
-                    ),
+                  Text('${'page'.tr()} ${_currentPage + 1} of $totalPages'),
+                  IconButton(
+                    icon: const Icon(Icons.chevron_right_outlined),
+                    onPressed: _currentPage < totalPages - 1
+                        ? () {
+                            setState(() {
+                              _currentPage++;
+                            });
+                          }
+                        : null,
+                  ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
+          ],
+        ),
+      );
+    }
   }
 }

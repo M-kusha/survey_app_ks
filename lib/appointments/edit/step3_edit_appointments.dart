@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentEditPageStep3 extends StatefulWidget {
   final Appointment appointment;
@@ -77,8 +77,7 @@ class AppointmentEditPageStep3State extends State<AppointmentEditPageStep3> {
               width: MediaQuery.of(context).size.width * 0.8,
               child: Card(
                 elevation: 5,
-                shadowColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15)),
                 child: InkWell(
@@ -88,29 +87,26 @@ class AppointmentEditPageStep3State extends State<AppointmentEditPageStep3> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.event,
-                            size: timeFontSize * 2.5,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'buttonColor')),
+                        Icon(
+                          Icons.event,
+                          size: timeFontSize * 2.5,
+                          color: getButtonColor(context),
+                        ),
                         const SizedBox(height: 20),
                         Text(
                           DateFormat("EEEE, d MMMM y").format(_expirationDate),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: timeFontSize * 1.1,
-                            fontWeight: FontWeight.bold,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'listTileColor'),
-                          ),
+                              fontSize: timeFontSize * 1.1,
+                              fontWeight: FontWeight.bold,
+                              color: getListTileColor(context)),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'tap_to_change'.tr(),
                           style: TextStyle(
-                            fontSize: timeFontSize * 0.8,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'listTileColor'),
-                          ),
+                              fontSize: timeFontSize * 0.8,
+                              color: getListTileColor(context)),
                         ),
                       ],
                     ),

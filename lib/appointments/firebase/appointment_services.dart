@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:uuid/uuid.dart';
@@ -24,16 +23,6 @@ class AppointmentService {
         .set(appointment.toFirestore());
 
     return uniqueId;
-  }
-
-  Stream<List<Appointment>> getAppointmentList(String companyId) {
-    return _db
-        .collection('appointments')
-        .where('companyId', isEqualTo: companyId)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => Appointment.fromFirestore(doc.data()))
-            .toList());
   }
 
   Future<bool> isAnyTimeSlotConfirmed(String appointmentId) async {
@@ -98,18 +87,6 @@ class AppointmentService {
     await docRef.update(updatedData);
   }
 
-  Future<bool> hasCurrentUserParticipated(
-      String appointmentId, String userId) async {
-    final participantsSnapshot = await _db
-        .collection('appointments')
-        .doc(appointmentId)
-        .collection('participants')
-        .where('userId', isEqualTo: userId)
-        .get();
-
-    return participantsSnapshot.docs.isNotEmpty;
-  }
-
   Stream<List<TimeSlot>> streamConfirmedTimeSlots(String appointmentId) {
     return _db.collection('appointments').doc(appointmentId).snapshots().map(
       (snapshot) {
@@ -124,17 +101,6 @@ class AppointmentService {
         }
       },
     );
-  }
-
-  Future<bool> fetchAdminStatus() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
-      return false;
-    }
-    final userId = user.uid;
-    final doc = await _db.collection('users').doc(userId).get();
-    final role = doc.data()?['role'] as String?;
-    return role == 'admin';
   }
 
   Future<String> fetchUserNameById(String userId) async {
@@ -224,24 +190,5 @@ class AppointmentService {
   Future<String?> getCompanyId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('companyId');
-  }
-
-  Future<Map<String, bool>> fetchParticipationStatusesForUser(
-      List<String> appointmentIds, String userId) async {
-    Map<String, bool> participationStatuses = {};
-
-    for (String appointmentId in appointmentIds) {
-      final participantsSnapshot = await _db
-          .collection('appointments')
-          .doc(appointmentId)
-          .collection('participants')
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      participationStatuses[appointmentId] =
-          participantsSnapshot.docs.isNotEmpty;
-    }
-
-    return participationStatuses;
   }
 }

@@ -8,20 +8,24 @@ import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/step2_participate_appointment.dart';
 import 'package:survey_app_ks/appointments/participants/step3_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class UserSelectCategories extends StatefulWidget {
   final Appointment appointment;
   final TimeSlot timeSlot;
   final String userName;
+  final bool isAdmin;
+  final bool hasParticipated;
 
   const UserSelectCategories({
     Key? key,
     required this.appointment,
     required this.userName,
     required this.timeSlot,
+    required this.isAdmin,
+    required this.hasParticipated,
   }) : super(key: key);
 
   @override
@@ -45,15 +49,14 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   }
 
   void _checkParticipationAndAdminStatus() async {
-    final isAdmin = await appointmentService.fetchAdminStatus();
+    final isAdmin = widget.isAdmin;
     final userId = FirebaseAuth.instance.currentUser?.uid;
     bool userHasParticipated = false;
     bool isTimeSlotConfirmed = await appointmentService
         .isAnyTimeSlotConfirmed(widget.appointment.appointmentId);
 
     if (userId != null) {
-      userHasParticipated = await appointmentService.hasCurrentUserParticipated(
-          widget.appointment.appointmentId, userId);
+      userHasParticipated = widget.hasParticipated;
     }
 
     setState(() {
@@ -82,7 +85,11 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       appBar: _buildAppBar(context, timeFontSize),
       body: _buildBody(context, isButtonDisabled, timeFontSize),
       bottomNavigationBar: participateSelected
-          ? buildParticipateButton(context)
+          ? buildBottomElevatedButton(
+              context: context,
+              onPressed: _onNextPressed,
+              buttonText: 'next',
+            )
           : const SizedBox.shrink(),
     );
   }
@@ -190,9 +197,7 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       child: Text(
         label.tr(),
         style: TextStyle(
-          color: isSelected
-              ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-              : Colors.grey,
+          color: isSelected ? getButtonColor(context) : Colors.grey,
           fontSize: fontSize * 1.2,
         ),
       ),
@@ -208,16 +213,15 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
             child: Container(
                 height: 2,
                 color: participateSelected
-                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                    ? getButtonColor(context)
                     : Colors.grey)),
         Expanded(flex: 0, child: Container(height: 2, color: Colors.black)),
         Expanded(
             flex: 2,
             child: Container(
                 height: 2,
-                color: overviewSelected
-                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-                    : Colors.grey)),
+                color:
+                    overviewSelected ? getButtonColor(context) : Colors.grey)),
       ],
     );
   }
@@ -249,7 +253,8 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
             initialData: const [],
           ),
         ],
-        child: ParticipantOverviewPage(appointment: widget.appointment),
+        child: ParticipantOverviewPage(
+            appointment: widget.appointment, isAdmin: widget.isAdmin),
       ),
     );
   }
@@ -261,38 +266,15 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     });
   }
 
-  Widget buildParticipateButton(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              minimumSize: Size.fromHeight(timeFontSize * 4.0),
-              padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-            ),
-            onPressed: () async {
-              appointmentService
-                  .updateParticipationCount(widget.appointment.appointmentId);
-              setState(() {
-                overviewSelected = true;
-                participateSelected = false;
-                _userHasParticipated = true;
-                widget.appointment.participationCount += 1;
-              });
-            },
-            child: Text('next'.tr(), style: TextStyle(fontSize: timeFontSize)),
-          ),
-          const SizedBox(height: 16.0),
-        ],
-      ),
-    );
+  void _onNextPressed() async {
+    appointmentService
+        .updateParticipationCount(widget.appointment.appointmentId);
+    setState(() {
+      overviewSelected = true;
+      participateSelected = false;
+      _userHasParticipated = true;
+      widget.appointment.participationCount += 1;
+    });
   }
 
   Widget buildEditButton() {

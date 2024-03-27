@@ -10,8 +10,8 @@ import 'package:survey_app_ks/register/registered_sucesfully.dart';
 import 'package:survey_app_ks/reset_password/reset_password.dart';
 import 'package:survey_app_ks/reset_password/reset_verification.dart';
 import 'package:survey_app_ks/settings/settings.dart';
-import 'package:survey_app_ks/survey_questionary/create_survey/create_survey_step_1.dart';
-import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
+import 'package:survey_app_ks/survey_pages/create_survey/step1_create_survey.dart';
+import 'package:survey_app_ks/survey_pages/main_sruvey/survey_main.dart';
 import 'package:survey_app_ks/utilities/bottom_navigation.dart';
 import 'package:survey_app_ks/register/register_logics.dart';
 
@@ -47,7 +47,7 @@ class AppRoutes {
       '/questionary_survey': (BuildContext context) =>
           const QuestionarySurveyPageUI(),
       '/create_training_survey_1': (BuildContext context) =>
-          const CreateTrainingSurveyStep1(),
+          const Step1CreateSurvey(),
     };
   }
 }

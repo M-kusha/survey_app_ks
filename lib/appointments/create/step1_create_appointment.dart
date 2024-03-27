@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step1CreateAppointment extends StatefulWidget {
   const Step1CreateAppointment({Key? key}) : super(key: key);
@@ -80,8 +80,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
                 padding: EdgeInsets.all(timeFontSize * 1.5),
                 child: Card(
                   elevation: 5,
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  shadowColor: getButtonColor(context),
                   child: Form(
                     key: _formKey,
                     child: GestureDetector(
@@ -135,15 +134,15 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
                                 height: 1.5,
                               ),
                               controller: _descriptionController,
-                              maxLength: 256,
-                              maxLines: maxLines,
+                              maxLength: 1000,
+                              maxLines: null,
+                              keyboardType: TextInputType.multiline,
+                              textInputAction: TextInputAction.newline,
                               decoration: InputDecoration(
                                 hintText:
                                     'create_appointment_description_hint'.tr(),
                                 hintStyle:
                                     TextStyle(fontSize: timeFontSize * 1.2),
-                                counterText:
-                                    '${_descriptionController.text.length}/256',
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {

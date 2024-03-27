@@ -2,8 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class ActionField extends StatefulWidget {
   final bool isSearching;
@@ -47,23 +47,21 @@ class ActionFieldState extends State<ActionField> {
               },
               decoration: InputDecoration(
                 hintStyle: TextStyle(
-                    color:
-                        ThemeBasedAppColors.getColor(context, 'buttonColor')),
+                  color: getButtonColor(context),
+                ),
                 border: InputBorder.none,
                 hintText: 'search'.tr(),
                 contentPadding:
                     const EdgeInsets.symmetric(vertical: 1.0, horizontal: 24.0),
                 filled: true,
-                prefixIconColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                prefixIconColor: getButtonColor(context),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide.none,
                   borderRadius: BorderRadius.circular(50),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: ThemeBasedAppColors.getColor(
-                        context, 'buttonColor'), // Adjust as needed
+                    color: getButtonColor(context), // Adjust as needed
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(50),

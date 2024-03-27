@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
-import 'package:survey_app_ks/settings/settings.dart';
+
+const double fontMediumSize = 14;
 
 class FontSizeProvider with ChangeNotifier {
   double _fontSize = fontMediumSize;

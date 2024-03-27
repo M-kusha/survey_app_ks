@@ -5,12 +5,14 @@ import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/step4_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class ParticipantOverviewPage extends StatefulWidget {
   final Appointment appointment;
+  final bool isAdmin;
 
-  const ParticipantOverviewPage({Key? key, required this.appointment})
+  const ParticipantOverviewPage(
+      {Key? key, required this.appointment, required this.isAdmin})
       : super(key: key);
 
   @override
@@ -67,13 +69,11 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
     return Card(
       margin: const EdgeInsets.all(8),
       elevation: 3,
-      shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      shadowColor: getButtonColor(context),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: isConfirmed
-            ? BorderSide(
-                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
-                width: 2)
+            ? BorderSide(color: getButtonColor(context), width: 2)
             : BorderSide.none,
       ),
       child: ListTile(
@@ -109,11 +109,10 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: ThemeBasedAppColors.getColor(context, 'buttonColor')
-            .withOpacity(0.1),
+        color: getButtonColor(context).withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          color: getButtonColor(context),
         ),
       ),
       child: Row(
@@ -124,14 +123,14 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
             style: TextStyle(
               fontSize: fontSize * 0.9,
               fontWeight: FontWeight.bold,
-              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: getButtonColor(context),
             ),
           ),
           const SizedBox(width: 4),
           Icon(
             Icons.people,
             size: fontSize * 1.0,
-            color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+            color: getButtonColor(context),
           ),
         ],
       ),
@@ -140,7 +139,7 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
 
   Widget buildLeadingIcon(BuildContext context, bool isConfirmed) {
     return CircleAvatar(
-      backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      backgroundColor: getButtonColor(context),
       child: Icon(
         isConfirmed ? Icons.alarm_on_outlined : Icons.alarm,
       ),
@@ -157,7 +156,9 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
           value: _appointmentService
               .streamConfirmedTimeSlots(widget.appointment.appointmentId),
           child: TimeSlotParticipantsPage(
-              appointment: widget.appointment, timeSlot: timeSlot),
+              appointment: widget.appointment,
+              timeSlot: timeSlot,
+              isAdmin: widget.isAdmin),
         ),
       ),
     );

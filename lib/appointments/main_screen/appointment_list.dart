@@ -1,5 +1,4 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
@@ -7,17 +6,19 @@ import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/participants_appointments_button.dart';
 import 'package:survey_app_ks/appointments/participants/step1_participate_appointment.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentListItem extends StatelessWidget {
   final Appointment appointment;
   final bool hasUserParticipated;
+  final bool isAdmin;
   final AppointmentService appointmentService = AppointmentService();
 
   AppointmentListItem({
     Key? key,
     required this.appointment,
     required this.hasUserParticipated,
+    required this.isAdmin,
   }) : super(key: key);
 
   Color? _textColor(BuildContext context) {
@@ -34,27 +35,20 @@ class AppointmentListItem extends StatelessWidget {
         ? fontSize.clamp(0.0, 15.0)
         : fontSize.clamp(0.0, 30.0);
     final isExpired = appointment.expirationDate.isBefore(DateTime.now());
+    final count = appointment.participationCount;
 
-    return FutureBuilder<bool>(
-      future: appointmentService.hasCurrentUserParticipated(
-          appointment.appointmentId, FirebaseAuth.instance.currentUser!.uid),
-      builder: (context, snapshot) {
-        final participated = snapshot.data ?? false;
-        final count = appointment.participationCount;
-
-        return _listItems(
-            context, isExpired, participated, timeFontSize, count);
-      },
-    );
+    return _listItems(
+        context, isExpired, hasUserParticipated, timeFontSize, count);
   }
 
   GestureDetector _listItems(BuildContext context, bool isExpired,
       bool participated, double timeFontSize, int count) {
     return GestureDetector(
-      onTap:
-          isExpired ? null : () => navigateToCorrectPage(context, participated),
+      onTap: (!isExpired)
+          ? () => navigateToCorrectPage(context, participated, isAdmin)
+          : null,
       child: Opacity(
-        opacity: isExpired ? 0.5 : 1.0,
+        opacity: (isExpired || participated) ? 0.8 : 1.0,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
           child:
@@ -71,9 +65,9 @@ class AppointmentListItem extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
         side: BorderSide(
-          color: participated
-              ? ThemeBasedAppColors.getColor(context, 'buttonColor')
-              : Colors.grey.withOpacity(0.2),
+          color: isExpired
+              ? getButtonColor(context).withOpacity(0.5)
+              : getButtonColor(context),
           width: 2,
         ),
       ),
@@ -83,7 +77,7 @@ class AppointmentListItem extends StatelessWidget {
           children: [
             Column(
               children: [
-                _buildRichText(context, timeFontSize, isExpired),
+                _buildRichText(context, timeFontSize, isExpired, participated),
                 const SizedBox(height: 8.0),
                 _buildInfoRow(context, timeFontSize, count),
               ],
@@ -94,8 +88,21 @@ class AppointmentListItem extends StatelessWidget {
     );
   }
 
-  RichText _buildRichText(
-      BuildContext context, double timeFontSize, bool isExpired) {
+  RichText _buildRichText(BuildContext context, double timeFontSize,
+      bool isExpired, bool hasParticipated) {
+    String statusText;
+    Color statusColor;
+
+    if (isExpired) {
+      statusText = 'expired'.tr();
+      statusColor = Colors.red;
+    } else if (hasParticipated) {
+      statusText = 'already_participated'.tr();
+      statusColor = getButtonColor(context);
+    } else {
+      statusText = 'open'.tr();
+      statusColor = getButtonColor(context);
+    }
     return RichText(
       text: TextSpan(
         children: [
@@ -110,11 +117,9 @@ class AppointmentListItem extends StatelessWidget {
             ),
           ),
           TextSpan(
-            text: isExpired ? 'expired'.tr() : 'open'.tr(),
+            text: statusText,
             style: TextStyle(
-              color: isExpired
-                  ? Colors.red
-                  : ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: statusColor,
               fontWeight: FontWeight.bold,
               fontSize: timeFontSize,
             ),
@@ -188,7 +193,8 @@ class AppointmentListItem extends StatelessWidget {
     );
   }
 
-  void navigateToCorrectPage(BuildContext context, bool participated) {
+  void navigateToCorrectPage(
+      BuildContext context, bool participated, bool isAdmin) {
     final isTimeSlotConfirmed =
         appointment.availableTimeSlots.any((ts) => ts.isConfirmed);
 
@@ -197,14 +203,15 @@ class AppointmentListItem extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (context) => UserSelectCategories(
-            appointment: appointment,
-            userName: '',
-            timeSlot: TimeSlot(
-              start: DateTime.now(),
-              end: DateTime.now(),
-              expirationDate: DateTime.now(),
-            ),
-          ),
+              appointment: appointment,
+              userName: '',
+              timeSlot: TimeSlot(
+                start: DateTime.now(),
+                end: DateTime.now(),
+                expirationDate: DateTime.now(),
+              ),
+              isAdmin: isAdmin,
+              hasParticipated: participated),
         ),
       );
     } else {
@@ -225,7 +232,9 @@ class AppointmentListItem extends StatelessWidget {
                   expirationDate: DateTime.now(),
                 ),
                 profileImageUrl: '',
-              )),
+              ),
+              hasParticipated: hasUserParticipated,
+              isAdmin: isAdmin),
         ),
       );
     }

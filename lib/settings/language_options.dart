@@ -40,7 +40,6 @@ class LanguageOptionsWidgetState extends State<LanguageOptionsWidget> {
     final fontSizeProvider = Provider.of<FontSizeProvider>(context);
     final currentLocale = context.locale;
     final List<Locale> locales = context.supportedLocales;
-    Color buttonColor = getButtonColor(context);
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
@@ -84,13 +83,12 @@ class LanguageOptionsWidgetState extends State<LanguageOptionsWidget> {
               children: locales
                   .map((locale) => ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: buttonColor,
+                          backgroundColor: getButtonColor(context),
                           child: Text(
                             locale.languageCode.toUpperCase(),
                             style: TextStyle(
-                              fontSize: fontSizeProvider.fontSize - 4,
-                              color: Colors.white,
-                            ),
+                                fontSize: fontSizeProvider.fontSize - 4,
+                                color: getCameraColor(context)),
                           ),
                         ),
                         title: Text(
@@ -99,7 +97,7 @@ class LanguageOptionsWidgetState extends State<LanguageOptionsWidget> {
                         ),
                         trailing: locale == currentLocale
                             ? Icon(Icons.check_circle,
-                                color: buttonColor,
+                                color: getButtonColor(context),
                                 size: fontSizeProvider.fontSize + 10)
                             : null,
                         onTap: () => _changeLanguage(context, locale),

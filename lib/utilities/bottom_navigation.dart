@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
 import 'package:survey_app_ks/home.dart';
 import 'package:survey_app_ks/settings/settings.dart';
-import 'package:survey_app_ks/survey_questionary/main_sruvey/survey_main.dart';
+import 'package:survey_app_ks/survey_pages/main_sruvey/survey_main.dart';
+
 import 'package:survey_app_ks/utilities/colors.dart';
 
 class BottomNavigation extends StatefulWidget {

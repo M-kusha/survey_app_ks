@@ -3,10 +3,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:survey_app_ks/appointments/firebase/appointment_provider.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/firebase_options.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/register/register_logics.dart';
+import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
+import 'package:survey_app_ks/utilities/firebase_services.dart';
 import 'package:survey_app_ks/utilities/routes.dart';
 import 'package:survey_app_ks/login/login.dart';
 
@@ -27,9 +30,20 @@ Future<void> main() async {
         Provider<AppointmentService>(
           create: (_) => AppointmentService(),
         ),
+        Provider<FirebaseServices>(
+          create: (_) => FirebaseServices(),
+        ),
         Provider<RegisterLogic>(
           create: (_) => RegisterLogic(),
         ),
+        ChangeNotifierProvider(
+          create: (context) => SurveyDataProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => AppointmentDataProvider(),
+        ),
+        ChangeNotifierProvider(
+            create: (_) => UserDataProvider()..loadCurrentUser()),
       ],
       child: EasyLocalization(
         supportedLocales: const [

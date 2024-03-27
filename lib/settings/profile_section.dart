@@ -5,6 +5,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
+import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/text_style.dart';
 
@@ -27,8 +29,8 @@ class _ProfileSectionState extends State<ProfileSection> {
   }
 
   Future<void> _pickAndUploadImage() async {
-    final ImagePicker _picker = ImagePicker();
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final ImagePicker picker = ImagePicker();
+    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
     if (image == null) return;
 
     File file = File(image.path);
@@ -62,9 +64,7 @@ class _ProfileSectionState extends State<ProfileSection> {
 
   @override
   Widget build(BuildContext context) {
-    Color buttonColor = getButtonColor(context);
-    Color listCameraColor = getCameraColor(context);
-
+    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     return StreamBuilder<DocumentSnapshot>(
       stream: getUserDataStream(),
       builder: (context, snapshot) {
@@ -94,7 +94,7 @@ class _ProfileSectionState extends State<ProfileSection> {
                       alignment: Alignment.center,
                       children: [
                         CircleAvatar(
-                          radius: 50,
+                          radius: fontSize * 3,
                           backgroundColor: Colors.grey.shade200,
                           backgroundImage:
                               !_isUploading && userProfilePic != null
@@ -103,7 +103,8 @@ class _ProfileSectionState extends State<ProfileSection> {
                           child: _isUploading
                               ? CircularProgressIndicator(
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                      buttonColor))
+                                  getButtonColor(context),
+                                ))
                               : null,
                         ),
                         if (userProfilePic == null && !_isUploading)
@@ -111,8 +112,8 @@ class _ProfileSectionState extends State<ProfileSection> {
                             alignment: Alignment.center,
                             child: Icon(
                               Icons.camera_alt,
-                              size: 40.0,
-                              color: listCameraColor,
+                              size: fontSize * 2,
+                              color: getCameraColor(context),
                             ),
                           ),
                       ],
@@ -121,11 +122,17 @@ class _ProfileSectionState extends State<ProfileSection> {
                   const SizedBox(height: 8),
                   Text(
                     userName,
-                    style: Theme.of(context).textTheme.titleLarge,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   Text(
                     userEmail,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 16),
                 ],

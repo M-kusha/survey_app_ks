@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step2CreateAppointment extends StatefulWidget {
   const Step2CreateAppointment({Key? key}) : super(key: key);
@@ -105,7 +105,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
         margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
-          color: ThemeBasedAppColors.getColor(context, 'dateColor'),
+          color: getButtonColor(context),
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(
@@ -120,8 +120,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Icon(Icons.calendar_today,
-                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
-                size: timeFontSize * 1.5),
+                color: getButtonColor(context), size: timeFontSize * 1.5),
             Expanded(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -139,8 +138,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: timeFontSize,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'listTileColor')),
+                        color: getListTileColor(context)),
                   ),
                 ],
               ),
@@ -168,7 +166,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
 
     return FloatingActionButton(
       onPressed: _addDate,
-      backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      backgroundColor: getButtonColor(context),
       child: Icon(Icons.add, size: timeFontSize * 2),
     );
   }
@@ -180,15 +178,14 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'create_appointment'.tr(),
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
+          title: Text(
+            'create_appointment'.tr(),
+            style: TextStyle(
+              fontSize: timeFontSize * 1.5,
+            ),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: LayoutBuilder(
         builder: (context, constraints) {
           final verticalSpacing = constraints.maxHeight * 0.02;
@@ -201,8 +198,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
                   style: TextStyle(
                       fontSize: timeFontSize * 1.3,
                       fontWeight: FontWeight.bold,
-                      color: ThemeBasedAppColors.getColor(
-                          context, "listTileColor")),
+                      color: getListTileColor(context)),
                 ),
               ),
               const SizedBox(height: 16),
@@ -214,8 +210,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
                         style: TextStyle(
                           fontSize: timeFontSize,
                           fontWeight: FontWeight.bold,
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'listTileColor'),
+                          color: getListTileColor(context),
                         ),
                       ))
                     : ListView.builder(

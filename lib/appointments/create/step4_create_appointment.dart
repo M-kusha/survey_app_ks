@@ -5,9 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/bottom_navigation.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step4CreateAppointment extends StatefulWidget {
   final Appointment appointment;
@@ -38,32 +38,32 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'create_appointment'.tr(),
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
+          title: Text(
+            'create_appointment'.tr(),
+            style: TextStyle(
+              fontSize: timeFontSize * 1.5,
+            ),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Card(
               elevation: 5,
-              shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              shadowColor: getButtonColor(context),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15)),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Icon(Icons.check_circle_outline,
-                        size: timeFontSize * 3,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'buttonColor')),
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: timeFontSize * 3,
+                      color: getButtonColor(context),
+                    ),
                     const SizedBox(height: 20),
                     Text(
                       'appointment_created_successfully'.tr(),
@@ -71,8 +71,7 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
                       style: TextStyle(
                         fontSize: timeFontSize * 1.2,
                         fontWeight: FontWeight.bold,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'listTileColor'),
+                        color: getListTileColor(context),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -87,8 +86,7 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
                           widget.appointment.appointmentId, timeFontSize),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'appbarColor'),
+                          color: getAppbarColor(context),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         padding: const EdgeInsets.symmetric(

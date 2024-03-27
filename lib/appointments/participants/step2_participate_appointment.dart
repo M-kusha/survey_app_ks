@@ -5,8 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppontmentParticipate extends StatefulWidget {
   final Appointment appointment;
@@ -73,12 +73,12 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
   ) {
     return Card(
       elevation: 2,
-      shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      shadowColor: getButtonColor(context),
       margin: const EdgeInsets.all(8.0),
       child: ListTile(
         leading: Icon(
           Icons.calendar_today,
-          color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          color: getButtonColor(context),
         ),
         title: buildAppointmentTitle(fontSize, formattedDate, timeFontSize,
             startTimeString, endTimeString),

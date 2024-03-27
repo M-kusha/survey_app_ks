@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<dynamic> userProfile(
@@ -59,8 +59,7 @@ Future<dynamic> userProfile(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.person_outline,
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'buttonColor')),
+                          color: getButtonColor(context)),
                       const SizedBox(width: 10),
                       Text(fullName,
                           style: const TextStyle(
@@ -85,8 +84,7 @@ Future<dynamic> userProfile(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.email_outlined,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'buttonColor')),
+                            color: getButtonColor(context)),
                         const SizedBox(width: 10),
                         Text(email, style: const TextStyle(fontSize: 16)),
                       ],

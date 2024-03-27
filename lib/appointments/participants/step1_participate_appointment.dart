@@ -6,18 +6,22 @@ import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/participants_appointments_button.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentNamePage extends StatefulWidget {
   final Appointment appointment;
   final AppointmentParticipants participant;
+  final bool isAdmin;
+  final bool hasParticipated;
 
   const AppointmentNamePage({
     Key? key,
     required this.appointment,
     required this.participant,
+    required this.isAdmin,
+    required this.hasParticipated,
   }) : super(key: key);
 
   @override
@@ -58,6 +62,8 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
             appointment: widget.appointment,
             userName: widget.participant.userName,
             timeSlot: widget.participant.timeSlot,
+            isAdmin: widget.isAdmin,
+            hasParticipated: widget.hasParticipated,
           ),
         ),
       );
@@ -70,15 +76,14 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          widget.appointment.title,
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
+          title: Text(
+            widget.appointment.title,
+            style: TextStyle(
+              fontSize: timeFontSize * 1.5,
+            ),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(timeFontSize * 1.5),
@@ -87,8 +92,7 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
             children: [
               Card(
                 elevation: 5,
-                shadowColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(15),
                 ),

@@ -3,7 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentEditPageStep4 extends StatefulWidget {
   final Appointment appointment;
@@ -40,7 +40,7 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
       body: Center(
         child: Card(
           elevation: 5,
-          shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          shadowColor: getButtonColor(context),
           margin: const EdgeInsets.all(24),
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -54,10 +54,10 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
                   child: Text(
                     'editing_confirmation_status'.tr(),
                     style: TextStyle(
-                        fontSize: fontSize * 1.1,
-                        fontWeight: FontWeight.bold,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'buttonColor')),
+                      fontSize: fontSize * 1.1,
+                      fontWeight: FontWeight.bold,
+                      color: getButtonColor(context),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -75,8 +75,7 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
                   value: isChecked,
                   onChanged: (value) => _handleCheckboxChanged(value),
                   activeColor: themeColor,
-                  checkColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  checkColor: getButtonColor(context),
                   controlAffinity: ListTileControlAffinity.leading,
                 ),
               ],

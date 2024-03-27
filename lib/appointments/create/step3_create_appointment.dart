@@ -5,9 +5,9 @@ import 'package:survey_app_ks/appointments/create/step4_create_appointment.dart'
 import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step3CreateAppointment extends StatefulWidget {
   const Step3CreateAppointment({super.key});
@@ -74,6 +74,57 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
     }
   }
 
+  // Future<void> sendNotification(String surveyTitle) async {
+  //   final fcmToken = await FirebaseMessaging.instance.getToken();
+
+  //   // Assuming using a topic here. Adjust accordingly if using tokens.
+  //   const topic = 'surveys';
+
+  //   // Your server key from Firebase project settings
+  //   const serverKey = 'YOUR_SERVER_KEY';
+
+  //   final response = await http.post(
+  //     Uri.parse('https://fcm.googleapis.com/fcm/send'),
+  //     headers: <String, String>{
+  //       'Content-Type': 'application/json',
+  //       'Authorization': 'key=$serverKey',
+  //     },
+  //     body: jsonEncode(
+  //       <String, dynamic>{
+  //         'notification': <String, dynamic>{
+  //           'body': 'Check out this new survey: $surveyTitle',
+  //           'title': 'New Survey Available'
+  //         },
+  //         'priority': 'high',
+  //         'data': <String, dynamic>{
+  //           'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+  //           'id': '1',
+  //           'status': 'done'
+  //         },
+  //         'to': '/topics/$topic',
+  //       },
+  //     ),
+  //   );
+
+  //   if (response.statusCode == 200) {
+  //     // Handle response and/or notify user
+  //     print("Notification sent");
+  //   } else {
+  //     // Handle failure
+  //     print("Failed to send notification");
+  //   }
+  // }
+
+  @override
+  void initState() {
+    super.initState();
+    // FirebaseMessaging.instance
+    //     .requestPermission(); // Request permissions for iOS
+    // FirebaseMessaging.instance.getToken().then((token) {
+    //   print("Firebase Messaging Token: $token");
+    // });
+  }
+
   @override
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
@@ -81,15 +132,14 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'create_appointment'.tr(),
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
+          title: Text(
+            'create_appointment'.tr(),
+            style: TextStyle(
+              fontSize: timeFontSize * 1.5,
+            ),
           ),
-        ),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -113,8 +163,7 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
               width: MediaQuery.of(context).size.width * 0.8,
               child: Card(
                 elevation: 5,
-                shadowColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(15)),
                 child: InkWell(
@@ -124,29 +173,26 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.event,
-                            size: timeFontSize * 2.5,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'buttonColor')),
+                        Icon(
+                          Icons.event,
+                          size: timeFontSize * 2.5,
+                          color: getButtonColor(context),
+                        ),
                         const SizedBox(height: 20),
                         Text(
                           DateFormat("EEEE, d MMMM y").format(_expirationDate),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: timeFontSize * 1.1,
-                            fontWeight: FontWeight.bold,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'listTileColor'),
-                          ),
+                              fontSize: timeFontSize * 1.1,
+                              fontWeight: FontWeight.bold,
+                              color: getListTileColor(context)),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'tap_to_change'.tr(),
                           style: TextStyle(
-                            fontSize: timeFontSize * 0.8,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'listTileColor'),
-                          ),
+                              fontSize: timeFontSize * 0.8,
+                              color: getListTileColor(context)),
                         ),
                       ],
                     ),
@@ -169,8 +215,8 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
     final timeFontSize = getTimeFontSize(context, 13);
     return OutlinedButton(
       style: OutlinedButton.styleFrom(
-        foregroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+        foregroundColor: getButtonColor(context),
+        backgroundColor: getButtonColor(context),
         shape: const CircleBorder(),
         padding: const EdgeInsets.all(6),
       ),

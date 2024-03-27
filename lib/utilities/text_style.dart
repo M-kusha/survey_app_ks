@@ -32,6 +32,27 @@ Color getButtonColor(BuildContext context) {
   return ThemeBasedAppColors.getColor(context, 'buttonColor');
 }
 
+Color getListTileColor(BuildContext context) {
+  return ThemeBasedAppColors.getColor(context, 'listTileColor');
+}
+
+Color getTextColor(BuildContext context) {
+  return ThemeBasedAppColors.getColor(context, 'textColor');
+}
+
+// get appbar color
+Color getAppbarColor(BuildContext context) {
+  return ThemeBasedAppColors.getColor(context, 'appbarColor');
+}
+
 Color getCameraColor(BuildContext context) {
   return ThemeBasedAppColors.getColor(context, 'cameraIconColor');
+}
+
+Color getIconColor(BuildContext context) {
+  return ThemeBasedAppColors.getColor(context, 'iconColor');
+}
+
+Color getCardColor(BuildContext context) {
+  return ThemeBasedAppColors.getColor(context, 'cardColor');
 }

@@ -15,6 +15,8 @@ class ThemeBasedAppColors {
     'listparticipatedColor': Colors.green,
     'listnotparticipatedColor': Colors.white,
     "cameraIconColor": Colors.blueGrey,
+    'cardColor': Colors.grey[800] ?? Colors.white,
+    "iconColor": Colors.blueGrey,
   };
 
   static final Map<String, Color> _darkThemeColors = {
@@ -31,6 +33,8 @@ class ThemeBasedAppColors {
     'listparticipatedColor': Colors.green,
     'listnotparticipatedColor': Colors.white,
     "cameraIconColor": Colors.blueGrey,
+    'cardColor': Colors.grey[800] ?? Colors.white,
+    "iconColor": Colors.blueGrey,
   };
 
   static Color getColor(BuildContext context, String colorKey) {

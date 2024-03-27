@@ -2,22 +2,21 @@ import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:survey_app_ks/login/login.dart';
 import 'package:survey_app_ks/settings/daten_schutz.dart';
-import 'package:survey_app_ks/settings/email_options.dart';
 import 'package:survey_app_ks/settings/font_size_options.dart';
+import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/settings/language_options.dart';
 import 'package:survey_app_ks/settings/notifications_options.dart';
 import 'package:survey_app_ks/settings/password_change.dart';
 import 'package:survey_app_ks/settings/profile_section.dart';
 import 'package:survey_app_ks/settings/text_to_speach_options.dart';
 import 'package:survey_app_ks/settings/theme_options.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/settings/user_menagment.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
 import 'package:survey_app_ks/utilities/text_style.dart';
-
-const double fontMediumSize = 14;
 
 class SettingsPageUI extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
@@ -28,7 +27,6 @@ class SettingsPageUI extends StatefulWidget {
 }
 
 class _SettingsPageUIState extends State<SettingsPageUI> {
-  double currentFontSize = fontMediumSize;
   String userID = '';
 
   @override
@@ -59,6 +57,8 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
   @override
   Widget build(BuildContext context) {
+    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+
     return Builder(
       builder: (context) {
         return Scaffold(
@@ -66,6 +66,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             automaticallyImplyLeading: false,
             centerTitle: true,
             title: Text('settings'.tr()),
+            backgroundColor: getAppbarColor(context),
           ),
           body: Container(
             padding: const EdgeInsets.all(10),
@@ -73,8 +74,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               children: [
                 Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  shadowColor: getButtonColor(context),
                   child: Stack(
                     children: [
                       Align(
@@ -105,19 +105,44 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                   ),
                 ),
                 Card(
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  shadowColor: getButtonColor(context),
+                  margin: const EdgeInsets.symmetric(vertical: 8),
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.group,
+                      ),
+                      title: Text(
+                        'user_management'.tr(),
+                        style: TextStyle(
+                          fontSize: fontSize,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      trailing: Icon(
+                        Icons.chevron_right_outlined,
+                        color: getButtonColor(context),
+                      ),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  UserManagementPage(userId: userID)),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                Card(
+                  shadowColor: getButtonColor(context),
                   margin: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
                     children: [
                       NotificationsOptions(
                         icon: Icons.notifications,
                         title: 'global_notifications'.tr(),
-                      ),
-                      sizedBoxSettings,
-                      EmailOptions(
-                        icon: Icons.email,
-                        title: 'email_notifications'.tr(),
                       ),
                       sizedBoxSettings,
                       TTSOptions(
@@ -134,8 +159,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                 ),
                 Card(
                   margin: const EdgeInsets.symmetric(vertical: 8),
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  shadowColor: getButtonColor(context),
                   child: Column(
                     children: [
                       DatenSchutzOptionsWidget(

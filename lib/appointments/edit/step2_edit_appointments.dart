@@ -5,6 +5,7 @@ import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentEditPageStep2 extends StatefulWidget {
   final Appointment appointment;
@@ -30,17 +31,14 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
         lastDate: DateTime(2101));
 
     if (pickedDateRange != null && mounted) {
-      // Check if the widget is still mounted
       final TimeOfDay? pickedStartTime =
           await showTimePicker(context: context, initialTime: TimeOfDay.now());
 
       if (pickedStartTime != null && mounted) {
-        // Check again after async gap
         final TimeOfDay? pickedEndTime = await showTimePicker(
             context: context, initialTime: pickedStartTime);
 
         if (pickedEndTime != null && mounted) {
-          // Check again after async gap
           _updateTimeSlots(
               pickedDateRange, pickedStartTime, pickedEndTime, index);
         }
@@ -107,7 +105,7 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
           children: [
             Icon(
               Icons.calendar_today,
-              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: getButtonColor(context),
               size: timeFontSize * 1.5,
             ),
             Expanded(
@@ -127,12 +125,8 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
                     '${DateFormat.jm().format(widget.appointment.availableTimeSlots[index].start)} - ${DateFormat.jm().format(widget.appointment.availableTimeSlots[index].end)}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: timeFontSize,
-                      color: ThemeBasedAppColors.getColor(
-                        context,
-                        'listTileColor',
-                      ),
-                    ),
+                        fontSize: timeFontSize,
+                        color: getListTileColor(context)),
                   ),
                 ],
               ),
@@ -157,7 +151,7 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
 
     return FloatingActionButton(
       onPressed: _addDate,
-      backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+      backgroundColor: getButtonColor(context),
       child: Icon(Icons.add, size: timeFontSize * 2),
     );
   }

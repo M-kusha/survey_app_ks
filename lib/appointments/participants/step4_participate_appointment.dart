@@ -5,18 +5,20 @@ import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/appointments/participants/user_profile_short.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class TimeSlotParticipantsPage extends StatefulWidget {
   final TimeSlot timeSlot;
   final Appointment appointment;
+  final bool isAdmin;
 
   const TimeSlotParticipantsPage({
     Key? key,
     required this.timeSlot,
     required this.appointment,
+    required this.isAdmin,
   }) : super(key: key);
 
   @override
@@ -54,7 +56,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
 
   void _initPage() async {
     final companyId = await _appointmentService.getCompanyId();
-    final isAdmin = await _appointmentService.fetchAdminStatus();
+    final isAdmin = widget.isAdmin;
     List<AppointmentParticipants> allParticipantsWithImages = [];
 
     final allParticipants = await _appointmentService.fetchParticipants(
@@ -127,7 +129,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
             fontSize: timeFontSize * 1.5,
           ),
         ),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
+        backgroundColor: getAppbarColor(context),
         centerTitle: true,
       ),
       body: _isLoading
@@ -138,8 +140,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
               children: [
                 Card(
                   elevation: 3,
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                  shadowColor: getButtonColor(context),
                   child: Column(
                     children: [
                       buildConfirmationStatus(),
@@ -170,8 +171,8 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
   }
 
   Widget buildConfirmationStatus() {
-    final textColor = ThemeBasedAppColors.getColor(context, "listTileColor");
-    final buttonColor = ThemeBasedAppColors.getColor(context, "buttonColor");
+    final textColor = getListTileColor(context);
+    final buttonColor = getButtonColor(context);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     final timeSlot = widget.timeSlot;
@@ -194,7 +195,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
             side: BorderSide(
-              color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              color: buttonColor,
               width: 1,
             ),
           ),
@@ -238,7 +239,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
                     ),
                   ],
                 ),
-                if (_isAdmin) // Show the icon if the user is an admin
+                if (_isAdmin)
                   Positioned(
                     right: 0,
                     top: 0,
@@ -341,7 +342,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
                 borderRadius: BorderRadius.circular(12.0),
               ),
               elevation: 3,
-              shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+              shadowColor: getButtonColor(context),
               margin:
                   const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
               child: ListTile(
