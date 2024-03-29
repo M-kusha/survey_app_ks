@@ -1,11 +1,14 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:survey_app_ks/settings/delete_account.dart';
 import 'package:survey_app_ks/utilities/colors.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class PasswordChanger extends StatefulWidget {
-  const PasswordChanger({Key? key, d}) : super(key: key);
+  final bool isSuperAdmin;
+  const PasswordChanger({Key? key, d, required this.isSuperAdmin})
+      : super(key: key);
 
   @override
   PasswordChangertate createState() => PasswordChangertate();
@@ -22,6 +25,7 @@ class PasswordChangertate extends State<PasswordChanger> {
   @override
   void initState() {
     super.initState();
+
     _newPasswordController.addListener(() {
       _updateStrength(_newPasswordController.text);
     });
@@ -147,145 +151,150 @@ class PasswordChangertate extends State<PasswordChanger> {
             ))
           : SingleChildScrollView(
               child: Center(
-                child: Card(
-                  shadowColor:
-                      ThemeBasedAppColors.getColor(context, 'buttonColor'),
-                  margin: const EdgeInsets.symmetric(
-                      vertical: 50.0, horizontal: 25.0),
-                  elevation: 5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const SizedBox(height: 20),
-                        Padding(
-                          padding:
-                              const EdgeInsets.only(left: 8.0, bottom: 8.0),
-                          child: Text(
-                            'change_password_title'.tr(),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 50),
-                        TextFormField(
-                          controller: _oldPasswordController,
-                          obscureText: !_isPasswordVisible,
-                          decoration: InputDecoration(
-                            labelText: 'old_password'.tr(),
-                            border: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                            ),
-                            focusedBorder: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                            ),
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        TextFormField(
-                          controller: _newPasswordController,
-                          onChanged: (value) {
-                            _updateStrength(value);
-                            _newPasswordController.text = value;
-                          },
-                          obscureText: !_isPasswordVisible,
-                          decoration: InputDecoration(
-                            labelText: 'set_your_password'.tr(),
-                            hintStyle: const TextStyle(
-                              fontSize: 10,
-                            ),
-                            border: const OutlineInputBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12)),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(
-                                color: _getBorderColorBasedOnStrength(
-                                  _strength,
+                child: Column(
+                  children: [
+                    Card(
+                      shadowColor:
+                          ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                      margin: const EdgeInsets.symmetric(
+                          vertical: 50.0, horizontal: 25.0),
+                      elevation: 5,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(height: 20),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                              child: Text(
+                                'change_password_title'.tr(),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                width: 2.0,
                               ),
                             ),
-                            prefixIcon: const Icon(Icons.lock),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
+                            const SizedBox(height: 50),
+                            TextFormField(
+                              controller: _oldPasswordController,
+                              obscureText: !_isPasswordVisible,
+                              decoration: InputDecoration(
+                                labelText: 'old_password'.tr(),
+                                border: const OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(12)),
+                                ),
+                                focusedBorder: const OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(12)),
+                                ),
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
                               ),
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
-                                });
+                            ),
+                            const SizedBox(height: 20),
+                            TextFormField(
+                              controller: _newPasswordController,
+                              onChanged: (value) {
+                                _updateStrength(value);
+                                _newPasswordController.text = value;
                               },
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        const SizedBox(height: 10),
-                        TextFormField(
-                          controller: _confirmPasswordController,
-                          obscureText: !_isPasswordVisible,
-                          onChanged: (value) {
-                            setState(() {});
-                          },
-                          decoration: InputDecoration(
-                            labelText: 'confirm_password'.tr(),
-                            border: OutlineInputBorder(
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(
-                                color: _getConfirmPasswordBorderColor(),
-                                width: 1.0,
+                              obscureText: !_isPasswordVisible,
+                              decoration: InputDecoration(
+                                labelText: 'set_your_password'.tr(),
+                                hintStyle: const TextStyle(
+                                  fontSize: 10,
+                                ),
+                                border: const OutlineInputBorder(
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(12)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(12)),
+                                  borderSide: BorderSide(
+                                    color: _getBorderColorBasedOnStrength(
+                                      _strength,
+                                    ),
+                                    width: 2.0,
+                                  ),
+                                ),
+                                prefixIcon: const Icon(Icons.lock),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
                               ),
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius:
-                                  const BorderRadius.all(Radius.circular(12)),
-                              borderSide: BorderSide(
-                                color: _getConfirmPasswordBorderColor(),
-                                width: 2.0,
-                              ),
-                            ),
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _isPasswordVisible
-                                    ? Icons.visibility_off
-                                    : Icons.visibility,
-                              ),
-                              onPressed: () {
-                                setState(() {
-                                  _isPasswordVisible = !_isPasswordVisible;
-                                });
+                            const SizedBox(height: 10),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              controller: _confirmPasswordController,
+                              obscureText: !_isPasswordVisible,
+                              onChanged: (value) {
+                                setState(() {});
                               },
+                              decoration: InputDecoration(
+                                labelText: 'confirm_password'.tr(),
+                                border: OutlineInputBorder(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(12)),
+                                  borderSide: BorderSide(
+                                    color: _getConfirmPasswordBorderColor(),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(12)),
+                                  borderSide: BorderSide(
+                                    color: _getConfirmPasswordBorderColor(),
+                                    width: 2.0,
+                                  ),
+                                ),
+                                prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 50),
+                          ],
                         ),
-                        const SizedBox(height: 50),
-                      ],
+                      ),
                     ),
-                  ),
+                    DeleteAccountButton(isSuperadmin: widget.isSuperAdmin),
+                  ],
                 ),
               ),
             ),
