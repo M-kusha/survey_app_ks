@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_provider.dart';
 import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
 import 'package:survey_app_ks/firebase_options.dart';
+import 'package:survey_app_ks/login/user_preferences.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
 import 'package:survey_app_ks/register/register_logics.dart';
 import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
@@ -18,6 +19,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await UserPreferences.init();
 
   await EasyLocalization.ensureInitialized();
 
@@ -88,9 +90,7 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: theme,
         darkTheme: darkTheme,
-        home: const LoginPage(
-          message: '',
-        ),
+        home: const LoginPage(),
       ),
     );
   }
