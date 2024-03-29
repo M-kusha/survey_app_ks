@@ -1,30 +1,33 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/login/biometrics.dart';
+import 'package:survey_app_ks/login/login_logics.dart';
+import 'package:survey_app_ks/login/user_preferences.dart';
+import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/settings_controller.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
-  final String message;
-  const LoginPage({Key? key, required this.message, this.savedThemeMode})
-      : super(key: key);
+
+  const LoginPage({Key? key, this.savedThemeMode}) : super(key: key);
 
   @override
   LoginPageState createState() => LoginPageState();
 }
 
 class LoginPageState extends State<LoginPage> {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final AuthManager _authManager = AuthManager();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  bool isLoginIn = false;
   bool _rememberMe = false;
   String _errorMessage = '';
   bool _passwordVisible = false;
   bool _light = true;
+  String _fullName = '';
 
   @override
   void initState() {
@@ -37,32 +40,29 @@ class LoginPageState extends State<LoginPage> {
     _loadRememberMe();
   }
 
-  _loadRememberMe() async {
+  void _loadRememberMe() async {
     final prefs = await SharedPreferences.getInstance();
     bool rememberMe = prefs.getBool('rememberMe') ?? false;
     setState(() {
       _rememberMe = rememberMe;
       if (rememberMe) {
-        _emailController.text = prefs.getString('email') ?? '';
-        _passwordController.text = prefs.getString('password') ?? '';
+        _emailController.text = UserPreferences.getEmail() ?? '';
+        _passwordController.text = UserPreferences.getPassword() ?? '';
+        _fullName = UserPreferences.getFullName() ?? '';
       }
     });
   }
 
-  _saveRememberMe(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setBool('rememberMe', value);
-    if (value) {
-      prefs.setString('email', _emailController.text.trim());
-      prefs.setString('password', _passwordController.text.trim());
-    } else {
-      prefs.remove('email');
-      prefs.remove('password');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
+    if (isLoginIn) {
+      return const Scaffold(
+        body: Center(
+            child: CustomLoadingWidget(
+          loadingText: "login_in",
+        )),
+      );
+    }
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -72,29 +72,7 @@ class LoginPageState extends State<LoginPage> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 const SizedBox(height: 60),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.calendar_month_outlined,
-                      size: 35,
-                      color:
-                          ThemeBasedAppColors.getColor(context, 'buttonColor'),
-                    ),
-                    // ignore: prefer_const_constructors
-                    SizedBox(width: 10),
-                    Text(
-                      'app_title'.tr(),
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'buttonColor'),
-                        fontFamily: 'CustomFont', // Use your custom font
-                      ),
-                    ),
-                  ],
-                ),
+                _buildWelcomeBack(),
                 const SizedBox(height: 50),
                 _buildLoginContainer(),
                 const SizedBox(height: 20),
@@ -107,6 +85,46 @@ class LoginPageState extends State<LoginPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildWelcomeBack() {
+    String? fullName = UserPreferences.getFullName();
+    return fullName != null
+        ? Column(
+            children: [
+              Text(
+                'welcome_back'.tr(),
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: getButtonColor(context),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                fullName,
+                style: TextStyle(
+                  fontSize: 18,
+                  color: getButtonColor(context),
+                ),
+              ),
+            ],
+          )
+        : Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.calendar_month_outlined,
+                  size: 35, color: getButtonColor(context)),
+              const SizedBox(width: 10),
+              Text(
+                'app_title'.tr(),
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: getButtonColor(context)),
+              ),
+            ],
+          );
   }
 
   Widget buildThemeSwitch() {
@@ -165,10 +183,8 @@ class LoginPageState extends State<LoginPage> {
               Row(
                 children: [
                   Checkbox(
-                    checkColor:
-                        ThemeBasedAppColors.getColor(context, 'textColor'),
-                    activeColor:
-                        ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                    checkColor: getTextColor(context),
+                    activeColor: getButtonColor(context),
                     value: _rememberMe,
                     onChanged: (value) {
                       setState(() {
@@ -178,9 +194,7 @@ class LoginPageState extends State<LoginPage> {
                   ),
                   Text(
                     'remember_me'.tr(),
-                    style: const TextStyle(
-                      fontSize: 12.0, // Specify your desired font size here
-                    ),
+                    style: const TextStyle(fontSize: 12.0),
                   ),
                 ],
               ),
@@ -250,8 +264,8 @@ class LoginPageState extends State<LoginPage> {
   Widget _buildLoginButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        foregroundColor: ThemeBasedAppColors.getColor(context, 'textColor'),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+        foregroundColor: getTextColor(context),
+        backgroundColor: getButtonColor(context),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(30.0),
         ),
@@ -274,8 +288,7 @@ class LoginPageState extends State<LoginPage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             IconButton(
-              icon: Icon(Icons.g_mobiledata,
-                  color: ThemeBasedAppColors.getColor(context, 'buttonColor')),
+              icon: Icon(Icons.g_mobiledata, color: getButtonColor(context)),
               onPressed: () {
                 // Handle Google login
               },
@@ -285,7 +298,7 @@ class LoginPageState extends State<LoginPage> {
             IconButton(
               icon: Icon(
                 Icons.facebook,
-                color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                color: getButtonColor(context),
               ),
               onPressed: () {},
             ),
@@ -315,42 +328,44 @@ class LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleLogin() async {
-    try {
-      await _auth.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-      _saveRememberMe(_rememberMe);
-      _handleLoginSuccess();
-    } on FirebaseAuthException catch (e) {
+    final canUseBiometric = await AuthService().canCheckBiometrics() &&
+        await AuthService().isDeviceSupported();
+    final biometricEnabled = UserPreferences.getBiometricAuthEnabled() ?? false;
+
+    if (canUseBiometric && biometricEnabled) {
+      bool authenticated = await AuthService().authenticateUser();
+      if (authenticated) {
+        _navigateToHome();
+        return;
+      } else {}
+    }
+
+    await _manualLogin();
+  }
+
+  Future<void> _manualLogin() async {
+    setState(() {
+      isLoginIn = true;
+    });
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    bool success = await _authManager.signInWithEmailAndPassword(
+        email, password, _rememberMe, _fullName);
+
+    if (success) {
+      if (!context.mounted) return;
+      _navigateToHome();
+    } else {
       setState(() {
-        _errorMessage = e.message ?? 'An unknown error occurred';
+        _errorMessage = 'login_failed'.tr();
+        isLoginIn = false;
       });
     }
   }
 
-  void _handleLoginSuccess() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-      String? companyId = userData['companyId'];
-      String? role = userData['role'];
-
-      final prefs = await SharedPreferences.getInstance();
-      if (companyId != null) {
-        prefs.setString('companyId', companyId);
-      }
-      if (role != null) {
-        prefs.setString('userRole', role);
-      }
-
-      if (!context.mounted) return;
-
-      Navigator.pushReplacementNamed(context, '/home');
-    }
+  void _navigateToHome() {
+    if (!context.mounted) return;
+    Navigator.pushReplacementNamed(context, '/home');
   }
 }
