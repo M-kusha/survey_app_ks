@@ -61,14 +61,9 @@ class Step3ParticipateSurveyState extends State<Step3ParticipateSurvey> {
                         style: TextStyle(
                             fontSize: timeFontSize + 2,
                             fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
-                      Text(
-                        widget.participant.name,
-                        style: TextStyle(
-                            fontSize: timeFontSize + 2,
-                            fontStyle: FontStyle.italic),
-                      ),
                       const SizedBox(height: 20),
                       Text(
                         widget.survey.surveyType == SurveyType.survey

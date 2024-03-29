@@ -102,7 +102,8 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
       canPop: _shouldPop(),
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Welcome ${widget.participant.name.split(' ')[0]}'),
+          title: Text(
+              '${"welcome".tr()} ${widget.participant.name.split(' ')[0]}'),
           centerTitle: true,
           automaticallyImplyLeading:
               widget.survey.surveyType == SurveyType.survey,

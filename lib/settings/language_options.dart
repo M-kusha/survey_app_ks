@@ -83,12 +83,12 @@ class LanguageOptionsWidgetState extends State<LanguageOptionsWidget> {
               children: locales
                   .map((locale) => ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: getButtonColor(context),
+                          backgroundColor: getCameraColor(context),
                           child: Text(
                             locale.languageCode.toUpperCase(),
                             style: TextStyle(
                                 fontSize: fontSizeProvider.fontSize - 4,
-                                color: getCameraColor(context)),
+                                color: getTextColor(context)),
                           ),
                         ),
                         title: Text(

@@ -11,9 +11,11 @@ class ParticipantOverviewPage extends StatefulWidget {
   final Appointment appointment;
   final bool isAdmin;
 
-  const ParticipantOverviewPage(
-      {Key? key, required this.appointment, required this.isAdmin})
-      : super(key: key);
+  const ParticipantOverviewPage({
+    Key? key,
+    required this.appointment,
+    required this.isAdmin,
+  }) : super(key: key);
 
   @override
   ParticipantOverviewPageState createState() => ParticipantOverviewPageState();

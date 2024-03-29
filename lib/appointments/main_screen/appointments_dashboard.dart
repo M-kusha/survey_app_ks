@@ -31,8 +31,8 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
   int _currentPage = 0;
   final int _appointmentsPerPage = 4;
   bool _isLoading = false;
-
   late FirebaseServices _firebaseServices;
+
   @override
   void initState() {
     super.initState();
@@ -54,10 +54,10 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             .currentUser
             ?.companyId ??
         '';
-
     if (companyId.isNotEmpty) {
       await provider.loadAppointments(companyId);
       await provider.preloadUserParticipationStatus(userId);
+      await provider.preloadAppointmentsTimeSlotConfirmation();
     }
 
     final isAdmin = await _firebaseServices.fetchAdminStatus();
@@ -293,10 +293,16 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
                   bool hasParticipated = appointmentListProvider
                           .userParticipationStatus[appointment.appointmentId] ??
                       false;
+                  bool isAnyTimeSlotConfirmed = appointmentListProvider
+                          .isAnyTimeSlotConfirmed[appointment.appointmentId] ??
+                      false;
+
                   return AppointmentListItem(
-                      appointment: appointmentsForCurrentPage[index],
-                      hasUserParticipated: hasParticipated,
-                      isAdmin: _isAdmin);
+                    appointment: appointmentsForCurrentPage[index],
+                    hasUserParticipated: hasParticipated,
+                    isAdmin: _isAdmin,
+                    isAnyTimeSLotConfirmed: isAnyTimeSlotConfirmed,
+                  );
                 },
               ),
             ),

@@ -15,6 +15,7 @@ class AppointmentNamePage extends StatefulWidget {
   final AppointmentParticipants participant;
   final bool isAdmin;
   final bool hasParticipated;
+  final bool isTimeSlotConfirmed;
 
   const AppointmentNamePage({
     Key? key,
@@ -22,6 +23,7 @@ class AppointmentNamePage extends StatefulWidget {
     required this.participant,
     required this.isAdmin,
     required this.hasParticipated,
+    required this.isTimeSlotConfirmed,
   }) : super(key: key);
 
   @override
@@ -64,6 +66,7 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
             timeSlot: widget.participant.timeSlot,
             isAdmin: widget.isAdmin,
             hasParticipated: widget.hasParticipated,
+            isAnyTimeSLotConfirmed: widget.isTimeSlotConfirmed,
           ),
         ),
       );

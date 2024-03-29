@@ -64,8 +64,8 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
 
     if (filteredParticipants.isEmpty) {
       String message = (selectedSortOption == 0)
-          ? 'no_user_found_with_score_less_than_50'.tr()
-          : 'no_user_found_with_score_50_or_more'.tr();
+          ? 'no_user_found_with_score_50_or_more'.tr()
+          : 'no_user_found_with_score_less_than_50'.tr();
       return Center(child: Text(message));
     }
 

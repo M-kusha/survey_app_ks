@@ -8,6 +8,7 @@ import 'package:survey_app_ks/appointments/edit/step2_edit_appointments.dart';
 import 'package:survey_app_ks/appointments/edit/step3_edit_appointments.dart';
 import 'package:survey_app_ks/appointments/edit/step4_edit_appointments.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
+import 'package:survey_app_ks/utilities/bottom_navigation.dart';
 import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 import 'package:survey_app_ks/utilities/tablet_size.dart';
 
@@ -65,9 +66,9 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          ' ${'survey_edit'.tr()} ${widget.appointment.title}',
+          ' ${'appointment_edit'.tr()} ${widget.appointment.title}',
           style: TextStyle(
-            fontSize: timeFontSize * 1.2,
+            fontSize: timeFontSize * 1.5,
           ),
         ),
         centerTitle: true,
@@ -85,7 +86,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
         context: context,
         onPressed: _handleNextButtonPressed,
         buttonText: _currentPageIndex == _pages.length - 1
-            ? 'update_survey'.tr()
+            ? 'update_appointment'.tr()
             : 'next'.tr(),
       ),
     );
@@ -94,7 +95,13 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
   Future<void> _handleNextButtonPressed() async {
     if (_currentPageIndex == _pages.length - 1) {
       _saveAppointment();
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const BottomNavigation(initialIndex: 1),
+        ),
+        (route) => false,
+      );
     } else {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 400),

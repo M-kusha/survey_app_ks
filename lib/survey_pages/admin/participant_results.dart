@@ -82,7 +82,7 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          '${widget.participant.name}\'s ${'answers'.tr()},',
+          '${widget.participant.name}\'s ${'answers'.tr()}',
           style: TextStyle(
             fontSize: fontSize * 1.2,
             fontWeight: FontWeight.bold,

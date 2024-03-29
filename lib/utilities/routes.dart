@@ -19,9 +19,7 @@ class AppRoutes {
   static Map<String, WidgetBuilder> routes() {
     return {
       '/settings': (BuildContext context) => const SettingsPageUI(),
-      '/login': (BuildContext context) => const LoginPage(
-            message: '',
-          ),
+      '/login': (BuildContext context) => const LoginPage(),
       '/register': (context) => Register1step(
             registerLogic: RegisterLogic(),
           ),
@@ -37,13 +35,8 @@ class AppRoutes {
           const Step2CreateAppointment(),
       '/create_appointment_step_3': (BuildContext context) =>
           const Step3CreateAppointment(),
-      // '/create_appointment_step_4': (BuildContext context) =>
-      //      Step4CreateAppointment(survey: ),
-
-      // registerred successfully
       '/registered_successfully': (BuildContext context) =>
           const RegistrationSuccessPage(),
-
       '/questionary_survey': (BuildContext context) =>
           const QuestionarySurveyPageUI(),
       '/create_training_survey_1': (BuildContext context) =>

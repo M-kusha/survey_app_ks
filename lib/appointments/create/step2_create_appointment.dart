@@ -105,7 +105,7 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
         margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
         decoration: BoxDecoration(
-          color: getButtonColor(context),
+          color: getAppbarColor(context),
           borderRadius: BorderRadius.circular(15),
           boxShadow: [
             BoxShadow(

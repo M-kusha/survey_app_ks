@@ -83,28 +83,36 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
                       style: TextStyle(fontSize: timeFontSize),
                     ),
                     const SizedBox(height: 30),
-                    InkWell(
-                      onTap: () => copyToClipboard(
-                          context, widget.survey.id, timeFontSize),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: getAppbarColor(context),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 12, horizontal: 20),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.content_copy, size: timeFontSize * 1.2),
-                            const SizedBox(width: 10),
-                            Text(
-                              widget.survey.surveyType == SurveyType.survey
-                                  ? '${'survey_id'.tr()} ${widget.survey.id}'
-                                  : '${'test_id'.tr()} ${widget.survey.id}',
-                              style: TextStyle(fontSize: timeFontSize - 1),
-                            ),
-                          ],
+                    Container(
+                      decoration: BoxDecoration(
+                        color: getCardColor(context),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: getButtonColor(context)),
+                      ),
+                      child: InkWell(
+                        onTap: () => copyToClipboard(
+                            context, widget.survey.id, timeFontSize),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: getAppbarColor(context),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 12, horizontal: 20),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.content_copy,
+                                  size: timeFontSize * 1.2),
+                              const SizedBox(width: 10),
+                              Text(
+                                widget.survey.surveyType == SurveyType.survey
+                                    ? '${'survey_id'.tr()} ${widget.survey.id}'
+                                    : '${'test_id'.tr()} ${widget.survey.id}',
+                                style: TextStyle(fontSize: timeFontSize - 2),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
