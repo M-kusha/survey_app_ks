@@ -18,6 +18,7 @@ class UserSelectCategories extends StatefulWidget {
   final String userName;
   final bool isAdmin;
   final bool hasParticipated;
+  final bool isAnyTimeSLotConfirmed;
 
   const UserSelectCategories({
     Key? key,
@@ -26,6 +27,7 @@ class UserSelectCategories extends StatefulWidget {
     required this.timeSlot,
     required this.isAdmin,
     required this.hasParticipated,
+    required this.isAnyTimeSLotConfirmed,
   }) : super(key: key);
 
   @override
@@ -38,7 +40,6 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   bool overviewSelected = false;
   bool _isAdmin = false;
   bool _userHasParticipated = false;
-  bool _isLoading = true;
   bool _isTimeSlotConfirmed = false;
 
   @override
@@ -52,8 +53,7 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     final isAdmin = widget.isAdmin;
     final userId = FirebaseAuth.instance.currentUser?.uid;
     bool userHasParticipated = false;
-    bool isTimeSlotConfirmed = await appointmentService
-        .isAnyTimeSlotConfirmed(widget.appointment.appointmentId);
+    bool isTimeSlotConfirmed = widget.isAnyTimeSLotConfirmed;
 
     if (userId != null) {
       userHasParticipated = widget.hasParticipated;
@@ -63,10 +63,8 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       _isAdmin = isAdmin;
       _userHasParticipated = userHasParticipated;
       _isTimeSlotConfirmed = isTimeSlotConfirmed;
-
       overviewSelected = userHasParticipated || _isTimeSlotConfirmed;
       participateSelected = !(userHasParticipated || _isTimeSlotConfirmed);
-      _isLoading = false;
     });
   }
 
@@ -76,10 +74,6 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     final fontSize = fontSizeProvider.fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     final isButtonDisabled = _userHasParticipated || _isTimeSlotConfirmed;
-
-    if (_isLoading) {
-      return _buildLoadingScreen(timeFontSize);
-    }
 
     return Scaffold(
       appBar: _buildAppBar(context, timeFontSize),
@@ -91,15 +85,6 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
               buttonText: 'next',
             )
           : const SizedBox.shrink(),
-    );
-  }
-
-  Widget _buildLoadingScreen(double fontSize) {
-    return const Scaffold(
-      body: Center(
-          child: CustomLoadingWidget(
-        loadingText: 'loading',
-      )),
     );
   }
 
@@ -254,7 +239,9 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
           ),
         ],
         child: ParticipantOverviewPage(
-            appointment: widget.appointment, isAdmin: widget.isAdmin),
+          appointment: widget.appointment,
+          isAdmin: widget.isAdmin,
+        ),
       ),
     );
   }
