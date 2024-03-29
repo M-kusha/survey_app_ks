@@ -21,6 +21,7 @@ class ProfileSection extends StatefulWidget {
 
 class _ProfileSectionState extends State<ProfileSection> {
   bool _isUploading = false;
+
   Stream<DocumentSnapshot> getUserDataStream() {
     return FirebaseFirestore.instance
         .collection('users')
@@ -93,28 +94,46 @@ class _ProfileSectionState extends State<ProfileSection> {
                     child: Stack(
                       alignment: Alignment.center,
                       children: [
-                        CircleAvatar(
-                          radius: fontSize * 3,
-                          backgroundColor: Colors.grey.shade200,
-                          backgroundImage:
-                              !_isUploading && userProfilePic != null
-                                  ? NetworkImage(userProfilePic)
-                                  : null,
-                          child: _isUploading
-                              ? CircularProgressIndicator(
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                  getButtonColor(context),
-                                ))
-                              : null,
-                        ),
-                        if (userProfilePic == null && !_isUploading)
-                          Container(
-                            alignment: Alignment.center,
-                            child: Icon(
-                              Icons.camera_alt,
-                              size: fontSize * 2,
-                              color: getCameraColor(context),
+                        if (userProfilePic != null)
+                          ClipOval(
+                            child: Image.network(
+                              userProfilePic,
+                              width: fontSize * 6,
+                              height: fontSize * 6,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (BuildContext context,
+                                  Widget child,
+                                  ImageChunkEvent? loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return SizedBox(
+                                  width: fontSize * 6,
+                                  height: fontSize * 6,
+                                  child: Center(
+                                    child: CircularProgressIndicator(
+                                      value:
+                                          loadingProgress.expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
+                          ),
+                        if (_isUploading)
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                getButtonColor(context)),
+                          ),
+                        if (userProfilePic == null && !_isUploading)
+                          Icon(
+                            Icons.camera_alt,
+                            size: fontSize * 2,
+                            color: getCameraColor(context),
                           ),
                       ],
                     ),
