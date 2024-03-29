@@ -200,47 +200,59 @@ class UserManagementPageState extends State<UserManagementPage> {
         ),
       ),
       title: Text(user.name),
-      trailing: buildUserRoleDropdown(user),
+      trailing: buildUserRoleSelection(user),
     );
   }
 
-  Widget buildUserRoleDropdown(UserModel user) {
+  Widget buildUserRoleSelection(UserModel user) {
     if (user.id == widget.userId) {
-      return Text(capitalize(user.role),
-          style: TextStyle(color: getListTileColor(context), fontSize: 16));
+      return Text(
+        capitalize(user.role),
+        style: TextStyle(color: getListTileColor(context), fontSize: 16),
+        textAlign: TextAlign.center,
+      );
     }
+
     String currentRoleLabel = roleLabelsToValues.entries
         .firstWhere((entry) => entry.value == user.role,
             orElse: () => roleLabelsToValues.entries.first)
         .key;
 
-    return DropdownButton<String>(
-      value: currentRoleLabel,
-      onChanged: (newValue) {
-        if (newValue != null) {
-          String? newRoleValue = roleLabelsToValues[newValue];
-          if (newRoleValue != null) {
-            setState(() {
-              updateUserRole(user.id, newRoleValue);
-            });
-          }
-        }
-      },
-      items: roleLabelsToValues.entries.map((entry) {
-        return DropdownMenuItem<String>(
-          value: entry.key,
-          child: Text(entry.key),
+    return GestureDetector(
+      onTap: () => _showRoleSelectionModal(context, user),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          vertical: 8,
+        ),
+        child: Text(
+          currentRoleLabel,
+          style: const TextStyle(fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  void _showRoleSelectionModal(BuildContext context, UserModel user) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: roleLabelsToValues.entries.map((entry) {
+              return ListTile(
+                title: Text(entry.key, textAlign: TextAlign.center),
+                onTap: () {
+                  setState(() {
+                    updateUserRole(user.id, entry.value);
+                  });
+                  Navigator.of(context).pop();
+                },
+              );
+            }).toList(),
+          ),
         );
-      }).toList(),
-      style: TextStyle(color: getListTileColor(context), fontSize: 16),
-      underline: Container(
-        height: 1,
-        color: getButtonColor(context),
-      ),
-      icon: Icon(
-        Icons.arrow_drop_down,
-        color: getButtonColor(context),
-      ),
+      },
     );
   }
 
