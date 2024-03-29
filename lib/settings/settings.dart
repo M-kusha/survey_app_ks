@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:survey_app_ks/login/login.dart';
+import 'package:survey_app_ks/settings/biometrics_options.dart';
 import 'package:survey_app_ks/settings/daten_schutz.dart';
 import 'package:survey_app_ks/settings/font_size_options.dart';
 import 'package:survey_app_ks/settings/font_size_provider.dart';
@@ -38,8 +39,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     super.initState();
     SettingsController settingsController = SettingsController();
     _initPage();
-    _firebaseServices =
-        FirebaseServices(); // Ensure you have an instance of FirebaseServices
+    _firebaseServices = FirebaseServices();
     _checkSuperAdminStatus();
 
     settingsController.getFontSize().then((value) {
@@ -54,7 +54,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     if (!mounted) return;
     setState(() {
       _isSuperAdmin = isSuperAdmin;
-      _isLoadingSuperAdminCheck = false; // Update after check is complete
+      _isLoadingSuperAdminCheck = false;
     });
   }
 
@@ -119,8 +119,8 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) =>
-                                      const PasswordChanger()),
+                                  builder: (context) => PasswordChanger(
+                                      isSuperAdmin: _isSuperAdmin)),
                             );
                           },
                         ),
@@ -168,6 +168,11 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                       NotificationsOptions(
                         icon: Icons.notifications,
                         title: 'global_notifications'.tr(),
+                      ),
+                      sizedBoxSettings,
+                      BiometricOptions(
+                        icon: Icons.fingerprint,
+                        title: 'biometrics'.tr(),
                       ),
                       sizedBoxSettings,
                       TTSOptions(
@@ -222,9 +227,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const LoginPage(
-          message: '',
-        ),
+        builder: (context) => const LoginPage(),
       ),
     );
   }
