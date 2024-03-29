@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:survey_app_ks/login/user_preferences.dart';
@@ -24,15 +25,21 @@ class AuthService {
 
   Future<bool> authenticateUser() async {
     final LocalAuthentication auth = LocalAuthentication();
+    bool authenticated = false;
     try {
-      return await auth.authenticate(
-          localizedReason: 'Please authenticate to access this feature',
-          authMessages: const <AuthMessages>[
-            AndroidAuthMessages(),
-          ]);
-    } on PlatformException {
-      return false;
+      authenticated = await auth.authenticate(
+        localizedReason: 'authenticate_with_biometrics'.tr(),
+        authMessages: const <AuthMessages>[
+          AndroidAuthMessages(),
+        ],
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+        ),
+      );
+    } catch (e) {
+      authenticated = false;
     }
+    return authenticated;
   }
 
   Future<void> attemptBiometricLogin() async {

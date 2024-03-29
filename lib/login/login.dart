@@ -28,10 +28,13 @@ class LoginPageState extends State<LoginPage> {
   bool _passwordVisible = false;
   bool _light = true;
   String _fullName = '';
+  bool _useBiometricAuthentication = false;
 
   @override
   void initState() {
     super.initState();
+    _useBiometricAuthentication =
+        UserPreferences.getBiometricAuthEnabled() ?? false;
     SettingsController().getThemeBool().then((value) {
       setState(() {
         _light = value;
@@ -272,7 +275,13 @@ class LoginPageState extends State<LoginPage> {
         elevation: 0,
         padding: const EdgeInsets.symmetric(vertical: 16.0),
       ),
-      onPressed: _handleLogin,
+      onPressed: () {
+        if (_useBiometricAuthentication) {
+          _handleLogin();
+        } else {
+          _manualLogin();
+        }
+      },
       child: const Text('login_button').tr(),
     );
   }
@@ -337,10 +346,17 @@ class LoginPageState extends State<LoginPage> {
       if (authenticated) {
         _navigateToHome();
         return;
-      } else {}
+      } else {
+        setState(() {
+          _useBiometricAuthentication = false;
+        });
+        return;
+      }
+    } else {
+      setState(() {
+        _useBiometricAuthentication = false;
+      });
     }
-
-    await _manualLogin();
   }
 
   Future<void> _manualLogin() async {

@@ -6,6 +6,8 @@
   "ok": "OK",
   "login_failed": "Login failed",
   "login_in": "Logging in...",
+  "authenticate_with_biometrics":"Verify your identity to continue.",
+  "text1":"",
   "login_title": "Login",
   "email_label": "Email",
   "password_label": "Password",
