@@ -12,6 +12,7 @@ class AppointmentListItem extends StatelessWidget {
   final Appointment appointment;
   final bool hasUserParticipated;
   final bool isAdmin;
+  final bool isAnyTimeSLotConfirmed;
   final AppointmentService appointmentService = AppointmentService();
 
   AppointmentListItem({
@@ -19,6 +20,7 @@ class AppointmentListItem extends StatelessWidget {
     required this.appointment,
     required this.hasUserParticipated,
     required this.isAdmin,
+    required this.isAnyTimeSLotConfirmed,
   }) : super(key: key);
 
   Color? _textColor(BuildContext context) {
@@ -77,9 +79,19 @@ class AppointmentListItem extends StatelessWidget {
           children: [
             Column(
               children: [
-                _buildRichText(context, timeFontSize, isExpired, participated),
+                Text(
+                  appointment.title,
+                  style: TextStyle(
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? _textColor(context)
+                        : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: timeFontSize,
+                  ),
+                ),
                 const SizedBox(height: 8.0),
-                _buildInfoRow(context, timeFontSize, count),
+                _buildInfoRow(context, timeFontSize, count, isExpired,
+                    participated, isAnyTimeSLotConfirmed),
               ],
             ),
           ],
@@ -89,13 +101,16 @@ class AppointmentListItem extends StatelessWidget {
   }
 
   RichText _buildRichText(BuildContext context, double timeFontSize,
-      bool isExpired, bool hasParticipated) {
+      bool isExpired, bool hasParticipated, bool isAnyTimeSLotConfirmed) {
     String statusText;
     Color statusColor;
 
     if (isExpired) {
       statusText = 'expired'.tr();
       statusColor = Colors.red;
+    } else if (isAnyTimeSLotConfirmed) {
+      statusText = 'time_slot_confirmed'.tr();
+      statusColor = getButtonColor(context);
     } else if (hasParticipated) {
       statusText = 'already_participated'.tr();
       statusColor = getButtonColor(context);
@@ -129,34 +144,29 @@ class AppointmentListItem extends StatelessWidget {
     );
   }
 
-  Row _buildInfoRow(BuildContext context, double timeFontSize, int count) {
+  Row _buildInfoRow(BuildContext context, double timeFontSize, int count,
+      bool isExpired, bool hasUserParticipated, bool isAnyTimeSLotConfirmed) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildColumnLeft(context, timeFontSize),
+        _buildColumnLeft(context, timeFontSize, isExpired, hasUserParticipated,
+            isAnyTimeSLotConfirmed),
         _buildColumnRight(context, timeFontSize, count),
       ],
     );
   }
 
-  Column _buildColumnLeft(BuildContext context, double timeFontSize) {
+  Column _buildColumnLeft(BuildContext context, double timeFontSize,
+      bool isExpired, bool hasUserParticipated, bool isAnyTimeSLotConfirmed) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          appointment.title,
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.light
-                ? _textColor(context)
-                : Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: timeFontSize,
-          ),
-        ),
+        _buildRichText(context, timeFontSize, isExpired, hasUserParticipated,
+            isAnyTimeSLotConfirmed),
         SizedBox(height: timeFontSize),
         Text(
-            '${'voting_expiration_date'.tr()}: ${DateFormat("dd E y").format(appointment.expirationDate)}',
+            '${'expires'.tr()} ${DateFormat("dd E y").format(appointment.expirationDate)}',
             style: TextStyle(
               fontSize: timeFontSize,
               fontWeight: FontWeight.bold,
@@ -203,15 +213,17 @@ class AppointmentListItem extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (context) => UserSelectCategories(
-              appointment: appointment,
-              userName: '',
-              timeSlot: TimeSlot(
-                start: DateTime.now(),
-                end: DateTime.now(),
-                expirationDate: DateTime.now(),
-              ),
-              isAdmin: isAdmin,
-              hasParticipated: participated),
+            appointment: appointment,
+            userName: '',
+            timeSlot: TimeSlot(
+              start: DateTime.now(),
+              end: DateTime.now(),
+              expirationDate: DateTime.now(),
+            ),
+            isAdmin: isAdmin,
+            hasParticipated: participated,
+            isAnyTimeSLotConfirmed: isTimeSlotConfirmed,
+          ),
         ),
       );
     } else {
@@ -219,22 +231,24 @@ class AppointmentListItem extends StatelessWidget {
         context,
         MaterialPageRoute(
           builder: (context) => AppointmentNamePage(
-              appointment: appointment,
-              participant: AppointmentParticipants(
-                userId: '',
-                userName: '',
-                status: '',
-                participated: false,
-                date: DateTime.now(),
-                timeSlot: TimeSlot(
-                  start: DateTime.now(),
-                  end: DateTime.now(),
-                  expirationDate: DateTime.now(),
-                ),
-                profileImageUrl: '',
+            appointment: appointment,
+            participant: AppointmentParticipants(
+              userId: '',
+              userName: '',
+              status: '',
+              participated: false,
+              date: DateTime.now(),
+              timeSlot: TimeSlot(
+                start: DateTime.now(),
+                end: DateTime.now(),
+                expirationDate: DateTime.now(),
               ),
-              hasParticipated: hasUserParticipated,
-              isAdmin: isAdmin),
+              profileImageUrl: '',
+            ),
+            hasParticipated: hasUserParticipated,
+            isAdmin: isAdmin,
+            isTimeSlotConfirmed: isTimeSlotConfirmed,
+          ),
         ),
       );
     }
