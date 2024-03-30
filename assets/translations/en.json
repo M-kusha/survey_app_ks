@@ -265,5 +265,17 @@
   "time_slot_confirmed": "Scheduled",
   "delete_account_warning": "Are you sure you want to delete your account? This cannot be undone.",
   "delete": "Delete",
-  "delete_account": "Delete Account"
+  "delete_account": "Delete Account",
+  "survey": "Survey",
+
+  "notes": "Notes",
+  "sort_newest":"Newest",
+  "sort_oldest":"Oldest",
+  "sort_completed":"Completed",
+  "sort_uncompleted":"Uncompleted",
+  "add_note":"Add a new note",
+  "write_note":"Write a note here",
+  "add":"Add",
+  "no_items":"No items found",
+  "no_notes":"No notes found"
 }
