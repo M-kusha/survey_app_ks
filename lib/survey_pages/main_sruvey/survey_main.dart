@@ -33,6 +33,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
   String searchQuery = '';
   late FirebaseServices _firebaseServices;
   bool _isLoading = false;
+  TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
@@ -88,8 +89,6 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
       searchQuery = text;
     });
   }
-
-  TextEditingController searchController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
