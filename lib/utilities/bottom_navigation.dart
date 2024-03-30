@@ -1,10 +1,12 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
-import 'package:survey_app_ks/home.dart';
+import 'package:survey_app_ks/notes/notes_main.dart';
 import 'package:survey_app_ks/settings/settings.dart';
 import 'package:survey_app_ks/survey_pages/main_sruvey/survey_main.dart';
 
 import 'package:survey_app_ks/utilities/colors.dart';
+import 'package:survey_app_ks/utilities/text_style.dart';
 
 class BottomNavigation extends StatefulWidget {
   final int initialIndex;
@@ -51,27 +53,27 @@ class BottomNavigationState extends State<BottomNavigation> {
         showUnselectedLabels: true,
         selectedFontSize: 12, // Adjust font size if necessary
         unselectedFontSize: 12,
-        selectedItemColor: ThemeBasedAppColors.getColor(
-            context, 'buttonColor'), // Saturated color for light theme
+        selectedItemColor:
+            getButtonColor(context), // Saturated color for light theme
         unselectedItemColor: Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[600] // Muted for dark theme
             : Colors.grey[500],
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.notes_outlined),
-            label: 'Notes',
+            icon: const Icon(Icons.notes_outlined),
+            label: 'notes'.tr(),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.schedule_outlined),
-            label: 'Appointments',
+            icon: const Icon(Icons.schedule_outlined),
+            label: 'appointments'.tr(),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.quiz_outlined),
-            label: 'Survey',
+            icon: const Icon(Icons.quiz_outlined),
+            label: 'survey'.tr(),
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+            icon: const Icon(Icons.settings_outlined),
+            label: 'settings'.tr(),
           ),
         ],
       ),
