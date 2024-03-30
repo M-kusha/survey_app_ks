@@ -1,8 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-
 import 'error_reset.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -64,7 +63,7 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('reset_password'.tr()),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
+        backgroundColor: getAppbarColor(context),
         elevation: 0, // Flat design for the app bar
         centerTitle: true,
       ),

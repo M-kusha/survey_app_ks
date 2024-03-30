@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/login/login.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/login/login.dart';
 
 class DeleteAccountButton extends StatelessWidget {
   final bool isSuperadmin;

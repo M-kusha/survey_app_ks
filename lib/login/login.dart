@@ -1,13 +1,13 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:echomeet/login/biometrics.dart';
+import 'package:echomeet/login/login_logics.dart';
+import 'package:echomeet/login/user_preferences.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/settings_controller.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:survey_app_ks/login/biometrics.dart';
-import 'package:survey_app_ks/login/login_logics.dart';
-import 'package:survey_app_ks/login/user_preferences.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/settings_controller.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;

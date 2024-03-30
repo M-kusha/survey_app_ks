@@ -1,12 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/register/register_4step.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/register/registered_sucesfully.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:password_strength/password_strength.dart';
-import 'package:survey_app_ks/register/registered_sucesfully.dart';
-import 'package:survey_app_ks/register/register_4step.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/register/register_logics.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class Register3step extends StatefulWidget {
   final RegisterLogic registerLogic;
@@ -155,10 +155,9 @@ class Register3stepState extends State<Register3step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('set_your_password'.tr()),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          title: Text('set_your_password'.tr()),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: _isSaving
           ? const Center(
               child: CustomLoadingWidget(
@@ -166,8 +165,8 @@ class Register3stepState extends State<Register3step> {
             ))
           : Center(
               child: Card(
-                shadowColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                shadowColor: getButtonColor(
+                    context), // ThemeBasedAppColors.getColor(context, 'buttonColor'
                 margin: const EdgeInsets.symmetric(
                     vertical: 50.0, horizontal: 25.0),
                 elevation: 5,

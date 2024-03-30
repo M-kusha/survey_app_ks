@@ -1,19 +1,19 @@
+import 'package:echomeet/appointments/create/step1_create_appointment.dart';
+import 'package:echomeet/appointments/create/step2_create_appointment.dart';
+import 'package:echomeet/appointments/create/step3_create_appointment.dart';
+import 'package:echomeet/appointments/main_screen/appointments_dashboard.dart';
+import 'package:echomeet/login/login.dart';
+import 'package:echomeet/register/register_1step.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/register/registered_sucesfully.dart';
+import 'package:echomeet/reset_password/change_password.dart';
+import 'package:echomeet/reset_password/reset_password.dart';
+import 'package:echomeet/reset_password/reset_verification.dart';
+import 'package:echomeet/settings/settings.dart';
+import 'package:echomeet/survey_pages/create_survey/step1_create_survey.dart';
+import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
+import 'package:echomeet/utilities/bottom_navigation.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/appointments/create/step1_create_appointment.dart';
-import 'package:survey_app_ks/appointments/create/step2_create_appointment.dart';
-import 'package:survey_app_ks/appointments/create/step3_create_appointment.dart';
-import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
-import 'package:survey_app_ks/reset_password/change_password.dart';
-import 'package:survey_app_ks/login/login.dart';
-import 'package:survey_app_ks/register/register_1step.dart';
-import 'package:survey_app_ks/register/registered_sucesfully.dart';
-import 'package:survey_app_ks/reset_password/reset_password.dart';
-import 'package:survey_app_ks/reset_password/reset_verification.dart';
-import 'package:survey_app_ks/settings/settings.dart';
-import 'package:survey_app_ks/survey_pages/create_survey/step1_create_survey.dart';
-import 'package:survey_app_ks/survey_pages/main_sruvey/survey_main.dart';
-import 'package:survey_app_ks/utilities/bottom_navigation.dart';
-import 'package:survey_app_ks/register/register_logics.dart';
 
 class AppRoutes {
   static Map<String, WidgetBuilder> routes() {

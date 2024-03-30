@@ -1,16 +1,16 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/main_sruvey/survey_action_field.dart';
+import 'package:echomeet/survey_pages/main_sruvey/survey_create_button.dart';
+import 'package:echomeet/survey_pages/main_sruvey/survey_list.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/colors.dart';
+import 'package:echomeet/utilities/firebase_services.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/survey_pages/main_sruvey/survey_action_field.dart';
-import 'package:survey_app_ks/survey_pages/main_sruvey/survey_create_button.dart';
-import 'package:survey_app_ks/survey_pages/main_sruvey/survey_list.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/firebase_services.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart';
 

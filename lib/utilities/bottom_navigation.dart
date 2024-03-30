@@ -1,12 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/appointments/main_screen/appointments_dashboard.dart';
+import 'package:echomeet/notes/notes_main.dart';
+import 'package:echomeet/settings/settings.dart';
+import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/appointments/main_screen/appointments_dashboard.dart';
-import 'package:survey_app_ks/notes/notes_main.dart';
-import 'package:survey_app_ks/settings/settings.dart';
-import 'package:survey_app_ks/survey_pages/main_sruvey/survey_main.dart';
-
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class BottomNavigation extends StatefulWidget {
   final int initialIndex;

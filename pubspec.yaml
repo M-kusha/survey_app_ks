@@ -1,4 +1,5 @@
-name: survey_app_ks
+name: echomeet
+
 description: A new Flutter project.
 publish_to: 'none' # Ensures package is not accidentally published to pub.dev.
 

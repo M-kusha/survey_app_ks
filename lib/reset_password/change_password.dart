@@ -1,7 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-// import 'package:firebase_auth/firebase_auth.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -38,7 +37,7 @@ class ChangePasswordPageState extends State<ChangePasswordPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text('set_new_password'.tr()),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
+        backgroundColor: getAppbarColor(context),
         elevation: 0,
         centerTitle: true,
       ),

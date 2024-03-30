@@ -1,18 +1,16 @@
+import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
 
 class AppointmentDataProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   List<Appointment> _appointments = [];
-  List<Participant>? _participants;
   Appointment? _currentAppointment;
   bool _isLoading = false;
   Map<String, bool> userParticipationStatus = {};
   Map<String, bool> isAnyTimeSlotConfirmed = {};
   List<Appointment> get appointments => _appointments;
-  List<Participant>? get participants => _participants;
+
   Appointment? get currentAppointment => _currentAppointment;
   bool get isLoading => _isLoading;
 

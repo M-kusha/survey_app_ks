@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 Future<dynamic> userProfile(

@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/register/register_3step.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:survey_app_ks/register/register_3step.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/register/register_logics.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class Register2step extends StatefulWidget {
   final RegisterLogic registerLogic;
@@ -95,14 +95,16 @@ class _Register2stepState extends State<Register2step> {
       onTap: _pickImage,
       child: CircleAvatar(
         radius: 50,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+        backgroundColor: getButtonColor(context),
         backgroundImage: widget.registerLogic.profileImage != null
             ? FileImage(widget.registerLogic.profileImage!) as ImageProvider
             : null,
         child: widget.registerLogic.profileImage == null
-            ? Icon(Icons.camera_alt,
+            ? Icon(
+                Icons.camera_alt,
                 size: 40,
-                color: ThemeBasedAppColors.getColor(context, 'textColor'))
+                color: getTextColor(context),
+              )
             : null,
       ),
     );
@@ -112,13 +114,12 @@ class _Register2stepState extends State<Register2step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('basic_information'.tr()),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          title: Text('basic_information'.tr()),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: Center(
         child: Card(
-          shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          shadowColor: getButtonColor(context),
           margin: const EdgeInsets.all(20),
           elevation: 5,
           child: SingleChildScrollView(
@@ -137,9 +138,10 @@ class _Register2stepState extends State<Register2step> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
-                      prefixIcon: Icon(Icons.person,
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'buttonColor')),
+                      prefixIcon: Icon(
+                        Icons.person,
+                        color: getButtonColor(context),
+                      ),
                     ),
                   ),
                 ),
@@ -154,8 +156,7 @@ class _Register2stepState extends State<Register2step> {
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
                       prefixIcon: Icon(Icons.calendar_today,
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'buttonColor')),
+                          color: getButtonColor(context)),
                     ),
                     onTap: () {
                       final DateTime currentDate = DateTime.now();
@@ -185,9 +186,8 @@ class _Register2stepState extends State<Register2step> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
-                      prefixIcon: Icon(Icons.email,
-                          color: ThemeBasedAppColors.getColor(
-                              context, 'buttonColor')),
+                      prefixIcon:
+                          Icon(Icons.email, color: getButtonColor(context)),
                     ),
                   ),
                 ),
@@ -200,8 +200,7 @@ class _Register2stepState extends State<Register2step> {
                       decoration: InputDecoration(
                         labelText: 'company_name'.tr(),
                         prefixIcon: Icon(Icons.business,
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'buttonColor')),
+                            color: getButtonColor(context)),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),

@@ -1,9 +1,8 @@
 import 'dart:async';
-
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 
 class ResetPasswordVerificationPage extends StatefulWidget {
   const ResetPasswordVerificationPage({super.key});
@@ -53,7 +52,7 @@ class ResetPasswordVerificationPageState
     return Scaffold(
       appBar: AppBar(
         title: Text('reset_verification'.tr()),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
+        backgroundColor: getAppbarColor(context),
         elevation: 0,
         centerTitle: true,
       ),

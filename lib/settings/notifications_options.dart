@@ -1,11 +1,11 @@
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class NotificationsOptions extends StatefulWidget {
   final IconData icon;

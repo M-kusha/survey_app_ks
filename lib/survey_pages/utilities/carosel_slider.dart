@@ -1,8 +1,8 @@
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 
 class NumberCarouselSlider extends StatefulWidget {
   final Function(int)? onNumberChanged;
@@ -54,16 +54,13 @@ class _NumberCarouselSliderState extends State<NumberCarouselSlider> {
                 right: 40,
               ),
               child: Card(
-                shadowColor:
-                    ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                shadowColor: getButtonColor(context),
                 elevation: 5,
                 child: Center(
                   child: Text(
                     seconds == 0 ? "Unlimited" : "$seconds sec",
                     style: TextStyle(
-                        fontSize: fontSize,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'listTileColor')),
+                        fontSize: fontSize, color: getListTileColor(context)),
                   ),
                 ),
               ),

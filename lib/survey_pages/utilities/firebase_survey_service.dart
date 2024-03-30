@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:uuid/uuid.dart';
 
 class FirebaseSurveyService {

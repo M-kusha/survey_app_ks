@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/survey_pages/user_survey/question_card.dart';
+import 'package:echomeet/survey_pages/user_survey/step3_participate_survey.dart';
+import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/survey_pages/user_survey/question_card.dart';
-import 'package:survey_app_ks/survey_pages/user_survey/step3_participate_survey.dart';
-import 'package:survey_app_ks/survey_pages/utilities/firebase_survey_service.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step2ParticipateSurvey extends StatefulWidget {
   final Survey survey;

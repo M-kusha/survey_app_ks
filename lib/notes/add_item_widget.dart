@@ -1,6 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/notes/notes_logics.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/notes/notes_logics.dart';
 
 class DialogUtils {
   static Future<void> displayAddNoteDialog(

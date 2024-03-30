@@ -1,11 +1,11 @@
+import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/firebase/appointment_services.dart';
+import 'package:echomeet/appointments/participants/step4_participate_appointment.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
-import 'package:survey_app_ks/appointments/participants/step4_participate_appointment.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class ParticipantOverviewPage extends StatefulWidget {
   final Appointment appointment;

@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/login/user_preferences.dart';
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:survey_app_ks/login/user_preferences.dart';
 import 'package:local_auth_android/local_auth_android.dart';
 
 class AuthService {

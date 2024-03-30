@@ -1,6 +1,6 @@
 import 'dart:async';
+import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
 
 class SettingsController {
   Future<double> getFontSize() async {

@@ -1,13 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/create/step4_create_appointment.dart';
+import 'package:echomeet/appointments/firebase/appointment_services.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointments/create/step4_create_appointment.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/appointments/firebase/appointment_services.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class Step3CreateAppointment extends StatefulWidget {
   const Step3CreateAppointment({super.key});

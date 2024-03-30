@@ -1,17 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/appointments/main_screen/appointment_search_field.dart';
+import 'package:echomeet/notes/add_item_widget.dart';
+import 'package:echomeet/notes/filter_widget.dart';
+import 'package:echomeet/notes/pagination_widget.dart';
+import 'package:echomeet/notes/search_widget.dart';
+import 'package:echomeet/notes/sorting_widget.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:survey_app_ks/appointments/main_screen/appointment_search_field.dart';
-import 'package:survey_app_ks/notes/add_item_widget.dart';
-import 'package:survey_app_ks/notes/filter_widget.dart';
-import 'package:survey_app_ks/notes/notes_logics.dart';
-import 'package:survey_app_ks/notes/pagination_widget.dart';
-import 'package:survey_app_ks/notes/search_widget.dart';
-import 'package:survey_app_ks/notes/sorting_widget.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/notes/notes_logics.dart';
 
 class TodoList extends StatefulWidget {
   const TodoList({Key? key}) : super(key: key);

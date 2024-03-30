@@ -1,6 +1,6 @@
 // create a text style to be used in the app with all imports
+import 'package:echomeet/utilities/colors.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
 
 TextStyle textStyle = const TextStyle(
   color: Colors.black45,

@@ -1,7 +1,7 @@
+import 'package:echomeet/survey_pages/utilities/sorting.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:survey_app_ks/survey_pages/utilities/sorting.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class SortingWidget extends StatelessWidget {
   final int selectedSortOption;

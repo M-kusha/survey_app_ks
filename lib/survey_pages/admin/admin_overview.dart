@@ -1,9 +1,9 @@
+import 'package:echomeet/survey_pages/admin/survey_analytics.dart';
+import 'package:echomeet/survey_pages/admin/survey_participants.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/survey_pages/admin/survey_analytics.dart';
-import 'package:survey_app_ks/survey_pages/admin/survey_participants.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
 
 class AdminOverviewPage extends StatefulWidget {
   final String surveyId;
@@ -37,10 +37,6 @@ class AdminOverviewPageState extends State<AdminOverviewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // appBar: AppBar(
-      //   title: Text('${widget.survey.surveyName} - admin'),
-      //   centerTitle: true,
-      // ),
       body: _buildCurrentPage(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
@@ -54,10 +50,6 @@ class AdminOverviewPageState extends State<AdminOverviewPage> {
             icon: Icon(Icons.group),
             label: 'Participants',
           ),
-          // BottomNavigationBarItem(
-          //   icon: Icon(Icons.insert_chart),
-          //   label: 'Statistics',
-          // ),
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics),
             label: 'Analytics',

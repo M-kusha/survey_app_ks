@@ -1,13 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/create_survey/step4_create_survey.dart';
+import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/survey_pages/create_survey/step4_create_survey.dart';
-import 'package:survey_app_ks/survey_pages/utilities/firebase_survey_service.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class CreateTrainingSurveyStep3 extends StatefulWidget {
   const CreateTrainingSurveyStep3({

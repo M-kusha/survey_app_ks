@@ -1,9 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/delete_account.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/settings/delete_account.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class PasswordChanger extends StatefulWidget {
   final bool isSuperAdmin;
@@ -140,10 +140,9 @@ class PasswordChangertate extends State<PasswordChanger> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('set_new_password'.tr()),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          title: Text('set_new_password'.tr()),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: _isSaving
           ? const Center(
               child: CustomLoadingWidget(
@@ -154,8 +153,8 @@ class PasswordChangertate extends State<PasswordChanger> {
                 child: Column(
                   children: [
                     Card(
-                      shadowColor:
-                          ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                      shadowColor: getButtonColor(
+                          context), // Card with shadow (elevation
                       margin: const EdgeInsets.symmetric(
                           vertical: 50.0, horizontal: 25.0),
                       elevation: 5,

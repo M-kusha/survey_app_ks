@@ -1,13 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
 import 'package:flutter/material.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
-
-import '../../../settings/font_size_provider.dart';
 
 class PDFResults extends StatefulWidget {
   final Participant participant;

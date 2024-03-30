@@ -1,9 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/register/register_2step.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/utilities/colors.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/register/register_2step.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/register/register_logics.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class Register1step extends StatefulWidget {
   final RegisterLogic registerLogic;
@@ -36,13 +37,12 @@ class Register1stepState extends State<Register1step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('register'.tr()),
-        centerTitle: true,
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'appbarColor'),
-      ),
+          title: Text('register'.tr()),
+          centerTitle: true,
+          backgroundColor: getAppbarColor(context)),
       body: Center(
         child: Card(
-          shadowColor: ThemeBasedAppColors.getColor(context, 'buttonColor'),
+          shadowColor: getButtonColor(context), // Use the color
           margin: const EdgeInsets.all(20),
           elevation: 5,
           child: Column(
@@ -62,7 +62,7 @@ class Register1stepState extends State<Register1step> {
                 userType: 'register_as_company'.tr(),
                 icon: Icons.business,
                 color: _selectedType == ProfileType.company
-                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                    ? getButtonColor(context)
                     : ThemeBasedAppColors.getColor(context, 'selectedColor'),
                 onTap: () =>
                     setState(() => _selectedType = ProfileType.company),
@@ -71,7 +71,7 @@ class Register1stepState extends State<Register1step> {
                 userType: 'register_as_user'.tr(),
                 icon: Icons.person,
                 color: _selectedType == ProfileType.user
-                    ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                    ? getButtonColor(context)
                     : ThemeBasedAppColors.getColor(context, 'selectedColor'),
                 onTap: () => setState(() => _selectedType = ProfileType.user),
               ),

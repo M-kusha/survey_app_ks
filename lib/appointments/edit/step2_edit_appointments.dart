@@ -1,11 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/utilities/colors.dart';
+import 'package:echomeet/utilities/tablet_size.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/utilities/tablet_size.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class AppointmentEditPageStep2 extends StatefulWidget {
   final Appointment appointment;

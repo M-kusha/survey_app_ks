@@ -1,12 +1,12 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/admin/participant_results.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/survey_pages/admin/participant_results.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_data_provider.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:easy_localization/easy_localization.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class SurveyParticipantsPage extends StatefulWidget {
   final List<Participant> participants;
@@ -141,7 +141,6 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 
   void _navigateToParticipantAnswers(Participant participant) {
-    // final correctAnswersCount = calculateCorrectAnswersCount(participant);
     Navigator.push(
       context,
       MaterialPageRoute(

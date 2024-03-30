@@ -1,7 +1,7 @@
 // auth_manager.dart
+import 'package:echomeet/login/user_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:survey_app_ks/login/user_preferences.dart';
 
 class AuthManager {
   final FirebaseAuth _auth = FirebaseAuth.instance;

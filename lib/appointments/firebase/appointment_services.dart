@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:survey_app_ks/appointments/appointment_data.dart';
 import 'package:uuid/uuid.dart';
 
 class AppointmentService {

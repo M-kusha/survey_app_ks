@@ -1,10 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/print_analytics.dart';
+import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:survey_app_ks/settings/font_size_provider.dart';
-import 'package:survey_app_ks/survey_pages/admin/print_pages/print_analytics.dart';
-import 'package:survey_app_ks/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:survey_app_ks/utilities/text_style.dart';
 
 class SurveyAnalyticsPage extends StatefulWidget {
   final List<Participant> participants;

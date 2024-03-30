@@ -1,10 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/register/registered_sucesfully.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
+import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:survey_app_ks/register/registered_sucesfully.dart';
-import 'package:survey_app_ks/utilities/colors.dart';
-import 'package:survey_app_ks/register/register_logics.dart';
-import 'package:survey_app_ks/utilities/reusable_widgets.dart';
 
 class Register4step extends StatefulWidget {
   final RegisterLogic registerLogic;
@@ -85,12 +85,12 @@ class Register4stepState extends State<Register4step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-            'select_company'.tr(),
-          ),
-          centerTitle: true,
-          backgroundColor:
-              ThemeBasedAppColors.getColor(context, 'appbarColor')),
+        title: Text(
+          'select_company'.tr(),
+        ),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: _isSaving
           ? const Center(
               child: CustomLoadingWidget(
@@ -136,8 +136,7 @@ class Register4stepState extends State<Register4step> {
                             vertical: 10, horizontal: 20),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
-                            color: ThemeBasedAppColors.getColor(
-                                context, 'buttonColor'),
+                            color: getButtonColor(context), // Color(0xFFE8E8E8
                             width: 2,
                           ),
                           borderRadius: BorderRadius.circular(32),
@@ -196,8 +195,7 @@ class Register4stepState extends State<Register4step> {
                     Card(
                       elevation: 5,
                       margin: const EdgeInsets.all(20),
-                      shadowColor:
-                          ThemeBasedAppColors.getColor(context, 'buttonColor'),
+                      shadowColor: getButtonColor(context), // Color(0xFFE8E8E8
                       child: Column(
                         children: companies
                             .map((company) => _buildCompanyTile(company))
@@ -221,23 +219,16 @@ class Register4stepState extends State<Register4step> {
                 borderRadius: BorderRadius.circular(10),
                 side: BorderSide(
                   color: isSelected(company['id'])
-                      ? ThemeBasedAppColors.getColor(context, 'buttonColor')
+                      ? getButtonColor(context)
                       : Colors.transparent,
                   width: 2,
                 ),
               ),
               child: ListTile(
-                leading: Icon(
-                  Icons.business,
-                  color: ThemeBasedAppColors.getColor(context, 'buttonColor'),
-                ),
+                leading: Icon(Icons.business, color: getButtonColor(context)),
                 title: Text(company['name']),
                 trailing: isSelected(company['id'])
-                    ? Icon(
-                        Icons.check,
-                        color: ThemeBasedAppColors.getColor(
-                            context, 'buttonColor'),
-                      )
+                    ? Icon(Icons.check, color: getButtonColor(context))
                     : null,
                 onTap: () => selectCompany(company['id']),
               ),
