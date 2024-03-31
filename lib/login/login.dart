@@ -12,7 +12,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
 
-  const LoginPage({Key? key, this.savedThemeMode}) : super(key: key);
+  const LoginPage({super.key, this.savedThemeMode});
 
   @override
   LoginPageState createState() => LoginPageState();

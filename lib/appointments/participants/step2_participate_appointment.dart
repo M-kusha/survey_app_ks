@@ -13,10 +13,10 @@ class AppontmentParticipate extends StatefulWidget {
   final String userName;
 
   const AppontmentParticipate({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.userName,
-  }) : super(key: key);
+  });
 
   @override
   AppontmentParticipateState createState() => AppontmentParticipateState();

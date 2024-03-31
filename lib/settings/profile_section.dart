@@ -12,7 +12,7 @@ import 'package:provider/provider.dart';
 class ProfileSection extends StatefulWidget {
   final String userId;
 
-  const ProfileSection({Key? key, required this.userId}) : super(key: key);
+  const ProfileSection({super.key, required this.userId});
 
   @override
   State<ProfileSection> createState() => _ProfileSectionState();
@@ -50,10 +50,10 @@ class _ProfileSectionState extends State<ProfileSection> {
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'profileImage': downloadURL,
       });
-      if (!context.mounted) return;
+      if (!mounted) return;
       UIUtils.showSnackBar(context, 'profile_image_uploaded'.tr());
     } catch (e) {
-      if (!context.mounted) return;
+      if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_updating_profile_image'.tr());
     } finally {
       setState(() {

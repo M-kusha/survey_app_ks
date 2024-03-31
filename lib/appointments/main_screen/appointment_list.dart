@@ -16,12 +16,12 @@ class AppointmentListItem extends StatelessWidget {
   final AppointmentService appointmentService = AppointmentService();
 
   AppointmentListItem({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.hasUserParticipated,
     required this.isAdmin,
     required this.isAnyTimeSLotConfirmed,
-  }) : super(key: key);
+  });
 
   Color? _textColor(BuildContext context) {
     return Theme.of(context).brightness == Brightness.light

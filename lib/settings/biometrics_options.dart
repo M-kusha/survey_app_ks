@@ -9,10 +9,10 @@ class BiometricOptions extends StatefulWidget {
   final String title;
 
   const BiometricOptions({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   State<BiometricOptions> createState() => _BiometricOptionsState();

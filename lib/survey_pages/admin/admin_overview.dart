@@ -11,11 +11,10 @@ class AdminOverviewPage extends StatefulWidget {
   final List<Participant> participants;
 
   const AdminOverviewPage(
-      {Key? key,
+      {super.key,
       required this.surveyId,
       required this.survey,
-      required this.participants})
-      : super(key: key);
+      required this.participants});
 
   @override
   AdminOverviewPageState createState() => AdminOverviewPageState();

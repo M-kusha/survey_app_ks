@@ -11,10 +11,10 @@ import 'package:easy_localization/easy_localization.dart';
 
 class Step2CreateSurvey extends StatefulWidget {
   const Step2CreateSurvey({
-    Key? key,
+    super.key,
     required this.survey,
     required this.onSurveyCreated,
-  }) : super(key: key);
+  });
 
   final Survey survey;
   final Function(Survey) onSurveyCreated;

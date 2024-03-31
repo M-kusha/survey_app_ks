@@ -12,10 +12,10 @@ class NotificationsOptions extends StatefulWidget {
   final String title;
 
   const NotificationsOptions({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   State<NotificationsOptions> createState() => _NotificationsOptionsState();

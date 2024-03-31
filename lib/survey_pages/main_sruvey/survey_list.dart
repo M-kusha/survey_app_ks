@@ -17,11 +17,10 @@ class SurveyListItem extends StatelessWidget {
   final bool hasParticipated;
 
   const SurveyListItem(
-      {Key? key,
+      {super.key,
       required this.survey,
       required this.isAdmin,
-      required this.hasParticipated})
-      : super(key: key);
+      required this.hasParticipated});
 
   Color? _textColor(BuildContext context) {
     return Theme.of(context).brightness == Brightness.light

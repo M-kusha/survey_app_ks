@@ -9,8 +9,7 @@ import 'package:flutter/material.dart';
 class Register4step extends StatefulWidget {
   final RegisterLogic registerLogic;
 
-  const Register4step({Key? key, required this.registerLogic})
-      : super(key: key);
+  const Register4step({super.key, required this.registerLogic});
 
   @override
   Register4stepState createState() => Register4stepState();
@@ -59,7 +58,7 @@ class Register4stepState extends State<Register4step> {
 
     try {
       await widget.registerLogic.registerUser(companyId: _selectedCompanyId);
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(

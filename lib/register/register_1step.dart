@@ -9,8 +9,7 @@ import 'package:flutter/material.dart';
 class Register1step extends StatefulWidget {
   final RegisterLogic registerLogic;
 
-  const Register1step({Key? key, required this.registerLogic})
-      : super(key: key);
+  const Register1step({super.key, required this.registerLogic});
 
   @override
   Register1stepState createState() => Register1stepState();
@@ -115,12 +114,11 @@ class UserTypeCard extends StatelessWidget {
   final Color color;
 
   const UserTypeCard(
-      {Key? key,
+      {super.key,
       required this.userType,
       required this.icon,
       required this.onTap,
-      required this.color})
-      : super(key: key);
+      required this.color});
 
   @override
   Widget build(BuildContext context) {

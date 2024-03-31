@@ -49,7 +49,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
 
     await Provider.of<UserDataProvider>(context, listen: false)
         .loadCurrentUser();
-    if (!context.mounted) return;
+    if (!mounted) return;
     final companyId = Provider.of<UserDataProvider>(context, listen: false)
             .currentUser
             ?.companyId ??

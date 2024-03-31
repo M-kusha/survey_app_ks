@@ -11,11 +11,11 @@ class PDFAnalytics extends StatefulWidget {
   final List<List<int>> answerCounts;
 
   const PDFAnalytics({
-    Key? key,
+    super.key,
     required this.participants,
     required this.survey,
     required this.answerCounts,
-  }) : super(key: key);
+  });
 
   @override
   PdfGenerationPageState createState() => PdfGenerationPageState();
@@ -190,13 +190,13 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
                             ),
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ),
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

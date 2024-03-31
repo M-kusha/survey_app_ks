@@ -14,11 +14,11 @@ class PDFResults extends StatefulWidget {
   final Map<String, bool> textQuestionCorrect;
 
   const PDFResults({
-    Key? key,
+    super.key,
     required this.participant,
     required this.survey,
     required this.textQuestionCorrect,
-  }) : super(key: key);
+  });
 
   @override
   PDFResultsState createState() => PDFResultsState();

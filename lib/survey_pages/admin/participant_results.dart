@@ -15,13 +15,13 @@ class ParticipantAnswersPage extends StatefulWidget {
   final String userId;
 
   const ParticipantAnswersPage({
-    Key? key,
+    super.key,
     required this.participant,
     required this.survey,
     required this.correctAnswersCount,
     required this.totalScore,
     required this.userId,
-  }) : super(key: key);
+  });
 
   @override
   ParticipantAnswersPageState createState() => ParticipantAnswersPageState();

@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class Step2CreateAppointment extends StatefulWidget {
-  const Step2CreateAppointment({Key? key}) : super(key: key);
+  const Step2CreateAppointment({super.key});
 
   @override
   Step2CreateAppointmentState createState() => Step2CreateAppointmentState();

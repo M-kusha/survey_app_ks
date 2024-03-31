@@ -12,7 +12,7 @@ import 'package:provider/provider.dart';
 
 class UserManagementPage extends StatefulWidget {
   final String userId;
-  const UserManagementPage({Key? key, required this.userId}) : super(key: key);
+  const UserManagementPage({super.key, required this.userId});
 
   @override
   UserManagementPageState createState() => UserManagementPageState();

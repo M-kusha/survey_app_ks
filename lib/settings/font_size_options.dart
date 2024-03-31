@@ -9,10 +9,10 @@ class SizeOptions extends StatefulWidget {
   final String title;
 
   const SizeOptions({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   SizeOptionsState createState() => SizeOptionsState();

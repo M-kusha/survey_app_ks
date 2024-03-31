@@ -14,11 +14,10 @@ class Register3step extends StatefulWidget {
   final String? companyId;
 
   const Register3step(
-      {Key? key,
+      {super.key,
       required this.registerLogic,
       required this.profileType,
-      this.companyId})
-      : super(key: key);
+      this.companyId});
 
   @override
   Register3stepState createState() => Register3stepState();
@@ -129,7 +128,7 @@ class Register3stepState extends State<Register3step> {
 
     try {
       await widget.registerLogic.registerUser(companyId: widget.companyId);
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(

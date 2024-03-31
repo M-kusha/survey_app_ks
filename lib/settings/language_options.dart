@@ -9,10 +9,10 @@ class LanguageOptionsWidget extends StatefulWidget {
   final String title;
 
   const LanguageOptionsWidget({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   LanguageOptionsWidgetState createState() => LanguageOptionsWidgetState();

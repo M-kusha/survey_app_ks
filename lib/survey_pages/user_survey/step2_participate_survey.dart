@@ -14,11 +14,11 @@ class Step2ParticipateSurvey extends StatefulWidget {
   final String imageProfile;
 
   const Step2ParticipateSurvey({
-    Key? key,
+    super.key,
     required this.survey,
     required this.participant,
     required this.imageProfile,
-  }) : super(key: key);
+  });
 
   @override
   Step2ParticipateSurveyState createState() => Step2ParticipateSurveyState();
@@ -277,7 +277,7 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
         textAnswersReviewed: widget.participant.textAnswersReviewed,
         totalCorrectAnswers: totalCorrectAnswers,
       );
-      if (!context.mounted) return;
+      if (!mounted) return;
       Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (context) => Step3ParticipateSurvey(
               participant: widget.participant, survey: widget.survey)));

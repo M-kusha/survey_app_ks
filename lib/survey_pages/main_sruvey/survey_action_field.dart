@@ -11,11 +11,11 @@ class ActionField extends StatefulWidget {
   final void Function(String) onSearchTextChanged;
 
   const ActionField({
-    Key? key,
+    super.key,
     required this.isSearching,
     required this.searchController,
     required this.onSearchTextChanged,
-  }) : super(key: key);
+  });
 
   @override
   ActionFieldState createState() => ActionFieldState();

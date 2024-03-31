@@ -12,7 +12,7 @@ import 'package:provider/provider.dart';
 class Step4CreateSurvey extends StatefulWidget {
   final Survey survey;
 
-  const Step4CreateSurvey({Key? key, required this.survey}) : super(key: key);
+  const Step4CreateSurvey({super.key, required this.survey});
 
   @override
   State<Step4CreateSurvey> createState() => Step4CreateSurveyState();

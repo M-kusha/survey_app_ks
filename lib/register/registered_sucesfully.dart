@@ -4,7 +4,7 @@ import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 
 class RegistrationSuccessPage extends StatefulWidget {
-  const RegistrationSuccessPage({Key? key}) : super(key: key);
+  const RegistrationSuccessPage({super.key});
 
   @override
   RegistrationSuccessPageState createState() => RegistrationSuccessPageState();

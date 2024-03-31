@@ -11,11 +11,11 @@ class AppointmentEditPageStep4 extends StatefulWidget {
   final Function(int) onPageChange;
 
   const AppointmentEditPageStep4({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.onPageChange,
     required this.timeSlot,
-  }) : super(key: key);
+  });
 
   @override
   AppointmentEditPageStep4State createState() =>

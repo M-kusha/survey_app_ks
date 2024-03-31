@@ -15,11 +15,11 @@ class TimeSlotParticipantsPage extends StatefulWidget {
   final bool isAdmin;
 
   const TimeSlotParticipantsPage({
-    Key? key,
+    super.key,
     required this.timeSlot,
     required this.appointment,
     required this.isAdmin,
-  }) : super(key: key);
+  });
 
   @override
   TimeSlotParticipantsPageState createState() =>

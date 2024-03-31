@@ -14,11 +14,10 @@ class SurveyParticipantsPage extends StatefulWidget {
   final String surveyId;
 
   const SurveyParticipantsPage(
-      {Key? key,
+      {super.key,
       required this.participants,
       required this.survey,
-      required this.surveyId})
-      : super(key: key);
+      required this.surveyId});
 
   @override
   SurveyParticipantsPageState createState() => SurveyParticipantsPageState();

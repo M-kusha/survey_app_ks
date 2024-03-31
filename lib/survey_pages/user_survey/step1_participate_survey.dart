@@ -11,11 +11,10 @@ class Step1ParticipateSurvey extends StatelessWidget {
   final String imageProfile;
 
   const Step1ParticipateSurvey(
-      {Key? key,
+      {super.key,
       required this.survey,
       required this.participant,
-      required this.imageProfile})
-      : super(key: key);
+      required this.imageProfile});
 
   @override
   Widget build(BuildContext context) {

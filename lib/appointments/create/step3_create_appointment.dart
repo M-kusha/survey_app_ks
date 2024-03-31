@@ -25,7 +25,7 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
     if (_newAppointment.isValid()) {
       await _appointmentService.createAppointment(_newAppointment);
 
-      if (!context.mounted) return;
+      if (!mounted) return;
 
       Navigator.push(
         context,

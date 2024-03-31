@@ -18,13 +18,13 @@ class AppointmentNamePage extends StatefulWidget {
   final bool isTimeSlotConfirmed;
 
   const AppointmentNamePage({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.participant,
     required this.isAdmin,
     required this.hasParticipated,
     required this.isTimeSlotConfirmed,
-  }) : super(key: key);
+  });
 
   @override
   AppointmentNamePageState createState() => AppointmentNamePageState();

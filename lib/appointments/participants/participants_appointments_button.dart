@@ -21,14 +21,14 @@ class UserSelectCategories extends StatefulWidget {
   final bool isAnyTimeSLotConfirmed;
 
   const UserSelectCategories({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.userName,
     required this.timeSlot,
     required this.isAdmin,
     required this.hasParticipated,
     required this.isAnyTimeSLotConfirmed,
-  }) : super(key: key);
+  });
 
   @override
   UserSelectCategoriesState createState() => UserSelectCategoriesState();

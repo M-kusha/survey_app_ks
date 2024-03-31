@@ -9,10 +9,10 @@ class TTSOptions extends StatelessWidget {
   final String title;
 
   const TTSOptions({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

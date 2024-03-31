@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 class Step1CreateSurvey extends StatefulWidget {
-  const Step1CreateSurvey({Key? key}) : super(key: key);
+  const Step1CreateSurvey({super.key});
 
   @override
   Step1CreateSurveyState createState() => Step1CreateSurveyState();

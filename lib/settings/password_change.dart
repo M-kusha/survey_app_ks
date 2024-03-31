@@ -7,8 +7,7 @@ import 'package:flutter/material.dart';
 
 class PasswordChanger extends StatefulWidget {
   final bool isSuperAdmin;
-  const PasswordChanger({Key? key, d, required this.isSuperAdmin})
-      : super(key: key);
+  const PasswordChanger({super.key, d, required this.isSuperAdmin});
 
   @override
   PasswordChangertate createState() => PasswordChangertate();
@@ -104,7 +103,7 @@ class PasswordChangertate extends State<PasswordChanger> {
       bool isValidOldPassword =
           await _validateCurrentPassword(_oldPasswordController.text);
       if (!isValidOldPassword) {
-        if (!context.mounted) return;
+        if (!mounted) return;
         UIUtils.showSnackBar(context, 'invalid_old_password'.tr());
         setState(() {
           _isSaving = false;
@@ -115,14 +114,14 @@ class PasswordChangertate extends State<PasswordChanger> {
       try {
         User? user = FirebaseAuth.instance.currentUser;
         await user!.updatePassword(_newPasswordController.text);
-        if (!context.mounted) return;
+        if (!mounted) return;
 
         UIUtils.showSnackBar(context, 'password_updated_success'.tr());
         await Future.delayed(const Duration(seconds: 2));
-        if (!context.mounted) return;
+        if (!mounted) return;
         Navigator.pop(context);
       } catch (e) {
-        if (!context.mounted) return;
+        if (!mounted) return;
         UIUtils.showSnackBar(context, 'An error occurred. Please try again.');
       } finally {
         if (context.mounted) {

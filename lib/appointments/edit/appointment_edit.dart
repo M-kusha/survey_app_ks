@@ -18,11 +18,11 @@ class AppointmentEditPage extends StatefulWidget {
   final String userName;
 
   const AppointmentEditPage({
-    Key? key,
+    super.key,
     required this.appointment,
     required this.userName,
     required this.timeSlot,
-  }) : super(key: key);
+  });
 
   @override
   AppointmentEditPageState createState() => AppointmentEditPageState();

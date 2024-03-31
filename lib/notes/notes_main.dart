@@ -14,7 +14,7 @@ import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/notes/notes_logics.dart';
 
 class TodoList extends StatefulWidget {
-  const TodoList({Key? key}) : super(key: key);
+  const TodoList({super.key});
 
   @override
   TodoListState createState() => TodoListState();
@@ -131,36 +131,41 @@ class TodoListState extends State<TodoList> {
 
   Widget _buildNotesItem(
       String title, bool completed, DocumentReference docRef) {
-    return Padding(
-      padding: const EdgeInsets.all(5.0),
-      child: Card(
-        elevation: 1,
-        shadowColor: getButtonColor(context),
-        child: ListTile(
-          leading: Checkbox(
-            value: completed,
-            onChanged: (bool? value) {
-              _backend.completeNotesItem(docRef, completed);
-            },
-          ),
-          title: Padding(
-            padding: const EdgeInsets.only(right: 20.0),
-            child: Text(
-              title,
-              style: TextStyle(
-                decoration: completed ? TextDecoration.lineThrough : null,
-                color: completed ? Colors.grey : null,
+    return InkWell(
+      // onTap: () => Navigator.of(context).push(MaterialPageRoute(
+      //   builder: (context) => DetailedNotePage(noteId: docRef.id),
+      // )),
+      child: Padding(
+        padding: const EdgeInsets.all(5.0),
+        child: Card(
+          elevation: 1,
+          shadowColor: getButtonColor(context),
+          child: ListTile(
+            leading: Checkbox(
+              value: completed,
+              onChanged: (bool? value) {
+                _backend.completeNotesItem(docRef, completed);
+              },
+            ),
+            title: Padding(
+              padding: const EdgeInsets.only(right: 20.0),
+              child: Text(
+                title,
+                style: TextStyle(
+                  decoration: completed ? TextDecoration.lineThrough : null,
+                  color: completed ? Colors.grey : null,
+                ),
               ),
             ),
-          ),
-          trailing: Wrap(
-            spacing: 12,
-            children: <Widget>[
-              IconButton(
-                icon: const Icon(Icons.delete, color: Colors.red),
-                onPressed: () => _backend.deleteNotesItem(docRef),
-              ),
-            ],
+            trailing: Wrap(
+              spacing: 12,
+              children: <Widget>[
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _backend.deleteNotesItem(docRef),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -11,9 +11,9 @@ import 'package:provider/provider.dart';
 
 class CreateTrainingSurveyStep3 extends StatefulWidget {
   const CreateTrainingSurveyStep3({
-    Key? key,
+    super.key,
     required this.survey,
-  }) : super(key: key);
+  });
   final Survey survey;
 
   @override

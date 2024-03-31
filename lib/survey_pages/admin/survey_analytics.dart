@@ -11,10 +11,10 @@ class SurveyAnalyticsPage extends StatefulWidget {
   final Survey survey;
 
   const SurveyAnalyticsPage({
-    Key? key,
+    super.key,
     required this.participants,
     required this.survey,
-  }) : super(key: key);
+  });
 
   @override
   SurveyAnalyticsPageState createState() => SurveyAnalyticsPageState();

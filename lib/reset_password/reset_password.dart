@@ -17,29 +17,44 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
 
   Future<void> _resetPassword() async {
     final String email = _emailController.text.trim();
-    final BuildContext currentContext = context; // Get the current BuildContext
 
     try {
       await _auth.sendPasswordResetEmail(email: email);
 
-      if (mounted) {
-        builResetPasswordVerificationPage(currentContext);
-      }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        String title = '';
-        String message = '';
+      if (!mounted) return;
 
-        if (e.code == 'user-not-found') {
-          title = 'user_not_found'.tr();
-          message = 'check_email_again'.tr();
-        } else {
-          title = 'Error';
-          message = 'unexpected_error'.tr();
-        }
-        showErrorDialog(currentContext, title, message);
+      _builResetPasswordVerificationPage();
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String title = '';
+      String message = '';
+
+      if (e.code == 'user-not-found') {
+        title = 'user_not_found'.tr();
+        message = 'check_email_again'.tr();
+      } else {
+        title = 'Error';
+        message = 'unexpected_error'.tr();
       }
+      _showErrorDialog(title, message);
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return ErrorDialog(
+          title: title,
+          message: message,
+        );
+      },
+    );
+  }
+
+  void _builResetPasswordVerificationPage() {
+    Navigator.pushNamed(context, '/ResetPasswordVerificationPage');
   }
 
   void showErrorDialog(BuildContext context, String title, String message) {
@@ -75,7 +90,6 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               SizedBox(height: MediaQuery.of(context).size.height * 0.2),
-
               Card(
                 elevation: 5.0, // Card with elevation
                 shape: RoundedRectangleBorder(
@@ -122,14 +136,11 @@ class ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         child: const Text('send_reset_code').tr(),
                       ),
-
                       const SizedBox(height: 16.0),
-                      // or go back to login page
                     ],
                   ),
                 ),
               ),
-              // Additional Widgets if needed
             ],
           ),
         ),

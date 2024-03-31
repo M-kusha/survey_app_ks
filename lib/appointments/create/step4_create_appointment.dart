@@ -12,8 +12,7 @@ import 'package:provider/provider.dart';
 class Step4CreateAppointment extends StatefulWidget {
   final Appointment appointment;
 
-  const Step4CreateAppointment({Key? key, required this.appointment})
-      : super(key: key);
+  const Step4CreateAppointment({super.key, required this.appointment});
 
   @override
   State<Step4CreateAppointment> createState() => Step4CreateAppointmentState();

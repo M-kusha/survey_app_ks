@@ -137,10 +137,10 @@ class CustomLoadingWidget extends StatelessWidget {
   final String loadingText;
 
   const CustomLoadingWidget({
-    Key? key,
+    super.key,
     this.height = 160.0,
     this.loadingText = "",
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

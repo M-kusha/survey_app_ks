@@ -11,10 +11,10 @@ class NumberCarouselSlider extends StatefulWidget {
 
   const NumberCarouselSlider({
     this.onNumberChanged,
-    Key? key,
+    super.key,
     required this.startValue,
     required this.carouselController,
-  }) : super(key: key);
+  });
 
   @override
   State<NumberCarouselSlider> createState() => _NumberCarouselSliderState();

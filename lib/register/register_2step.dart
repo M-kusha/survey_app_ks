@@ -12,8 +12,7 @@ class Register2step extends StatefulWidget {
   final ProfileType profileType;
 
   const Register2step(
-      {Key? key, required this.registerLogic, required this.profileType})
-      : super(key: key);
+      {super.key, required this.registerLogic, required this.profileType});
 
   @override
   State<Register2step> createState() => _Register2stepState();
@@ -65,7 +64,7 @@ class _Register2stepState extends State<Register2step> {
     if (widget.profileType == ProfileType.company) {
       companyId = await widget.registerLogic.registerCompany();
     }
-    if (!context.mounted) return;
+    if (!mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(

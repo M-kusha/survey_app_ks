@@ -12,13 +12,13 @@ class CustomPopupMenuButton extends StatelessWidget {
   final List<PopupMenuItemModel> menuItems;
 
   const CustomPopupMenuButton({
-    Key? key,
+    super.key,
     required this.buttonColor,
     required this.listTileColor,
     required this.selectedOption,
     required this.onOptionSelected,
     required this.menuItems,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

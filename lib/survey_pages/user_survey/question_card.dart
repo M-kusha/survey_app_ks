@@ -13,7 +13,7 @@ class QuestionCard extends StatefulWidget {
   final int remainingTime;
 
   const QuestionCard({
-    Key? key,
+    super.key,
     required this.questionData,
     required this.questionIndex,
     required this.userAnswers,
@@ -21,7 +21,7 @@ class QuestionCard extends StatefulWidget {
     required this.onUpdateUserAnswers,
     required this.timeLimitPerQuestion,
     required this.remainingTime,
-  }) : super(key: key);
+  });
 
   @override
   QuestionCardState createState() => QuestionCardState();

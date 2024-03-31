@@ -13,10 +13,10 @@ class Step3ParticipateSurvey extends StatefulWidget {
   final Survey survey;
 
   const Step3ParticipateSurvey({
-    Key? key,
+    super.key,
     required this.participant,
     required this.survey,
-  }) : super(key: key);
+  });
 
   @override
   State<Step3ParticipateSurvey> createState() => Step3ParticipateSurveyState();

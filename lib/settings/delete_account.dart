@@ -6,8 +6,7 @@ import 'package:flutter/material.dart';
 
 class DeleteAccountButton extends StatelessWidget {
   final bool isSuperadmin;
-  const DeleteAccountButton({Key? key, required this.isSuperadmin})
-      : super(key: key);
+  const DeleteAccountButton({super.key, required this.isSuperadmin});
 
   @override
   Widget build(BuildContext context) {
