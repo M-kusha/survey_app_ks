@@ -1,5 +1,5 @@
 {
-  "app_title": "Survey & Appointment",
+  "app_title": "EchoMeet ",
   "LOGIN_STRINGS": "",
   "Login Page": "Login Page",
   "welcome_back": "Welcome back!",
@@ -267,6 +267,7 @@
   "delete": "Delete",
   "delete_account": "Delete Account",
   "survey": "Survey",
+  "text_answers": "Text Answers",
 
   "notes": "Notes",
   "sort_newest":"Newest",
