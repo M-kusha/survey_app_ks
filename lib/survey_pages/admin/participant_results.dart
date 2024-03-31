@@ -28,7 +28,6 @@ class ParticipantAnswersPage extends StatefulWidget {
 }
 
 class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
-  Map<String, bool> textQuestionCorrect = {};
   Map<String, dynamic> textQuestionStatus = {};
   FirebaseSurveyService firebaseSurveyService = FirebaseSurveyService();
   void confirmCorrectAnswer(String surveyId, String questionId,
@@ -294,7 +293,7 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                 builder: (context) => PDFResults(
                   participant: widget.participant,
                   survey: widget.survey,
-                  textQuestionCorrect: textQuestionCorrect,
+                  textQuestionCorrect: widget.participant.textAnswersReviewed,
                 ),
               ),
             );
