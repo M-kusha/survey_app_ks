@@ -112,7 +112,7 @@ class TodoListState extends State<TodoList> {
             )
           : _buildNotesList(theme),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: theme.primaryColor,
+        backgroundColor: getButtonColor(context),
         onPressed: () => _displayDialog(context),
         tooltip: 'add_note'.tr(),
         child: Icon(Icons.add, color: theme.scaffoldBackgroundColor),
