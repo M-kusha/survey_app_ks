@@ -188,18 +188,64 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     Text(
+          //       option,
+          //       style: TextStyle(
+          //         fontSize: fontSize,
+          //         fontWeight: FontWeight.w500,
+          //       ),
+          //     ),
+          //     Text("($voteCount ${'votes'.tr()})",
+          //         style: TextStyle(fontSize: fontSize)),
+          //   ],
+          // ),
+          // Row(
+          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          //   children: [
+          //     Expanded(
+          //       // This makes the text widget flexible, allowing it to fill available space
+          //       child: Text(
+          //         option,
+          //         overflow: TextOverflow
+          //             .ellipsis, // Adds ellipses when text overflows
+          //         style: TextStyle(
+          //           fontSize: fontSize,
+          //           fontWeight: FontWeight.w500,
+          //         ),
+          //       ),
+          //     ),
+          //     Text(
+          //       "($voteCount ${'votes'.tr()})",
+          //       style: TextStyle(fontSize: fontSize),
+          //     ),
+          //   ],
+          // ),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                option,
-                style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option,
+                      softWrap: true,
+                      style: TextStyle(
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Text("($voteCount ${'votes'.tr()})",
-                  style: TextStyle(fontSize: fontSize)),
+              Text(
+                "($voteCount ${'votes'.tr()})",
+                style: TextStyle(fontSize: fontSize),
+              ),
             ],
           ),
           const SizedBox(height: 4),
