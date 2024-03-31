@@ -278,5 +278,8 @@
   "write_note":"Write a note here",
   "add":"Add",
   "no_items":"No items found",
-  "no_notes":"No notes found"
+  "no_notes":"No notes found",
+  "note_saved":"Note saved successfully",
+  "edit_note":"Edit Note",
+  "start_writting":"Start writing your note here..."
 }

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/appointments/main_screen/appointment_search_field.dart';
 import 'package:echomeet/notes/add_item_widget.dart';
+import 'package:echomeet/notes/detailed_notes.dart';
 import 'package:echomeet/notes/filter_widget.dart';
 import 'package:echomeet/notes/pagination_widget.dart';
 import 'package:echomeet/notes/search_widget.dart';
@@ -78,8 +79,10 @@ class TodoListState extends State<TodoList> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
+
     return Scaffold(
       appBar: AppBar(
         leading: sorting(context),
@@ -90,28 +93,34 @@ class TodoListState extends State<TodoList> {
                 onSearchTextChanged: _onSearchTextChanged,
               )
             : Text('notes'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5)),
+                style: theme.textTheme.titleLarge!
+                    .copyWith(fontSize: timeFontSize)),
         centerTitle: true,
         actions: [
-          _buildSearchBar(
-            getButtonColor(context),
-          ),
+          _buildSearchBar(theme.primaryColor),
         ],
         automaticallyImplyLeading: false,
+        elevation: 0,
+        backgroundColor: theme.scaffoldBackgroundColor,
       ),
       body: _filteredNotes.isEmpty
-          ? Center(child: Text(isSearching ? 'no_items'.tr() : 'no_notes'.tr()))
-          : _buildNotesList(),
+          ? Center(
+              child: Text(
+                isSearching ? 'no_items'.tr() : 'no_notes'.tr(),
+                style: theme.textTheme.titleLarge,
+              ),
+            )
+          : _buildNotesList(theme),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: getButtonColor(context),
+        backgroundColor: theme.primaryColor,
         onPressed: () => _displayDialog(context),
         tooltip: 'add_note'.tr(),
-        child: Icon(Icons.add, color: getTextColor(context)),
+        child: Icon(Icons.add, color: theme.scaffoldBackgroundColor),
       ),
     );
   }
 
-  Widget _buildNotesList() {
+  Widget _buildNotesList(ThemeData theme) {
     return Column(
       children: [
         Expanded(
@@ -120,7 +129,8 @@ class TodoListState extends State<TodoList> {
             itemBuilder: (context, index) {
               var doc = _filteredNotes[index];
               bool completed = doc['completed'] ?? false;
-              return _buildNotesItem(doc['title'], completed, doc.reference);
+              return _buildNotesItem(
+                  doc['title'], completed, doc.reference, theme);
             },
           ),
         ),
@@ -130,18 +140,22 @@ class TodoListState extends State<TodoList> {
   }
 
   Widget _buildNotesItem(
-      String title, bool completed, DocumentReference docRef) {
+      String title, bool completed, DocumentReference docRef, ThemeData theme) {
     return InkWell(
-      // onTap: () => Navigator.of(context).push(MaterialPageRoute(
-      //   builder: (context) => DetailedNotePage(noteId: docRef.id),
-      // )),
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+        builder: (context) => DetailedNotePage(
+          noteId: docRef.id,
+          title: title,
+        ),
+      )),
       child: Padding(
-        padding: const EdgeInsets.all(5.0),
+        padding: const EdgeInsets.all(8.0),
         child: Card(
           elevation: 1,
           shadowColor: getButtonColor(context),
           child: ListTile(
             leading: Checkbox(
+              activeColor: getButtonColor(context),
               value: completed,
               onChanged: (bool? value) {
                 _backend.completeNotesItem(docRef, completed);
@@ -151,7 +165,7 @@ class TodoListState extends State<TodoList> {
               padding: const EdgeInsets.only(right: 20.0),
               child: Text(
                 title,
-                style: TextStyle(
+                style: theme.textTheme.titleMedium!.copyWith(
                   decoration: completed ? TextDecoration.lineThrough : null,
                   color: completed ? Colors.grey : null,
                 ),
@@ -161,7 +175,7 @@ class TodoListState extends State<TodoList> {
               spacing: 12,
               children: <Widget>[
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Icons.remove, color: Colors.red),
                   onPressed: () => _backend.deleteNotesItem(docRef),
                 ),
               ],
@@ -184,7 +198,7 @@ class TodoListState extends State<TodoList> {
     );
   }
 
-  List getNotesForCurrentPage() {
+  List<DocumentSnapshot> getNotesForCurrentPage() {
     final int startIndex = (currentPage - 1) * itemsPerPage;
     final int endIndex = startIndex + itemsPerPage;
     if (endIndex > _filteredNotes.length) {
