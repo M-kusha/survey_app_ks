@@ -124,9 +124,7 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
 
                         return pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(
-                              vertical: 5,
-                              horizontal:
-                                  10), // Adjust container padding as needed
+                              vertical: 5, horizontal: 10),
                           child: pw.Container(
                             height: 40,
                             decoration: pw.BoxDecoration(
@@ -150,7 +148,7 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
                                   ),
                                 ),
                                 pw.Container(
-                                  width: 160, // Adjust progress bar width
+                                  width: 160,
                                   height: 20,
                                   decoration: pw.BoxDecoration(
                                     color: percentage >= 75
@@ -166,8 +164,7 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
                                     children: [
                                       pw.Positioned.fill(
                                         child: pw.Container(
-                                          width: (percentage / 100) *
-                                              160, // Adjust progress bar width
+                                          width: (percentage / 100) * 160,
                                         ),
                                       ),
                                       pw.Center(
