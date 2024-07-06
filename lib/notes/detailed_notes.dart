@@ -81,7 +81,6 @@ class DetailedNotePageState extends State<DetailedNotePage> {
                     placeholder: 'start_writting'.tr(),
                     padding: const EdgeInsets.all(8),
                     controller: _controller,
-                    readOnly: false,
                     scrollable: true,
                     sharedConfigurations: const QuillSharedConfigurations(),
                   ),

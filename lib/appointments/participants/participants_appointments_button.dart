@@ -173,7 +173,7 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     return TextButton(
       onPressed: isButtonDisabled ? null : onTap,
       style: ButtonStyle(
-        overlayColor: MaterialStateColor.resolveWith(
+        overlayColor: WidgetStateColor.resolveWith(
           (states) => isButtonDisabled
               ? Colors.transparent
               : Colors.grey.withOpacity(0.1),

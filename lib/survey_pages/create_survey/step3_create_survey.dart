@@ -269,9 +269,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           });
         },
         checkColor: getTextColor(context),
-        fillColor: MaterialStateProperty.resolveWith<Color>(
-            (Set<MaterialState> states) {
-          if (states.contains(MaterialState.selected)) {
+        fillColor:
+            WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+          if (states.contains(WidgetState.selected)) {
             return getButtonColor(context);
           }
           return getTextColor(context);

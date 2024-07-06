@@ -91,26 +91,26 @@ Widget buildBottomElevatedButton({
         ElevatedButton(
           style: ButtonStyle(
             minimumSize:
-                MaterialStateProperty.all(Size.fromHeight(defaultButtonHeight)),
-            padding: MaterialStateProperty.all(
+                WidgetStateProperty.all(Size.fromHeight(defaultButtonHeight)),
+            padding: WidgetStateProperty.all(
                 EdgeInsets.symmetric(vertical: defaultFontSize * 0.5)),
-            backgroundColor: MaterialStateProperty.resolveWith<Color>(
-                (Set<MaterialState> states) {
+            backgroundColor: WidgetStateProperty.resolveWith<Color>(
+                (Set<WidgetState> states) {
               if (Theme.of(context).brightness == Brightness.light) {
                 return Colors.grey[100]!;
               } else {
                 return Colors.grey[900]!;
               }
             }),
-            foregroundColor: MaterialStateProperty.resolveWith<Color>(
-                (Set<MaterialState> states) {
+            foregroundColor: WidgetStateProperty.resolveWith<Color>(
+                (Set<WidgetState> states) {
               if (Theme.of(context).brightness == Brightness.light) {
                 return Colors.grey[900]!;
               } else {
                 return const Color.fromARGB(255, 255, 255, 255);
               }
             }),
-            shape: MaterialStateProperty.all<RoundedRectangleBorder>(
+            shape: WidgetStateProperty.all<RoundedRectangleBorder>(
               RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(32),
                 side: BorderSide(
