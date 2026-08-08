@@ -76,10 +76,18 @@ service cloud.firestore {
     // ---------- companies ----------
 
     match /companies/{companyId} {
-      // Registration lets you search companies to join, so any signed-in user
-      // can read them. Sign-up therefore has to create the account first and
-      // the company second — see RegisterLogic.registerUser.
-      allow read: if signedIn();
+      // Deliberately readable without signing in.
+      //
+      // The "join an existing company" step lists companies so the user can
+      // pick one, and it runs before the account is created — requiring auth
+      // here silently returns an empty list and makes that path impossible.
+      //
+      // This is a real tradeoff, not an oversight: anyone can enumerate company
+      // names. They are not secrets, and nothing else about a company is stored
+      // here. The proper fix is to create the auth account at the *start* of
+      // registration rather than the end, after which this can require auth
+      // again. Tracked with the registration rework.
+      allow read: if true;
 
       allow create: if signedIn()
         && request.resource.data.createdBy == uid()

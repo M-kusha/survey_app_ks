@@ -68,7 +68,13 @@ class LoginPageState extends State<LoginPage> {
         body: Center(child: CustomLoadingWidget(loadingText: "login_in")),
       );
     }
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      // A faint tint behind the card, so the card reads as a surface sitting on
+      // a page rather than as a rectangle of the same white.
+      backgroundColor: isDark
+          ? Theme.of(context).scaffoldBackgroundColor
+          : const Color(0xFFEFF2F6),
       body: SafeArea(
         child: PageBody(
           maxWidth: 460,
@@ -152,16 +158,26 @@ class LoginPageState extends State<LoginPage> {
   }
 
   Widget _buildLoginContainer() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(Spacing.xl),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(10),
-        color: AdaptiveTheme.of(context).theme.scaffoldBackgroundColor,
-        boxShadow: const [
+        borderRadius: BorderRadius.circular(16),
+        // The card used to paint itself scaffoldBackgroundColor — the exact
+        // colour of the page behind it — so it read as a faint shadow rather
+        // than a surface. That is barely noticeable on a phone and looks washed
+        // out on a monitor, where it sits in a large empty field.
+        color: isDark ? theme.colorScheme.surface : Colors.white,
+        border: Border.all(
+          color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
+        ),
+        boxShadow: [
           BoxShadow(
-            color: Colors.black12,
-            blurRadius: 15,
-            offset: Offset(0, 5),
+            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
         ],
       ),

@@ -76,7 +76,15 @@ describe('deny by default', () => {
   it('an unauthenticated client can read nothing', async () => {
     await assertFails(getDoc(doc(anon(), 'users', BOB)));
     await assertFails(getDoc(doc(anon(), 'surveys', 'acme-survey')));
-    await assertFails(getDoc(doc(anon(), 'companies', ACME)));
+    await assertFails(getDoc(doc(anon(), 'appointments', 'acme-standup')));
+  });
+
+  // The one deliberate exception. Registration lists companies so a new user
+  // can pick one to join, and that screen runs before the account exists — so
+  // requiring auth here would silently return an empty list and make joining
+  // an existing company impossible.
+  it('companies are the deliberate exception, readable before sign-up', async () => {
+    await assertSucceeds(getDoc(doc(anon(), 'companies', ACME)));
   });
 
   it('an unauthenticated client can write nothing', async () => {
