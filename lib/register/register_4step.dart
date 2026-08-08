@@ -57,7 +57,10 @@ class Register4stepState extends State<Register4step> {
     });
 
     try {
-      await widget.registerLogic.registerUser(companyId: _selectedCompanyId);
+      // Joining a company that already exists.
+      await widget.registerLogic.registerUser(
+        existingCompanyId: _selectedCompanyId,
+      );
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

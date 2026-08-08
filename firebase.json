@@ -1,1 +1,34 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"echomeet-app","appId":"1:1005316799898:android:e98a6ecceb2008aac98e23","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"echomeet-app","configurations":{"android":"1:1005316799898:android:e98a6ecceb2008aac98e23","ios":"1:1005316799898:ios:97e44d1c4fbc76e1c98e23","web":"1:1005316799898:web:75aae15cc70210fcc98e23"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "echomeet-app",
+          "appId": "1:1005316799898:android:e98a6ecceb2008aac98e23",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "echomeet-app",
+          "appId": "1:1005316799898:ios:97e44d1c4fbc76e1c98e23",
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "echomeet-app",
+          "configurations": {
+            "android": "1:1005316799898:android:e98a6ecceb2008aac98e23",
+            "ios": "1:1005316799898:ios:97e44d1c4fbc76e1c98e23",
+            "web": "1:1005316799898:web:75aae15cc70210fcc98e23"
+          }
+        }
+      }
+    }
+  }
+}

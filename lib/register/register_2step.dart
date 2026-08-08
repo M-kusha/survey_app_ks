@@ -62,18 +62,16 @@ class _Register2stepState extends State<Register2step> {
       return;
     }
 
-    String? companyId;
-    if (widget.profileType == ProfileType.company) {
-      companyId = await widget.registerLogic.registerCompany();
-    }
-    if (!mounted) return;
+    // The company is no longer created here. It is written after sign-up in
+    // registerUser(), so the request is authenticated and nothing is left
+    // behind if the user abandons the flow on the next screen.
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Register3step(
           registerLogic: widget.registerLogic,
           profileType: widget.profileType,
-          companyId: companyId,
+          companyId: null,
         ),
       ),
     );

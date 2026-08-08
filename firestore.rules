@@ -1,0 +1,231 @@
+rules_version = '2';
+
+// EchoMeet security rules.
+//
+// The app is multi-tenant: every user belongs to a company, and nothing should
+// ever cross that boundary. The client-side role checks in the Flutter code
+// (FirebaseServices.fetchAdminStatus and friends) only decide which buttons to
+// draw — they are not a security boundary and are trivially bypassed. This file
+// is the boundary.
+//
+// Two rules carry most of the weight:
+//   * a user can never change their own role
+//   * a participant can never write their own score
+//
+// Note on cost: helper functions below use get() to read the caller's profile.
+// Each get() counts as a document read and Firestore allows 10 per single-doc
+// request. The helpers are written so a request needs at most two.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- helpers ----------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function uid() {
+      return request.auth.uid;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(uid())).data;
+    }
+
+    function hasProfile() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(uid()));
+    }
+
+    function myCompanyId() {
+      return profile().companyId;
+    }
+
+    // Mirrors FirebaseServices.fetchAdminStatus on the client.
+    function isAdmin() {
+      return hasProfile()
+        && profile().role in ['admin', 'moderator', 'superadmin'];
+    }
+
+    // Same company as the caller. A null companyId never matches, so documents
+    // written before companyId existed stay invisible rather than public.
+    function sameCompany(companyId) {
+      return hasProfile()
+        && companyId != null
+        && myCompanyId() == companyId;
+    }
+
+    function adminOf(companyId) {
+      return isAdmin() && sameCompany(companyId);
+    }
+
+    // True when the caller created this company, which is how "I am registering
+    // my own company" is told apart from "I am joining someone else's".
+    function createdCompany(companyId) {
+      return companyId != null
+        && exists(/databases/$(database)/documents/companies/$(companyId))
+        && get(/databases/$(database)/documents/companies/$(companyId))
+             .data.createdBy == uid();
+    }
+
+    function fieldUnchanged(field) {
+      return request.resource.data[field] == resource.data[field];
+    }
+
+    // ---------- companies ----------
+
+    match /companies/{companyId} {
+      // Registration lets you search companies to join, so any signed-in user
+      // can read them. Sign-up therefore has to create the account first and
+      // the company second — see RegisterLogic.registerUser.
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0;
+
+      // Renaming a company is a superadmin action and must never reassign
+      // ownership.
+      allow update: if adminOf(companyId)
+        && fieldUnchanged('createdBy');
+
+      // Deleting a company would strand every user pointing at it.
+      allow delete: if false;
+    }
+
+    // ---------- users ----------
+
+    match /users/{userId} {
+      // Your own profile, or a colleague's — the app shows participant names
+      // and avatars, and user management lists the company's members.
+      allow read: if signedIn()
+        && (userId == uid() || sameCompany(resource.data.companyId));
+
+      // Sign-up writes this document. 'superadmin' is only accepted when the
+      // companyId names a company this same user just created; joining an
+      // existing company forces 'user'. Without this, anyone could pick any
+      // company at sign-up and hand themselves admin over it.
+      allow create: if signedIn()
+        && userId == uid()
+        && (
+          request.resource.data.role == 'user'
+          || (
+            request.resource.data.role == 'superadmin'
+            && createdCompany(request.resource.data.companyId)
+          )
+        );
+
+      // You may edit your own profile but never your own role or company.
+      // An admin may change a colleague's role, but not their company.
+      allow update: if signedIn() && (
+        (
+          userId == uid()
+          && fieldUnchanged('role')
+          && fieldUnchanged('companyId')
+        )
+        || (
+          adminOf(resource.data.companyId)
+          && fieldUnchanged('companyId')
+        )
+      );
+
+      // Account deletion, from AccountDeletionService.
+      allow delete: if signedIn() && userId == uid();
+
+      // Rich-text note bodies. Strictly private.
+      match /notes/{noteId} {
+        allow read, write: if signedIn() && userId == uid();
+      }
+    }
+
+    // ---------- notes ----------
+    // Note titles and completion state. Also strictly private.
+
+    match /notes/{userId} {
+      allow read, write: if signedIn() && userId == uid();
+
+      match /userNotes/{noteId} {
+        allow read, write: if signedIn() && userId == uid();
+      }
+    }
+
+    // ---------- surveys ----------
+
+    match /surveys/{surveyId} {
+      allow read: if sameCompany(resource.data.companyId);
+
+      // Only admins author surveys, and only inside their own company.
+      allow create: if adminOf(request.resource.data.companyId);
+      allow update: if adminOf(resource.data.companyId)
+        && fieldUnchanged('companyId');
+      allow delete: if adminOf(resource.data.companyId);
+
+      // One submission per participant, keyed by uid.
+      match /participants/{participantId} {
+        function surveyCompanyId() {
+          return get(/databases/$(database)/documents/surveys/$(surveyId))
+                   .data.companyId;
+        }
+
+        // Participants see their own result; admins see everyone's.
+        allow read: if signedIn()
+          && (participantId == uid() || adminOf(surveyCompanyId()));
+
+        // You submit your own answers, under your own id, once.
+        allow create: if signedIn()
+          && participantId == uid()
+          && request.resource.data.userId == uid()
+          && sameCompany(surveyCompanyId());
+
+        // Grading is an admin action. A participant must never be able to
+        // rewrite their own score or correct-answer count after submitting —
+        // that is the whole point of scoring server-side of the client.
+        allow update: if adminOf(surveyCompanyId());
+
+        allow delete: if signedIn()
+          && (participantId == uid() || adminOf(surveyCompanyId()));
+      }
+    }
+
+    // ---------- appointments ----------
+
+    match /appointments/{appointmentId} {
+      allow read: if sameCompany(resource.data.companyId);
+
+      allow create: if adminOf(request.resource.data.companyId);
+      allow update: if adminOf(resource.data.companyId)
+        && fieldUnchanged('companyId');
+      allow delete: if adminOf(resource.data.companyId);
+
+      // Participant ids here are '<uid>-<slotStart>-<slotEnd>', so ownership is
+      // asserted through the userId field rather than the document id.
+      match /participants/{participantId} {
+        function appointmentCompanyId() {
+          return get(/databases/$(database)/documents/appointments/$(appointmentId))
+                   .data.companyId;
+        }
+
+        // Everyone in the company can see who is coming to a meeting.
+        allow read: if sameCompany(appointmentCompanyId());
+
+        allow create, update: if signedIn()
+          && request.resource.data.userId == uid()
+          && sameCompany(appointmentCompanyId());
+
+        allow delete: if signedIn()
+          && (
+            resource.data.userId == uid()
+            || adminOf(appointmentCompanyId())
+          );
+      }
+    }
+
+    // Anything not matched above is denied. Adding a collection means adding a
+    // rule for it here, deliberately.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
