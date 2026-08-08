@@ -14,7 +14,11 @@ class RegisterLogic {
   final TextEditingController birthdateController = TextEditingController();
   final TextEditingController companyNameController = TextEditingController();
 
-  ProfileType profileType = ProfileType.user;
+  // There is deliberately no `profileType` field here. One used to exist,
+  // defaulted to ProfileType.user, and was never assigned by anything — the
+  // registration screens pass the choice down as a constructor argument
+  // instead. Anything reading the field silently got "ordinary user" no matter
+  // what the person picked on the first screen.
   String? selectedCompanyName;
   File? profileImage;
 
@@ -30,9 +34,15 @@ class RegisterLogic {
   /// and `companies` had to accept writes from anyone. It also left an orphaned
   /// company behind whenever somebody abandoned the flow before finishing.
   ///
+  /// [profileType] must be the choice made on the first screen — passed in
+  /// rather than read from shared state, so it cannot silently default.
+  ///
   /// [existingCompanyId] is set when joining a company that already exists;
   /// leave it null when registering a new one.
-  Future<void> registerUser({String? existingCompanyId}) async {
+  Future<void> registerUser({
+    required ProfileType profileType,
+    String? existingCompanyId,
+  }) async {
     final userCredential = await _auth.createUserWithEmailAndPassword(
       email: emailController.text.trim(),
       password: passwordController.text.trim(),

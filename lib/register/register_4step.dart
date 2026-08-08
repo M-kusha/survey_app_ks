@@ -57,8 +57,10 @@ class Register4stepState extends State<Register4step> {
     });
 
     try {
-      // Joining a company that already exists.
+      // Joining a company that already exists — never a company registration,
+      // so this screen is always the ordinary-user path.
       await widget.registerLogic.registerUser(
+        profileType: ProfileType.user,
         existingCompanyId: _selectedCompanyId,
       );
       if (!mounted) return;

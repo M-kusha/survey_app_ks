@@ -27,9 +27,13 @@ const _destinations = <_Destination>[
 /// Root shell. Shows a bottom bar on phones and a navigation rail on anything
 /// wider, with labels on the rail once there is room for them.
 class BottomNavigation extends StatefulWidget {
-  const BottomNavigation({super.key, this.initialIndex = 0});
+  const BottomNavigation({super.key, this.initialIndex = 0, this.pages});
 
   final int initialIndex;
+
+  /// Overrides the tab contents. Only used by tests — the real pages all reach
+  /// for Firebase in `initState`, which a widget test has no way to satisfy.
+  final List<Widget>? pages;
 
   @override
   State<BottomNavigation> createState() => _BottomNavigationState();
@@ -42,12 +46,14 @@ class _BottomNavigationState extends State<BottomNavigation> {
   // widget on every tab change, as this used to, disposed the other tabs'
   // State — so notes scroll position, filters and search were wiped every time
   // you left the tab and came back.
-  static const _pages = <Widget>[
+  static const _defaultPages = <Widget>[
     TodoList(),
     AppointmentPageUI(),
     QuestionarySurveyPageUI(),
     SettingsPageUI(),
   ];
+
+  List<Widget> get _pages => widget.pages ?? _defaultPages;
 
   void _onDestinationSelected(int index) {
     setState(() => _currentIndex = index);

@@ -132,7 +132,7 @@ class Register3stepState extends State<Register3step> {
 
     try {
       // Registering a new company: registerUser creates it after sign-up.
-      await widget.registerLogic.registerUser();
+      await widget.registerLogic.registerUser(profileType: widget.profileType);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
         context,
