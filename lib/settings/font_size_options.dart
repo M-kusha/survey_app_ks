@@ -1,5 +1,4 @@
 import 'package:echomeet/settings/font_size_provider.dart';
-import 'package:echomeet/utilities/settings_controller.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,33 +7,21 @@ class SizeOptions extends StatefulWidget {
   final IconData icon;
   final String title;
 
-  const SizeOptions({
-    super.key,
-    required this.icon,
-    required this.title,
-  });
+  const SizeOptions({super.key, required this.icon, required this.title});
 
   @override
   SizeOptionsState createState() => SizeOptionsState();
 }
 
 class SizeOptionsState extends State<SizeOptions> {
-  SettingsController settingsController = SettingsController();
-  double _fontSize = 16;
   bool _isExpandedFont = false;
 
   @override
-  void initState() {
-    super.initState();
-    settingsController.getFontSize().then((value) {
-      setState(() {
-        _fontSize = value;
-      });
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // Read straight from the provider so the slider and the rest of the app can
+    // never show different sizes.
+    final fontSizeProvider = context.watch<FontSizeProvider>();
+    final fontSize = fontSizeProvider.fontSize;
     Color buttonColor = getButtonColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
@@ -51,20 +38,18 @@ class SizeOptionsState extends State<SizeOptions> {
               children: [
                 Row(
                   children: [
-                    Icon(widget.icon, size: _fontSize + 15),
-                    const SizedBox(
-                      width: 10,
-                    ),
+                    Icon(widget.icon, size: fontSize + 15),
+                    const SizedBox(width: 10),
                     Text(
                       widget.title,
                       style: TextStyle(
-                        fontSize: _fontSize,
+                        fontSize: fontSize,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ],
                 ),
-                Icon(Icons.arrow_drop_down, size: _fontSize + 15),
+                Icon(Icons.arrow_drop_down, size: fontSize + 15),
               ],
             ),
           ),
@@ -75,20 +60,12 @@ class SizeOptionsState extends State<SizeOptions> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Slider(
-                value: _fontSize,
+                value: fontSize,
                 activeColor: buttonColor,
-                min: 12,
-                max: 22,
-                label: _fontSize.round().toString(),
-                onChanged: (double value) {
-                  setState(() {
-                    _fontSize = value;
-                  });
-                  Provider.of<FontSizeProvider>(context, listen: false)
-                      .setFontSize(value);
-
-                  settingsController.saveFontSize(value);
-                },
+                min: fontMinSize,
+                max: fontMaxSize,
+                label: fontSize.round().toString(),
+                onChanged: fontSizeProvider.setFontSize,
               ),
             ),
         ],

@@ -8,11 +8,7 @@ class BiometricOptions extends StatefulWidget {
   final IconData icon;
   final String title;
 
-  const BiometricOptions({
-    super.key,
-    required this.icon,
-    required this.title,
-  });
+  const BiometricOptions({super.key, required this.icon, required this.title});
 
   @override
   State<BiometricOptions> createState() => _BiometricOptionsState();
@@ -29,13 +25,14 @@ class _BiometricOptionsState extends State<BiometricOptions> {
   }
 
   Future<void> _loadBiometricSetting() async {
-    _biometricEnabled = UserPreferences.getBiometricAuthEnabled() ?? false;
+    _biometricEnabled = UserPreferences.getBiometricAuthEnabled();
     setState(() {});
   }
 
   Future<void> _updateBiometricSetting(bool value) async {
     if (value) {
-      final canAuthenticate = await _authService.canCheckBiometrics() &&
+      final canAuthenticate =
+          await _authService.canCheckBiometrics() &&
           await _authService.isDeviceSupported();
       if (canAuthenticate) {
         final didAuthenticate = await _authService.authenticateUser();
@@ -79,8 +76,8 @@ class _BiometricOptionsState extends State<BiometricOptions> {
           Transform.scale(
             scale: 0.7,
             child: CupertinoSwitch(
-              activeColor: buttonColor,
-              trackColor: Colors.grey,
+              activeTrackColor: buttonColor,
+              inactiveTrackColor: Colors.grey,
               value: _biometricEnabled,
               onChanged: (bool newValue) {
                 _updateBiometricSetting(newValue);

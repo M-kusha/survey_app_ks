@@ -1,6 +1,7 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/login/login.dart';
+import 'package:echomeet/login/login_logics.dart';
 import 'package:echomeet/settings/biometrics_options.dart';
 import 'package:echomeet/settings/daten_schutz.dart';
 import 'package:echomeet/settings/font_size_options.dart';
@@ -14,7 +15,6 @@ import 'package:echomeet/settings/theme_options.dart';
 import 'package:echomeet/settings/user_menagment.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/settings_controller.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -37,16 +37,9 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
   @override
   void initState() {
     super.initState();
-    SettingsController settingsController = SettingsController();
     _initPage();
     _firebaseServices = FirebaseServices();
     _checkSuperAdminStatus();
-
-    settingsController.getFontSize().then((value) {
-      setState(() {
-        EasyLocalization.of(context)!.setLocale(context.locale);
-      });
-    });
   }
 
   Future<void> _checkSuperAdminStatus() async {
@@ -79,10 +72,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
       builder: (context) {
         if (_isLoadingSuperAdminCheck) {
           return const Scaffold(
-            body: Center(
-                child: CustomLoadingWidget(
-              loadingText: 'loading',
-            )),
+            body: Center(child: CustomLoadingWidget(loadingText: 'loading')),
           );
         }
         return Scaffold(
@@ -105,9 +95,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                         alignment: Alignment.center,
                         child: Container(
                           padding: const EdgeInsets.all(16),
-                          child: ProfileSection(
-                            userId: userID,
-                          ),
+                          child: ProfileSection(userId: userID),
                         ),
                       ),
                       Positioned(
@@ -119,8 +107,10 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => PasswordChanger(
-                                      isSuperAdmin: _isSuperAdmin)),
+                                builder: (context) => PasswordChanger(
+                                  isSuperAdmin: _isSuperAdmin,
+                                ),
+                              ),
                             );
                           },
                         ),
@@ -135,9 +125,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                     child: Padding(
                       padding: const EdgeInsets.all(8.0),
                       child: ListTile(
-                        leading: const Icon(
-                          Icons.group,
-                        ),
+                        leading: const Icon(Icons.group),
                         title: Text(
                           'user_management'.tr(),
                           style: TextStyle(
@@ -153,8 +141,9 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                                builder: (context) =>
-                                    UserManagementPage(userId: userID)),
+                              builder: (context) =>
+                                  UserManagementPage(userId: userID),
+                            ),
                           );
                         },
                       ),
@@ -215,7 +204,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
           ),
           bottomNavigationBar: buildBottomElevatedButton(
             context: context,
-            onPressed: _onNextPressed,
+            onPressed: _logOut,
             buttonText: 'log_out',
           ),
         );
@@ -223,12 +212,16 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     );
   }
 
-  void _onNextPressed() async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const LoginPage(),
-      ),
+  /// Ends the session, then returns to login with the stack cleared.
+  ///
+  /// This button previously only pushed the login page: the user stayed signed
+  /// in, and the back gesture walked straight back into the app.
+  Future<void> _logOut() async {
+    await AuthManager().signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (context) => const LoginPage()),
+      (route) => false,
     );
   }
 }

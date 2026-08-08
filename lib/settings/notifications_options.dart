@@ -1,9 +1,9 @@
 import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -37,46 +37,72 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
     });
   }
 
+  final _notifications = FlutterLocalNotificationsPlugin();
+
   Future<void> _updateNotificationSetting(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('notificationsEnabled', value);
-    if (value) {
-      final permission = await Permission.notification.request();
-      if (permission.isGranted) {
-        _enableNotifications();
-      } else {
-        setState(() {
-          _notificationsEnabled = false;
-        });
-        await prefs.setBool('notificationsEnabled', false);
-      }
-    } else {
-      _disableNotifications();
+
+    if (!value) {
+      await _notifications.cancelAll();
+      await prefs.setBool('notificationsEnabled', false);
+      if (mounted) setState(() => _notificationsEnabled = false);
+      return;
     }
+
+    await _initialiseNotifications();
+    final granted = await _requestPermission();
+
+    // The preference is only written once the OS has actually granted the
+    // permission, so the toggle can never show "on" while notifications are
+    // blocked at the system level.
+    await prefs.setBool('notificationsEnabled', granted);
+    if (mounted) setState(() => _notificationsEnabled = granted);
   }
 
-  void _enableNotifications() {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
-    flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  Future<void> _initialiseNotifications() => _notifications.initialize(
+    settings: const InitializationSettings(
+      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+      iOS: DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      ),
+    ),
+  );
 
-    setState(() {
-      _notificationsEnabled = true;
-    });
-  }
+  /// Asks the OS for permission to post notifications.
+  ///
+  /// Uses flutter_local_notifications' own platform implementations rather than
+  /// a separate permission package: it already ships the Android 13+
+  /// POST_NOTIFICATIONS request and the iOS equivalent, so the extra dependency
+  /// bought nothing.
+  Future<bool> _requestPermission() async {
+    if (kIsWeb) return true;
 
-  void _disableNotifications() {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-        FlutterLocalNotificationsPlugin();
-    flutterLocalNotificationsPlugin.cancelAll();
-
-    setState(() {
-      _notificationsEnabled = false;
-    });
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        final android = _notifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        return await android?.requestNotificationsPermission() ?? false;
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        final darwin = _notifications
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >();
+        return await darwin?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            ) ??
+            false;
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        return true;
+    }
   }
 
   @override
@@ -91,9 +117,7 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
           Row(
             children: [
               Icon(widget.icon, size: fontSize + 15),
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
               Text(
                 widget.title,
                 style: TextStyle(
@@ -106,8 +130,8 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
           Transform.scale(
             scale: 0.7,
             child: CupertinoSwitch(
-              activeColor: buttonColor,
-              trackColor: Colors.grey,
+              activeTrackColor: buttonColor,
+              inactiveTrackColor: Colors.grey,
               value: _notificationsEnabled,
               onChanged: (bool newValue) {
                 _updateNotificationSetting(newValue).then((_) {
