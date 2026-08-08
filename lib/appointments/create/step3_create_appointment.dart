@@ -75,7 +75,6 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
           appointmentId: '',
           confirmedTimeSlots: [],
           expirationDate: DateTime.now(),
-          participationCount: 0,
           participants: [],
           creationDate: DateTime.now(),
         );

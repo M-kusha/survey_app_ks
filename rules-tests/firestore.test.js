@@ -1,3 +1,4 @@
+import { strictEqual } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { after, before, beforeEach, describe, it } from 'node:test';
 import {
@@ -64,7 +65,7 @@ beforeEach(async () => {
     });
 
     await setDoc(doc(db, 'appointments', 'acme-standup'), {
-      title: 'Standup', companyId: ACME,
+      title: 'Standup', companyId: ACME, participantUserIds: [ALICE],
     });
   });
 });
@@ -309,6 +310,71 @@ describe('survey authoring', () => {
   it('an ordinary user cannot delete a survey', async () => {
     await assertFails(deleteDoc(doc(as(BOB), 'surveys', 'acme-survey')));
     await assertSucceeds(deleteDoc(doc(as(ALICE), 'surveys', 'acme-survey')));
+  });
+});
+
+// Voting writes to the appointment document itself, because the set of people
+// who have answered lives there. That means relaxing the admin-only update
+// rule, and these pin down exactly how far.
+describe('voting on an appointment', () => {
+  const appt = () => 'acme-standup';
+
+  it('a colleague may add themselves to the voter list', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'appointments', appt()), {
+        participantUserIds: [ALICE, BOB],
+      }),
+    );
+  });
+
+  it('voting twice is a no-op rather than a second vote', async () => {
+    const ref = doc(as(BOB), 'appointments', appt());
+    await assertSucceeds(updateDoc(ref, { participantUserIds: [ALICE, BOB] }));
+    // arrayUnion semantics: writing the same set again changes nothing, which
+    // is what stops the count climbing every time somebody reopens the page.
+    await assertSucceeds(updateDoc(ref, { participantUserIds: [ALICE, BOB] }));
+
+    const stored = await getDoc(doc(as(ALICE), 'appointments', appt()));
+    strictEqual(stored.data().participantUserIds.length, 2);
+  });
+
+  it('nobody can vote on somebody else\'s behalf', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'appointments', appt()), {
+        participantUserIds: [ALICE, CAROL],
+      }),
+    );
+  });
+
+  it('a voter cannot remove anybody else', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'appointments', appt()), {
+        participantUserIds: [BOB],
+      }),
+    );
+  });
+
+  it('a voter cannot smuggle another field through with their vote', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'appointments', appt()), {
+        participantUserIds: [ALICE, BOB],
+        title: 'Renamed by a non-admin',
+      }),
+    );
+  });
+
+  it('an outsider cannot vote at all', async () => {
+    await assertFails(
+      updateDoc(doc(as(CAROL), 'appointments', appt()), {
+        participantUserIds: [ALICE, CAROL],
+      }),
+    );
+  });
+
+  it('an admin can still edit the appointment properly', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(ALICE), 'appointments', appt()), { title: 'Renamed' }),
+    );
   });
 });
 

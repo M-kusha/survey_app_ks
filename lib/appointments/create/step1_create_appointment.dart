@@ -25,7 +25,6 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
     appointmentId: '',
     confirmedTimeSlots: [],
     expirationDate: DateTime.now(),
-    participationCount: 0,
     creationDate: DateTime.now(),
   );
   final TextEditingController _titleController = TextEditingController();

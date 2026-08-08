@@ -224,9 +224,29 @@ service cloud.firestore {
       allow read: if sameCompany(resource.data.companyId);
 
       allow create: if adminOf(request.resource.data.companyId);
-      allow update: if adminOf(resource.data.companyId)
-        && fieldUnchanged('companyId');
       allow delete: if adminOf(resource.data.companyId);
+
+      // Editing the appointment itself stays with admins. Voting, though, has
+      // to write to this document — the set of people who have answered lives
+      // here — so a colleague may make exactly one change: adding their own uid
+      // to participantUserIds.
+      //
+      // Everything is pinned down: no other field may change, nobody may be
+      // removed, and the only id that may appear is the caller's own. Without
+      // the admin-only rule being relaxed like this, a non-admin's vote was
+      // rejected outright.
+      allow update: if (
+        adminOf(resource.data.companyId) && fieldUnchanged('companyId')
+      ) || (
+        sameCompany(resource.data.companyId)
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['participantUserIds'])
+        && request.resource.data.participantUserIds
+             .hasAll(resource.data.participantUserIds)
+        && request.resource.data.participantUserIds.toSet()
+             .difference(resource.data.participantUserIds.toSet())
+             .hasOnly([uid()])
+      );
 
       // Participant ids here are '<uid>-<slotStart>-<slotEnd>', so ownership is
       // asserted through the userId field rather than the document id.

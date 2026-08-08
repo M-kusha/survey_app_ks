@@ -56,7 +56,11 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     bool isTimeSlotConfirmed = widget.isAnyTimeSLotConfirmed;
 
     if (userId != null) {
-      userHasParticipated = widget.hasParticipated;
+      // `widget.hasParticipated` is a snapshot taken when the dashboard loaded,
+      // so it goes stale the moment somebody votes. The appointment carries the
+      // set of voters, so check that too rather than trusting the snapshot.
+      userHasParticipated =
+          widget.hasParticipated || widget.appointment.hasVoted(userId);
     }
 
     setState(() {
@@ -266,15 +270,27 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   }
 
   void _onNextPressed() async {
-    appointmentService.updateParticipationCount(
-      widget.appointment.appointmentId,
-    );
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    // Switch to the overview immediately — the vote itself is already written
+    // by the time this runs, and this only records who has answered.
     setState(() {
       overviewSelected = true;
       participateSelected = false;
       _userHasParticipated = true;
-      widget.appointment.participationCount += 1;
+      if (!widget.appointment.participantUserIds.contains(userId)) {
+        widget.appointment.participantUserIds = [
+          ...widget.appointment.participantUserIds,
+          userId,
+        ];
+      }
     });
+
+    await appointmentService.registerParticipation(
+      widget.appointment.appointmentId,
+      userId,
+    );
   }
 
   Widget buildEditButton() {

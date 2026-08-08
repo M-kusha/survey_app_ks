@@ -92,8 +92,21 @@ class Appointment {
   List<AppointmentParticipants> participants;
   DateTime expirationDate;
   List<TimeSlot> confirmedTimeSlots = [];
-  int participationCount = 0;
   DateTime creationDate;
+
+  /// Everyone who has voted, by uid.
+  ///
+  /// A set rather than a counter, because one person may vote on several time
+  /// slots and may change their mind. `participationCount` used to be an
+  /// integer incremented on every press of the participate button, so it
+  /// counted button presses instead of people and grew every time somebody
+  /// revisited an appointment they had already answered.
+  List<String> participantUserIds;
+
+  /// How many distinct people have voted. Derived, so it cannot drift.
+  int get participationCount => participantUserIds.length;
+
+  bool hasVoted(String userId) => participantUserIds.contains(userId);
 
   Appointment({
     this.companyId,
@@ -105,8 +118,8 @@ class Appointment {
     required this.availableTimeSlots,
     required this.confirmedTimeSlots,
     required this.expirationDate,
-    required this.participationCount,
     required this.creationDate,
+    this.participantUserIds = const [],
   });
 
   static Appointment fromFirestore(Map<String, dynamic> map) {
@@ -132,7 +145,9 @@ class Appointment {
         return TimeSlot.fromFirestore(ts);
       }).toList(),
       expirationDate: DateTime.parse(map['expirationDate']),
-      participationCount: map['participationCount'],
+      participantUserIds: List<String>.from(
+        (map['participantUserIds'] as List<dynamic>?) ?? const [],
+      ),
       creationDate: map['creationDate'].toDate(),
     );
   }
@@ -152,7 +167,7 @@ class Appointment {
       'confirmedTimeSlots': confirmedTimeSlots
           .map((ts) => ts.toFirestore())
           .toList(),
-      'participationCount': participationCount,
+      'participantUserIds': participantUserIds,
       'creationDate': creationDate,
     };
 

@@ -75,13 +75,19 @@ class AppointmentService {
         .set(participantData);
   }
 
-  Future<void> updateParticipationCount(String appointmentId) async {
-    final appointmentRef = FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(appointmentId);
-
-    await appointmentRef.update({
-      'participationCount': FieldValue.increment(1),
+  /// Records that [userId] has voted on this appointment.
+  ///
+  /// `arrayUnion` is idempotent: voting again, changing your answer, or
+  /// double-tapping the button all leave the set unchanged. This replaced a
+  /// `FieldValue.increment(1)`, which counted button presses rather than
+  /// people — the total climbed every time somebody reopened an appointment
+  /// they had already answered.
+  Future<void> registerParticipation(
+    String appointmentId,
+    String userId,
+  ) async {
+    await _db.collection('appointments').doc(appointmentId).update({
+      'participantUserIds': FieldValue.arrayUnion([userId]),
     });
   }
 
