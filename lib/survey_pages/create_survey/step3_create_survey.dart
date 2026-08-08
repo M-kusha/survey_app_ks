@@ -420,7 +420,10 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const SizedBox(height: 200.0),
+        // No fixed spacer here. There used to be a hardcoded 200px one, which
+        // overflowed on a short window — a phone in landscape has less height
+        // than that leaves room for once the finish bar is accounted for. The
+        // Expanded below centres the content on its own.
         Expanded(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -511,7 +514,13 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
       _handleSurveySubmission();
     }
 
-    return Center(
+    // heightFactor: 1 makes this hug the button's height. A plain Center is an
+    // Align with null factors, which expands to fill whatever bounded
+    // constraints it is given — in a bottomNavigationBar that is the full
+    // screen height, so the bar swallowed the page and only the button showed.
+    return Align(
+      alignment: Alignment.center,
+      heightFactor: 1,
       child: ElevatedButton(
         style: OutlinedButton.styleFrom(
           minimumSize: Size(250, timeFontSize * 4.0),

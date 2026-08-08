@@ -126,12 +126,16 @@ void main() {
 
     testWidgets('the rail only extends on a large window', (tester) async {
       await _pumpAt(tester, _viewports['expanded_tablet_landscape']!);
-      expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
-          isFalse);
+      expect(
+        tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
+        isFalse,
+      );
 
       await _pumpAt(tester, _viewports['large_desktop']!);
-      expect(tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
-          isTrue);
+      expect(
+        tester.widget<NavigationRail>(find.byType(NavigationRail)).extended,
+        isTrue,
+      );
     });
 
     testWidgets('every tab stays alive across a switch', (tester) async {
