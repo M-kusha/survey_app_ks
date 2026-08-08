@@ -3,6 +3,7 @@ import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/survey_pages/create_survey/step4_create_survey.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/tablet_size.dart';
 import 'package:echomeet/utilities/text_style.dart';
@@ -10,10 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class CreateTrainingSurveyStep3 extends StatefulWidget {
-  const CreateTrainingSurveyStep3({
-    super.key,
-    required this.survey,
-  });
+  const CreateTrainingSurveyStep3({super.key, required this.survey});
   final Survey survey;
 
   @override
@@ -45,10 +43,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
 
   void addQuestion(String type) {
     List<String> initialOptions = [];
-    Map<String, dynamic> newQuestion = {
-      'type': type,
-      'question': '',
-    };
+    Map<String, dynamic> newQuestion = {'type': type, 'question': ''};
 
     if (type == 'Single' || type == 'Multiple') {
       initialOptions = ['', '', '', ''];
@@ -110,12 +105,18 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
 
     switch (type) {
       case 'Single':
-        answerWidget =
-            buildSingleOrMultipleChoice(questionData, buildOptions, addOption);
+        answerWidget = buildSingleOrMultipleChoice(
+          questionData,
+          buildOptions,
+          addOption,
+        );
         break;
       case 'Multiple':
-        answerWidget =
-            buildSingleOrMultipleChoice(questionData, buildOptions, addOption);
+        answerWidget = buildSingleOrMultipleChoice(
+          questionData,
+          buildOptions,
+          addOption,
+        );
         break;
       case 'Text':
         answerWidget = buildTextAnswer(questionData);
@@ -128,8 +129,11 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
     return buildCard(questionData, question, answerWidget, type);
   }
 
-  Widget buildSingleOrMultipleChoice(Map<String, dynamic> questionData,
-      Widget Function(int index) buildOptions, Function addOption) {
+  Widget buildSingleOrMultipleChoice(
+    Map<String, dynamic> questionData,
+    Widget Function(int index) buildOptions,
+    Function addOption,
+  ) {
     return Column(
       children: [
         for (int i = 0; i < questionData['options'].length; i++)
@@ -162,9 +166,10 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
         child: Text(
           questionTypeDescription,
           style: TextStyle(
-              fontSize: timeFontSize,
-              fontWeight: FontWeight.bold,
-              color: getListTileColor(context)),
+            fontSize: timeFontSize,
+            fontWeight: FontWeight.bold,
+            color: getListTileColor(context),
+          ),
           textAlign: TextAlign.center,
         ),
       ),
@@ -172,7 +177,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
   }
 
   Widget buildQuestionField(
-      String question, Map<String, dynamic> questionData) {
+    String question,
+    Map<String, dynamic> questionData,
+  ) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
@@ -190,7 +197,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
         return null;
       },
       style: TextStyle(
-          fontSize: timeFontSize * 1.0, color: getListTileColor(context)),
+        fontSize: timeFontSize * 1.0,
+        color: getListTileColor(context),
+      ),
       textAlign: TextAlign.center,
       keyboardType: TextInputType.multiline,
       maxLines: null,
@@ -204,9 +213,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
         border: InputBorder.none,
         hintText: 'enter_question'.tr(),
         hintStyle: TextStyle(color: Colors.grey[500]),
-        contentPadding: const EdgeInsets.symmetric(
-          vertical: 10,
-        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
         counterStyle: TextStyle(
           color: Colors.grey[600],
           fontSize: timeFontSize * 0.8,
@@ -238,22 +245,26 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
   }
 
   Widget buildCheckbox(
-      String type, int index, Map<String, dynamic> questionData) {
+    String type,
+    int index,
+    Map<String, dynamic> questionData,
+  ) {
     if (type == 'Single') {
       int? correctAnswerIndex = questionData['correctAnswer'];
       return Checkbox(
-          value: correctAnswerIndex == index,
-          onChanged: (value) {
-            setState(() {
-              if (value!) {
-                correctAnswerIndex = index;
-              } else {
-                correctAnswerIndex = null;
-              }
-              questionData['correctAnswer'] = correctAnswerIndex;
-            });
-          },
-          activeColor: getButtonColor(context));
+        value: correctAnswerIndex == index,
+        onChanged: (value) {
+          setState(() {
+            if (value!) {
+              correctAnswerIndex = index;
+            } else {
+              correctAnswerIndex = null;
+            }
+            questionData['correctAnswer'] = correctAnswerIndex;
+          });
+        },
+        activeColor: getButtonColor(context),
+      );
     } else {
       List<int> correctAnswerIndices = questionData['correctAnswers'] ?? [];
       return Checkbox(
@@ -269,8 +280,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           });
         },
         checkColor: getTextColor(context),
-        fillColor:
-            WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+        fillColor: WidgetStateProperty.resolveWith<Color>((
+          Set<WidgetState> states,
+        ) {
           if (states.contains(WidgetState.selected)) {
             return getButtonColor(context);
           }
@@ -298,11 +310,15 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           }
           return null;
         },
-        style:
-            TextStyle(fontSize: timeFontSize, color: getListTileColor(context)),
+        style: TextStyle(
+          fontSize: timeFontSize,
+          color: getListTileColor(context),
+        ),
         decoration: InputDecoration(
-          labelStyle:
-              TextStyle(color: Colors.grey[400], fontSize: timeFontSize),
+          labelStyle: TextStyle(
+            color: Colors.grey[400],
+            fontSize: timeFontSize,
+          ),
           focusedBorder: InputBorder.none,
           enabledBorder: InputBorder.none,
           errorBorder: InputBorder.none,
@@ -316,7 +332,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
   }
 
   Widget buildRemoveOptionButton(
-      void Function(int index) removeOption, int index) {
+    void Function(int index) removeOption,
+    int index,
+  ) {
     return IconButton(
       icon: const Icon(Icons.close, color: Colors.red),
       onPressed: () => removeOption(index),
@@ -351,16 +369,17 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
 
   Widget buildAddOptionButton(Function addOption) {
     return IconButton(
-      icon: Icon(
-        Icons.add_circle_outline,
-        color: getButtonColor(context),
-      ),
+      icon: Icon(Icons.add_circle_outline, color: getButtonColor(context)),
       onPressed: () => addOption(),
     );
   }
 
-  Widget buildCard(Map<String, dynamic> questionData, String question,
-      Widget answerWidget, String type) {
+  Widget buildCard(
+    Map<String, dynamic> questionData,
+    String question,
+    Widget answerWidget,
+    String type,
+  ) {
     return Card(
       margin: const EdgeInsets.all(3.0),
       elevation: 4.0,
@@ -376,10 +395,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
                 elevation: 5,
                 shadowColor: getButtonColor(context),
                 child: Padding(
-                  padding: const EdgeInsets.only(
-                    left: 40,
-                    right: 40,
-                  ),
+                  padding: const EdgeInsets.only(left: 40, right: 40),
                   child: buildQuestionField(question, questionData),
                 ),
               ),
@@ -466,16 +482,20 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           ),
         ),
         Expanded(
-            child: Align(
-                alignment: Alignment.bottomCenter,
-                child: _buildFinishButton())),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: _buildFinishButton(),
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildFinishButton() {
-    final fontSize =
-        Provider.of<FontSizeProvider>(context, listen: false).fontSize;
+    final fontSize = Provider.of<FontSizeProvider>(
+      context,
+      listen: false,
+    ).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
     void attemptSurveySubmission() {
@@ -502,9 +522,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
         style: OutlinedButton.styleFrom(
           minimumSize: Size(250, timeFontSize * 4.0),
           padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-          side: BorderSide(
-            color: getButtonColor(context),
-          ),
+          side: BorderSide(color: getButtonColor(context)),
         ),
         onPressed: () => attemptSurveySubmission(),
         child: Text(
@@ -540,9 +558,16 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
     );
 
     try {
-      String? companyId =
-          await FirebaseSurveyService().fetchCurrentUserCompanyId();
-      newSurvey.companyId = companyId ?? '';
+      final companyId = await FirebaseServices().currentCompanyId();
+      // Defaulting to an empty companyId used to create a survey that no
+      // company query could ever match — invisible to everyone, including its
+      // author. Better to fail here than to write an orphan.
+      if (companyId == null) {
+        throw StateError(
+          'Cannot create a survey: the signed-in user has no companyId.',
+        );
+      }
+      newSurvey.companyId = companyId;
       if (!mounted) return;
       String surveyId = await FirebaseSurveyService().createSurvey(newSurvey);
       newSurvey.id = surveyId;
@@ -576,7 +601,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           int? correctAnswerIndex = question['correctAnswer'];
           if (correctAnswerIndex == null) {
             UIUtils.showSnackBar(
-                context, 'single_choice_validation_warning'.tr());
+              context,
+              'single_choice_validation_warning'.tr(),
+            );
             return false;
           }
         }
@@ -585,7 +612,9 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           List<int> correctAnswerIndices = question['correctAnswers'] ?? [];
           if (correctAnswerIndices.length < 2) {
             UIUtils.showSnackBar(
-                context, 'multiple_choice_validation_warning'.tr());
+              context,
+              'multiple_choice_validation_warning'.tr(),
+            );
             return false;
           }
         }
@@ -606,9 +635,8 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
       ),
       body: _isCreatingSurvey
           ? const Center(
-              child: CustomLoadingWidget(
-              loadingText: 'saving_regisration',
-            ))
+              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
+            )
           : GestureDetector(
               onTap: () => FocusScope.of(context).unfocus(),
               child: Stack(

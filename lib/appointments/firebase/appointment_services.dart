@@ -1,33 +1,41 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
+import 'package:echomeet/utilities/firebase_services.dart';
 
 class AppointmentService {
+  AppointmentService({FirebaseServices? userServices})
+    : _userServices = userServices ?? FirebaseServices();
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseServices _userServices;
 
   Future<String> createAppointment(Appointment appointment) async {
-    String uniqueId = const Uuid().v1().substring(0, 6);
-    appointment.appointmentId = uniqueId;
-
-    var companyId = await getCompanyId();
+    final companyId = await _userServices.currentCompanyId();
     if (companyId == null) {
-      throw Exception('Company ID not found');
+      throw StateError(
+        'Cannot create an appointment: the signed-in user has no companyId.',
+      );
     }
 
+    // A Firestore auto-id, rather than a truncated UUID. The previous
+    // `Uuid().v1().substring(0, 6)` kept only 24 bits of a 100ns clock, which
+    // wraps roughly every seven minutes — and because the write below is a
+    // `set`, a collision silently overwrote an existing appointment.
+    final document = _db.collection('appointments').doc();
+
+    appointment.appointmentId = document.id;
     appointment.companyId = companyId;
 
-    await _db
-        .collection('appointments')
-        .doc(uniqueId)
-        .set(appointment.toFirestore());
+    await document.set(appointment.toFirestore());
 
-    return uniqueId;
+    return document.id;
   }
 
   Future<bool> isAnyTimeSlotConfirmed(String appointmentId) async {
-    final docSnapshot =
-        await _db.collection('appointments').doc(appointmentId).get();
+    final docSnapshot = await _db
+        .collection('appointments')
+        .doc(appointmentId)
+        .get();
     if (docSnapshot.exists) {
       final appointment = Appointment.fromFirestore(docSnapshot.data()!);
       return appointment.confirmedTimeSlots.isNotEmpty;
@@ -88,24 +96,26 @@ class AppointmentService {
   }
 
   Stream<List<TimeSlot>> streamConfirmedTimeSlots(String appointmentId) {
-    return _db.collection('appointments').doc(appointmentId).snapshots().map(
-      (snapshot) {
-        if (snapshot.exists) {
-          var confirmedTimeSlotsData =
-              snapshot.data()?['confirmedTimeSlots'] ?? [];
-          return confirmedTimeSlotsData
-              .map<TimeSlot>((ts) => TimeSlot.fromFirestore(ts))
-              .toList();
-        } else {
-          return [];
-        }
-      },
-    );
+    return _db.collection('appointments').doc(appointmentId).snapshots().map((
+      snapshot,
+    ) {
+      if (snapshot.exists) {
+        var confirmedTimeSlotsData =
+            snapshot.data()?['confirmedTimeSlots'] ?? [];
+        return confirmedTimeSlotsData
+            .map<TimeSlot>((ts) => TimeSlot.fromFirestore(ts))
+            .toList();
+      } else {
+        return [];
+      }
+    });
   }
 
   Future<String> fetchUserNameById(String userId) async {
-    var userDoc =
-        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    var userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .get();
     if (userDoc.exists) {
       return userDoc.data()?['fullName'] ?? 'Unknown';
     } else {
@@ -125,19 +135,22 @@ class AppointmentService {
   }
 
   Future<void> confirmTimeSlot(
-      String appointmentId, TimeSlot timeSlotToConfirm) async {
-    final DocumentReference docRef =
-        _db.collection('appointments').doc(appointmentId);
+    String appointmentId,
+    TimeSlot timeSlotToConfirm,
+  ) async {
+    final DocumentReference docRef = _db
+        .collection('appointments')
+        .doc(appointmentId);
 
     final DocumentSnapshot docSnapshot = await docRef.get();
     if (!docSnapshot.exists) throw Exception("Appointment not found");
 
     List<dynamic> availableTimeSlots =
         (docSnapshot.data() as Map<String, dynamic>)['availableTimeSlots'] ??
-            [];
+        [];
     List<dynamic> confirmedTimeSlots =
         (docSnapshot.data() as Map<String, dynamic>)['confirmedTimeSlots'] ??
-            [];
+        [];
 
     bool found = false;
     for (int i = 0; i < availableTimeSlots.length; i++) {
@@ -152,7 +165,8 @@ class AppointmentService {
     if (!found) throw Exception("Time slot not found in appointment");
 
     if (!confirmedTimeSlots.any(
-        (ts) => ts['start'] == timeSlotToConfirm.start.toIso8601String())) {
+      (ts) => ts['start'] == timeSlotToConfirm.start.toIso8601String(),
+    )) {
       confirmedTimeSlots.add({
         'start': timeSlotToConfirm.start.toIso8601String(),
         'end': timeSlotToConfirm.end.toIso8601String(),
@@ -168,7 +182,9 @@ class AppointmentService {
   }
 
   Future<List<AppointmentParticipants>> fetchParticipants(
-      String appointmentId, TimeSlot timeSlot) async {
+    String appointmentId,
+    TimeSlot timeSlot,
+  ) async {
     List<AppointmentParticipants> participants = [];
 
     final participantsRef = _db
@@ -185,10 +201,5 @@ class AppointmentService {
     }
 
     return participants;
-  }
-
-  Future<String?> getCompanyId() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('companyId');
   }
 }

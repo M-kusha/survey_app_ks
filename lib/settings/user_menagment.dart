@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/main_screen/appointment_search_field.dart';
 import 'package:echomeet/settings/font_size_provider.dart';
@@ -52,20 +52,32 @@ class UserManagementPageState extends State<UserManagementPage> {
       isLoading = true;
     });
 
-    String? companyId = await firebaseSurveyService.fetchCurrentUserCompanyId();
-    String finalCompanyId = companyId ?? 'defaultCompanyId';
+    final companyId = await FirebaseServices().currentCompanyId();
+    if (!mounted) return;
 
-    QuerySnapshot querySnapshot =
-        await firebaseSurveyService.fetchUsersByCompanyId(finalCompanyId);
-
-    if (mounted) {
+    // Falling back to a placeholder id here used to query a company that does
+    // not exist, so a missing companyId rendered as "no users" rather than as
+    // the error it actually is.
+    if (companyId == null) {
       setState(() {
-        userList = querySnapshot.docs
-            .map((doc) => UserModel.fromFirestore(doc))
-            .toList();
+        userList = [];
         isLoading = false;
       });
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+      return;
     }
+
+    final querySnapshot = await firebaseSurveyService.fetchUsersByCompanyId(
+      companyId,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      userList = querySnapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .toList();
+      isLoading = false;
+    });
   }
 
   String capitalize(String input) {
@@ -77,12 +89,14 @@ class UserManagementPageState extends State<UserManagementPage> {
   Widget build(BuildContext context) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
-    List<UserModel> filteredUsers =
-        filterUsers(userList, searchQuery, currentPage, itemsPerPage);
+    List<UserModel> filteredUsers = filterUsers(
+      userList,
+      searchQuery,
+      currentPage,
+      itemsPerPage,
+    );
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CustomLoadingWidget()),
-      );
+      return const Scaffold(body: Center(child: CustomLoadingWidget()));
     }
 
     return Scaffold(
@@ -93,14 +107,12 @@ class UserManagementPageState extends State<UserManagementPage> {
                 searchController: searchController,
                 onSearchTextChanged: _onSearchTextChanged,
               )
-            : Text('user_management'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5)),
+            : Text(
+                'user_management'.tr(),
+                style: TextStyle(fontSize: timeFontSize * 1.5),
+              ),
         backgroundColor: getAppbarColor(context),
-        actions: [
-          buildSearchBar(
-            getButtonColor(context),
-          )
-        ],
+        actions: [buildSearchBar(getButtonColor(context))],
         centerTitle: true,
       ),
       body: Padding(
@@ -110,9 +122,7 @@ class UserManagementPageState extends State<UserManagementPage> {
     );
   }
 
-  Widget buildSearchBar(
-    Color buttonColor,
-  ) {
+  Widget buildSearchBar(Color buttonColor) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return isSearching
@@ -148,8 +158,11 @@ class UserManagementPageState extends State<UserManagementPage> {
 
     if (users.isEmpty) {
       return Center(
-          child: Text('user_list_empty'.tr(),
-              style: TextStyle(fontSize: fontSize)));
+        child: Text(
+          'user_list_empty'.tr(),
+          style: TextStyle(fontSize: fontSize),
+        ),
+      );
     }
 
     return Padding(
@@ -166,7 +179,7 @@ class UserManagementPageState extends State<UserManagementPage> {
           Expanded(
             child: ListView.separated(
               itemCount: users.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) => Card(
                 elevation: 5,
                 shadowColor: getButtonColor(context),
@@ -192,10 +205,7 @@ class UserManagementPageState extends State<UserManagementPage> {
               : null,
           backgroundColor: getIconColor(context),
           child: user.profileImage.isEmpty
-              ? Text(user.name[0],
-                  style: TextStyle(
-                    fontSize: fontSize,
-                  ))
+              ? Text(user.name[0], style: TextStyle(fontSize: fontSize))
               : null,
         ),
       ),
@@ -214,16 +224,16 @@ class UserManagementPageState extends State<UserManagementPage> {
     }
 
     String currentRoleLabel = roleLabelsToValues.entries
-        .firstWhere((entry) => entry.value == user.role,
-            orElse: () => roleLabelsToValues.entries.first)
+        .firstWhere(
+          (entry) => entry.value == user.role,
+          orElse: () => roleLabelsToValues.entries.first,
+        )
         .key;
 
     return GestureDetector(
       onTap: () => _showRoleSelectionModal(context, user),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 8,
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Text(
           currentRoleLabel,
           style: const TextStyle(fontSize: 16),
@@ -268,23 +278,32 @@ class UserManagementPageState extends State<UserManagementPage> {
   }
 
   Widget buildPaginationControls() {
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: currentPage > 1 ? () => setState(() => currentPage--) : null,
-      ),
-      Text('${'page'.tr()} $currentPage'),
-      IconButton(
-        icon: const Icon(Icons.arrow_forward),
-        onPressed: userList.length == itemsPerPage
-            ? () => setState(() => currentPage++)
-            : null,
-      ),
-    ]);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: currentPage > 1
+              ? () => setState(() => currentPage--)
+              : null,
+        ),
+        Text('${'page'.tr()} $currentPage'),
+        IconButton(
+          icon: const Icon(Icons.arrow_forward),
+          onPressed: userList.length == itemsPerPage
+              ? () => setState(() => currentPage++)
+              : null,
+        ),
+      ],
+    );
   }
 
   List<UserModel> filterUsers(
-      List<UserModel> users, String query, int page, int itemsCount) {
+    List<UserModel> users,
+    String query,
+    int page,
+    int itemsCount,
+  ) {
     return users
         .where((user) => user.name.toLowerCase().contains(query.toLowerCase()))
         .skip((page - 1) * itemsCount)

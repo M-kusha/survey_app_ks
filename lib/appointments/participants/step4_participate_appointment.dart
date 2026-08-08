@@ -27,7 +27,6 @@ class TimeSlotParticipantsPage extends StatefulWidget {
 }
 
 class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
-  late String? companyId;
   List<AppointmentParticipants>? filteredParticipants;
   List<AppointmentParticipants> allParticipants = [];
   List<TimeSlot> timeSlots = [];
@@ -47,39 +46,36 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
   }
 
   void _checkAnyTimeSlotConfirmed() async {
-    final anyConfirmed = await _appointmentService
-        .isAnyTimeSlotConfirmed(widget.appointment.appointmentId);
+    final anyConfirmed = await _appointmentService.isAnyTimeSlotConfirmed(
+      widget.appointment.appointmentId,
+    );
     setState(() {
       _anyTimeSlotConfirmed = anyConfirmed;
     });
   }
 
   void _initPage() async {
-    final companyId = await _appointmentService.getCompanyId();
-    final isAdmin = widget.isAdmin;
-    List<AppointmentParticipants> allParticipantsWithImages = [];
+    final participants = await _appointmentService.fetchParticipants(
+      widget.appointment.appointmentId,
+      widget.timeSlot,
+    );
 
-    final allParticipants = await _appointmentService.fetchParticipants(
-        widget.appointment.appointmentId, widget.timeSlot);
-
-    for (var participant in allParticipants) {
-      String imageUrl =
-          await _appointmentService.fetchProfileImage(participant.userId);
-
-      String userName =
-          await _appointmentService.fetchUserNameById(participant.userId);
-      participant.profileImageUrl = imageUrl;
-      participant.userName = userName;
-      allParticipantsWithImages.add(participant);
-    }
+    // `userName` is already stored on the participant document and parsed by
+    // AppointmentParticipants.fromFirestore, so only the avatar needs looking
+    // up — and those lookups run together rather than one await per person.
+    await Future.wait(
+      participants.map((participant) async {
+        participant.profileImageUrl = await _appointmentService
+            .fetchProfileImage(participant.userId);
+      }),
+    );
 
     if (!mounted) return;
 
     setState(() {
-      this.companyId = companyId;
-      _isAdmin = isAdmin;
-      this.allParticipants = allParticipantsWithImages;
-      filteredParticipants = allParticipantsWithImages;
+      _isAdmin = widget.isAdmin;
+      allParticipants = participants;
+      filteredParticipants = participants;
       _isLoading = false;
     });
   }
@@ -125,17 +121,13 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
       appBar: AppBar(
         title: Text(
           widget.appointment.title,
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
-          ),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
         ),
         backgroundColor: getAppbarColor(context),
         centerTitle: true,
       ),
       body: _isLoading
-          ? const CustomLoadingWidget(
-              loadingText: 'loading',
-            )
+          ? const CustomLoadingWidget(loadingText: 'loading')
           : Column(
               children: [
                 Card(
@@ -148,16 +140,29 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           buildParticipantStatus(
-                              Icons.group, Colors.blue, 'all', context),
+                            Icons.group,
+                            Colors.blue,
+                            'all',
+                            context,
+                          ),
                           buildParticipantStatus(
-                              Icons.check_circle_outline_outlined,
-                              Colors.green,
-                              'joined',
-                              context),
-                          buildParticipantStatus(Icons.help_outline_outlined,
-                              Colors.amber, 'maybe', context),
-                          buildParticipantStatus(Icons.cancel_outlined,
-                              Colors.red, 'declined', context),
+                            Icons.check_circle_outline_outlined,
+                            Colors.green,
+                            'joined',
+                            context,
+                          ),
+                          buildParticipantStatus(
+                            Icons.help_outline_outlined,
+                            Colors.amber,
+                            'maybe',
+                            context,
+                          ),
+                          buildParticipantStatus(
+                            Icons.cancel_outlined,
+                            Colors.red,
+                            'declined',
+                            context,
+                          ),
                         ],
                       ),
                     ],
@@ -182,96 +187,108 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
     String formattedDate = DateFormat.yMMMd().format(timeSlot.start);
     List<TimeSlot> confirmedTimeSlots = Provider.of<List<TimeSlot>>(context);
 
-    bool isTimeSlotConfirmed = confirmedTimeSlots.any((ts) =>
-        ts.start.isAtSameMomentAs(widget.timeSlot.start) &&
-        ts.end.isAtSameMomentAs(widget.timeSlot.end));
+    bool isTimeSlotConfirmed = confirmedTimeSlots.any(
+      (ts) =>
+          ts.start.isAtSameMomentAs(widget.timeSlot.start) &&
+          ts.end.isAtSameMomentAs(widget.timeSlot.end),
+    );
 
-    return Column(children: [
-      const SizedBox(height: 16.0),
-      SizedBox(
-        width: 350,
-        child: Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-            side: BorderSide(
-              color: buttonColor,
-              width: 1,
+    return Column(
+      children: [
+        const SizedBox(height: 16.0),
+        SizedBox(
+          width: 350,
+          child: Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+              side: BorderSide(color: buttonColor, width: 1),
             ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Stack(
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.calendar_today,
-                            size: timeFontSize * 1.1, color: buttonColor),
-                        const SizedBox(width: 5),
-                        Text(formattedDate,
-                            style: TextStyle(
-                                fontSize: timeFontSize * 1.1,
-                                fontWeight: FontWeight.bold,
-                                color: buttonColor)),
-                      ],
-                    ),
-                    const SizedBox(height: 8.0),
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: TextSpan(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Stack(
+                children: [
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          WidgetSpan(
-                              child: Icon(Icons.access_time,
-                                  size: timeFontSize * 1.1,
-                                  color: buttonColor)),
-                          TextSpan(
-                              text: " $startTimeString - $endTimeString",
-                              style: TextStyle(
-                                  fontSize: timeFontSize * 0.9,
-                                  fontWeight: FontWeight.bold,
-                                  color: buttonColor)),
+                          Icon(
+                            Icons.calendar_today,
+                            size: timeFontSize * 1.1,
+                            color: buttonColor,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            formattedDate,
+                            style: TextStyle(
+                              fontSize: timeFontSize * 1.1,
+                              fontWeight: FontWeight.bold,
+                              color: buttonColor,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
-                ),
-                if (_isAdmin)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: Center(
-                      child: GestureDetector(
-                        onTap: !_anyTimeSlotConfirmed || isTimeSlotConfirmed
-                            ? () {
-                                if (!isTimeSlotConfirmed) {
-                                  confirmTimeSlotDialog();
+                      const SizedBox(height: 8.0),
+                      RichText(
+                        textAlign: TextAlign.center,
+                        text: TextSpan(
+                          children: [
+                            WidgetSpan(
+                              child: Icon(
+                                Icons.access_time,
+                                size: timeFontSize * 1.1,
+                                color: buttonColor,
+                              ),
+                            ),
+                            TextSpan(
+                              text: " $startTimeString - $endTimeString",
+                              style: TextStyle(
+                                fontSize: timeFontSize * 0.9,
+                                fontWeight: FontWeight.bold,
+                                color: buttonColor,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_isAdmin)
+                    Positioned(
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      child: Center(
+                        child: GestureDetector(
+                          onTap: !_anyTimeSlotConfirmed || isTimeSlotConfirmed
+                              ? () {
+                                  if (!isTimeSlotConfirmed) {
+                                    confirmTimeSlotDialog();
+                                  }
                                 }
-                              }
-                            : null,
-                        child: Icon(
-                          isTimeSlotConfirmed ? Icons.alarm_on : Icons.alarm,
-                          color: isTimeSlotConfirmed
-                              ? buttonColor
-                              : _anyTimeSlotConfirmed
-                                  ? Colors.red
-                                  : textColor,
-                          size: timeFontSize * 1.8,
+                              : null,
+                          child: Icon(
+                            isTimeSlotConfirmed ? Icons.alarm_on : Icons.alarm,
+                            color: isTimeSlotConfirmed
+                                ? buttonColor
+                                : _anyTimeSlotConfirmed
+                                ? Colors.red
+                                : textColor,
+                            size: timeFontSize * 1.8,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
-      const SizedBox(height: 16.0),
-    ]);
+        const SizedBox(height: 16.0),
+      ],
+    );
   }
 
   Future<dynamic> confirmTimeSlotDialog() {
@@ -294,9 +311,7 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
               const Icon(Icons.alarm, color: Colors.blueGrey),
             ],
           ),
-          content: Text(
-            "confirm_time_slot_tip".tr(),
-          ),
+          content: Text("confirm_time_slot_tip".tr()),
           actions: <Widget>[
             TextButton(
               child: Text("cancel".tr()),
@@ -309,7 +324,9 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
               onPressed: () async {
                 Navigator.of(context).pop();
                 await _appointmentService.confirmTimeSlot(
-                    widget.appointment.appointmentId, widget.timeSlot);
+                  widget.appointment.appointmentId,
+                  widget.timeSlot,
+                );
               },
             ),
           ],
@@ -343,8 +360,10 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
               ),
               elevation: 3,
               shadowColor: getButtonColor(context),
-              margin:
-                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+              margin: const EdgeInsets.symmetric(
+                horizontal: 12.0,
+                vertical: 6.0,
+              ),
               child: ListTile(
                 leading: GestureDetector(
                   onTap: () {
@@ -362,21 +381,21 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
                                 ? participant.userName[0].toUpperCase()
                                 : '?',
                             style: TextStyle(
-                                fontSize: timeFontSize * 1.1,
-                                color: Colors.white),
+                              fontSize: timeFontSize * 1.1,
+                              color: Colors.white,
+                            ),
                           )
                         : null,
                   ),
                 ),
                 title: Padding(
-                  padding: const EdgeInsets.only(
-                    left: 20.0,
-                  ),
+                  padding: const EdgeInsets.only(left: 20.0),
                   child: Text(
                     participant.userName,
                     style: TextStyle(
-                        fontSize: timeFontSize * 1.2,
-                        fontWeight: FontWeight.bold),
+                      fontSize: timeFontSize * 1.2,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 trailing: Icon(
@@ -419,7 +438,11 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
   }
 
   Widget buildParticipantStatus(
-      IconData icon, Color color, String status, BuildContext context) {
+    IconData icon,
+    Color color,
+    String status,
+    BuildContext context,
+  ) {
     int count = getCountForStatus(status);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
@@ -433,9 +456,13 @@ class TimeSlotParticipantsPageState extends State<TimeSlotParticipantsPage> {
             children: [
               Icon(icon, color: color, size: timeFontSize * 1.3),
               const SizedBox(height: 8.0),
-              Text("$count",
-                  style: TextStyle(
-                      fontSize: timeFontSize, fontWeight: FontWeight.bold)),
+              Text(
+                "$count",
+                style: TextStyle(
+                  fontSize: timeFontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
         ),

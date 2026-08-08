@@ -47,15 +47,19 @@ class AppointmentDataProvider extends ChangeNotifier {
   Future<void> preloadUserParticipationStatus(String userId) async {
     Map<String, bool> tempStatus = {};
     for (var appointment in _appointments) {
-      final bool participated =
-          await hasCurrentUserParticipated(appointment.appointmentId, userId);
+      final bool participated = await hasCurrentUserParticipated(
+        appointment.appointmentId,
+        userId,
+      );
       tempStatus[appointment.appointmentId] = participated;
     }
     userParticipationStatus = tempStatus;
   }
 
   Future<bool> hasCurrentUserParticipated(
-      String appointmentId, String userId) async {
+    String appointmentId,
+    String userId,
+  ) async {
     final participantsSnapshot = await _db
         .collection('appointments')
         .doc(appointmentId)
