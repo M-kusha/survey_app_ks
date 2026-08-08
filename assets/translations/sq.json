@@ -270,5 +270,7 @@
   "send_reset_link": "Dërgo lidhjen e rivendosjes",
   "reset_link_sent": "Kontrolloni email-in tuaj",
   "reset_link_sent_body": "Nëse ekziston një llogari për {email}, ju kemi dërguar një lidhje për të rivendosur fjalëkalimin.",
-  "no_company_error": "Llogaria juaj nuk është e lidhur me një kompani, prandaj kjo nuk mund të krijohet. Ju lutemi kontaktoni administratorin tuaj."
+  "no_company_error": "Llogaria juaj nuk është e lidhur me një kompani, prandaj kjo nuk mund të krijohet. Ju lutemi kontaktoni administratorin tuaj.",
+  "company_name_invalid": "Ju lutemi shkruani një emër të vlefshëm kompanie.",
+  "company_name_taken": "Një kompani me këtë emër ekziston tashmë. Ju lutemi zgjidhni një emër tjetër."
 }

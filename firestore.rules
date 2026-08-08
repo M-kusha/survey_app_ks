@@ -103,6 +103,27 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---------- company name locks ----------
+    //
+    // One document per company name, keyed by a slug of the name. Firestore
+    // cannot enforce uniqueness on a field, but a document id is unique by
+    // definition — so allowing create and forbidding update turns this
+    // collection into a uniqueness constraint that holds even when two people
+    // register the same name at the same instant.
+
+    match /companyNames/{slug} {
+      // Readable for the same reason as companies: the client checks
+      // availability before the account exists, to give a useful message.
+      allow read: if true;
+
+      allow create: if signedIn()
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.companyId is string;
+
+      // Never reassign or release a name — that is the whole constraint.
+      allow update, delete: if false;
+    }
+
     // ---------- users ----------
 
     match /users/{userId} {

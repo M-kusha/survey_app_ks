@@ -78,11 +78,14 @@ class Register4stepState extends State<Register4step> {
         UIUtils.showSnackBar(context, 'Registration failed: ${e.message}');
       }
     } catch (e) {
-      UIUtils.showSnackBar(context, 'An unexpected error occurred.');
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, registrationErrorKey(e));
     } finally {
-      setState(() {
-        _isSaving = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
     }
   }
 
