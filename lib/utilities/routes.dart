@@ -6,9 +6,7 @@ import 'package:echomeet/login/login.dart';
 import 'package:echomeet/register/register_1step.dart';
 import 'package:echomeet/register/register_logics.dart';
 import 'package:echomeet/register/registered_sucesfully.dart';
-import 'package:echomeet/reset_password/change_password.dart';
 import 'package:echomeet/reset_password/reset_password.dart';
-import 'package:echomeet/reset_password/reset_verification.dart';
 import 'package:echomeet/settings/settings.dart';
 import 'package:echomeet/survey_pages/create_survey/step1_create_survey.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
@@ -20,13 +18,8 @@ class AppRoutes {
     return {
       '/settings': (BuildContext context) => const SettingsPageUI(),
       '/login': (BuildContext context) => const LoginPage(),
-      '/register': (context) => Register1step(
-            registerLogic: RegisterLogic(),
-          ),
+      '/register': (context) => Register1step(registerLogic: RegisterLogic()),
       '/reset_password': (context) => const ResetPasswordPage(),
-      '/ResetPasswordVerificationPage': (context) =>
-          const ResetPasswordVerificationPage(),
-      '/ChangePasswordPage': (context) => const ChangePasswordPage(),
       '/home': (BuildContext context) => const BottomNavigation(),
       '/survey': (BuildContext context) => const AppointmentPageUI(),
       '/create_appointment_step_1': (BuildContext context) =>

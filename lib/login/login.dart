@@ -5,9 +5,9 @@ import 'package:echomeet/login/user_preferences.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/settings_controller.dart';
 import 'package:echomeet/utilities/text_style.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
@@ -27,32 +27,35 @@ class LoginPageState extends State<LoginPage> {
   String _errorMessage = '';
   bool _passwordVisible = false;
   bool _light = true;
-  String _fullName = '';
   bool _useBiometricAuthentication = false;
 
   @override
   void initState() {
     super.initState();
-    _useBiometricAuthentication =
-        UserPreferences.getBiometricAuthEnabled() ?? false;
+    _useBiometricAuthentication = UserPreferences.getBiometricAuthEnabled();
     SettingsController().getThemeBool().then((value) {
+      if (!mounted) return;
       setState(() {
         _light = value;
       });
     });
-    _loadRememberMe();
+    _restoreRememberedUser();
   }
 
-  void _loadRememberMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    bool rememberMe = prefs.getBool('rememberMe') ?? false;
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  /// Pre-fills the email and greeting only. The password is deliberately never
+  /// stored, so "remember me" cannot pre-fill it.
+  void _restoreRememberedUser() {
+    if (!UserPreferences.getRememberMe()) return;
     setState(() {
-      _rememberMe = rememberMe;
-      if (rememberMe) {
-        _emailController.text = UserPreferences.getEmail() ?? '';
-        _passwordController.text = UserPreferences.getPassword() ?? '';
-        _fullName = UserPreferences.getFullName() ?? '';
-      }
+      _rememberMe = true;
+      _emailController.text = UserPreferences.getEmail() ?? '';
     });
   }
 
@@ -60,10 +63,7 @@ class LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     if (isLoginIn) {
       return const Scaffold(
-        body: Center(
-            child: CustomLoadingWidget(
-          loadingText: "login_in",
-        )),
+        body: Center(child: CustomLoadingWidget(loadingText: "login_in")),
       );
     }
     return Scaffold(
@@ -106,25 +106,26 @@ class LoginPageState extends State<LoginPage> {
               const SizedBox(height: 10),
               Text(
                 fullName,
-                style: TextStyle(
-                  fontSize: 18,
-                  color: getButtonColor(context),
-                ),
+                style: TextStyle(fontSize: 18, color: getButtonColor(context)),
               ),
             ],
           )
         : Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.calendar_month_outlined,
-                  size: 35, color: getButtonColor(context)),
+              Icon(
+                Icons.calendar_month_outlined,
+                size: 35,
+                color: getButtonColor(context),
+              ),
               const SizedBox(width: 10),
               Text(
                 'app_title'.tr(),
                 style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: getButtonColor(context)),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: getButtonColor(context),
+                ),
               ),
             ],
           );
@@ -169,8 +170,10 @@ class LoginPageState extends State<LoginPage> {
         children: [
           Row(
             children: [
-              Text('login_title'.tr(),
-                  style: Theme.of(context).textTheme.titleLarge),
+              Text(
+                'login_title'.tr(),
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const Spacer(),
               buildThemeSwitch(),
             ],
@@ -305,18 +308,10 @@ class LoginPageState extends State<LoginPage> {
             const Text('google_login').tr(),
             const SizedBox(width: 20),
             IconButton(
-              icon: Icon(
-                Icons.facebook,
-                color: getButtonColor(context),
-              ),
+              icon: Icon(Icons.facebook, color: getButtonColor(context)),
               onPressed: () {},
             ),
-            Text(
-              'facebook_login'.tr(),
-              style: const TextStyle(
-                fontSize: 12.0,
-              ),
-            ),
+            Text('facebook_login'.tr(), style: const TextStyle(fontSize: 12.0)),
           ],
         ),
       ],
@@ -336,27 +331,36 @@ class LoginPageState extends State<LoginPage> {
     );
   }
 
+  /// Unlocks an existing session with biometrics.
+  ///
+  /// Biometrics re-open a session Firebase is already holding; they are not a
+  /// credential and cannot create one. If there is no session left — after a
+  /// sign-out, or once Firebase has expired it — the app must fall back to the
+  /// password form, otherwise it would navigate to a home screen whose first
+  /// `currentUser!` read crashes on null.
   Future<void> _handleLogin() async {
-    final canUseBiometric = await AuthService().canCheckBiometrics() &&
-        await AuthService().isDeviceSupported();
-    final biometricEnabled = UserPreferences.getBiometricAuthEnabled() ?? false;
+    final authService = AuthService();
+    final available =
+        await authService.canCheckBiometrics() &&
+        await authService.isDeviceSupported();
 
-    if (canUseBiometric && biometricEnabled) {
-      bool authenticated = await AuthService().authenticateUser();
-      if (authenticated) {
-        _navigateToHome();
-        return;
-      } else {
-        setState(() {
-          _useBiometricAuthentication = false;
-        });
-        return;
-      }
-    } else {
-      setState(() {
-        _useBiometricAuthentication = false;
-      });
+    final hasSession = FirebaseAuth.instance.currentUser != null;
+
+    if (!available ||
+        !UserPreferences.getBiometricAuthEnabled() ||
+        !hasSession) {
+      if (!mounted) return;
+      setState(() => _useBiometricAuthentication = false);
+      return;
     }
+
+    if (!await authService.authenticateUser()) {
+      if (!mounted) return;
+      setState(() => _useBiometricAuthentication = false);
+      return;
+    }
+
+    _navigateToHome();
   }
 
   Future<void> _manualLogin() async {
@@ -367,7 +371,10 @@ class LoginPageState extends State<LoginPage> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     bool success = await _authManager.signInWithEmailAndPassword(
-        email, password, _rememberMe, _fullName);
+      email,
+      password,
+      rememberMe: _rememberMe,
+    );
 
     if (success) {
       if (!context.mounted) return;
