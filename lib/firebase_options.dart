@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,7 +25,10 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        return macos;
+        throw UnsupportedError(
+          'DefaultFirebaseOptions have not been configured for macos - '
+          'you can reconfigure this by running the FlutterFire CLI again.',
+        );
       case TargetPlatform.windows:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for windows - '
@@ -47,34 +47,26 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBToxwVxrXDP5PazulkYibtsFe4uM19rV0',
-    appId: '1:913078029574:android:60812c5ad1286c5976a287',
-    messagingSenderId: '913078029574',
-    projectId: 'survey-app-ks',
-    databaseURL:
-        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
-    storageBucket: 'survey-app-ks.appspot.com',
+    apiKey: 'AIzaSyD46ZAK41DkdZ8AKv9L4G_ARdR0V5TJ-3A',
+    appId: '1:1005316799898:android:e98a6ecceb2008aac98e23',
+    messagingSenderId: '1005316799898',
+    projectId: 'echomeet-app',
+    storageBucket: 'echomeet-app.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBlKbnmALhrUYeTUh4vj-iKsgcyYeHqrdI',
-    appId: '1:913078029574:ios:83c80a76f7cd3e4d76a287',
-    messagingSenderId: '913078029574',
-    projectId: 'survey-app-ks',
-    databaseURL:
-        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
-    storageBucket: 'survey-app-ks.appspot.com',
-    iosBundleId: 'com.example.flutterAppKs',
+    apiKey: 'AIzaSyCIkbOYgo_qjN6g1opTLQQQz4SvT5LM0B8',
+    appId: '1:1005316799898:ios:97e44d1c4fbc76e1c98e23',
+    messagingSenderId: '1005316799898',
+    projectId: 'echomeet-app',
+    storageBucket: 'echomeet-app.firebasestorage.app',
+    iosBundleId: 'com.echomeet.app',
   );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyBlKbnmALhrUYeTUh4vj-iKsgcyYeHqrdI',
-    appId: '1:913078029574:ios:ccd3cfcd5b0868b076a287',
-    messagingSenderId: '913078029574',
-    projectId: 'survey-app-ks',
-    databaseURL:
-        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
-    storageBucket: 'survey-app-ks.appspot.com',
-    iosBundleId: 'com.example.flutterAppKs.RunnerTests',
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyCHESrdF3ty1DKz7guTv1QzBnC6fZ87q6M',
+    appId: '1:1005316799898:web:75aae15cc70210fcc98e23',
+    messagingSenderId: '1005316799898',
+    projectId: 'echomeet-app',
+    authDomain: 'echomeet-app.firebaseapp.com',
+    storageBucket: 'echomeet-app.firebasestorage.app',
   );
 }

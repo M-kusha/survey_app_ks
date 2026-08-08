@@ -3,17 +3,17 @@
 <plist version="1.0">
 <dict>
 	<key>API_KEY</key>
-	<string>AIzaSyBlKbnmALhrUYeTUh4vj-iKsgcyYeHqrdI</string>
+	<string>AIzaSyCIkbOYgo_qjN6g1opTLQQQz4SvT5LM0B8</string>
 	<key>GCM_SENDER_ID</key>
-	<string>913078029574</string>
+	<string>1005316799898</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.flutterAppKs</string>
+	<string>com.echomeet.app</string>
 	<key>PROJECT_ID</key>
-	<string>survey-app-ks</string>
+	<string>echomeet-app</string>
 	<key>STORAGE_BUCKET</key>
-	<string>survey-app-ks.appspot.com</string>
+	<string>echomeet-app.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,8 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:913078029574:ios:83c80a76f7cd3e4d76a287</string>
-	<key>DATABASE_URL</key>
-	<string>https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app</string>
+	<string>1:1005316799898:ios:97e44d1c4fbc76e1c98e23</string>
 </dict>
 </plist>
