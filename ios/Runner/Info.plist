@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Flutter App Ks</string>
+	<string>EchoMeet</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>flutter_app_ks</string>
+	<string>echomeet</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,5 +45,14 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- iOS terminates the app immediately if a capability is used without a
+	     usage description. Unlike Android, there is no manifest merging, so
+	     these cannot come from the plugins and must live here. -->
+	<key>NSFaceIDUsageDescription</key>
+	<string>EchoMeet uses Face ID to unlock your account without retyping your password.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EchoMeet needs access to your photos so you can choose a profile picture.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>EchoMeet needs access to your camera so you can take a profile picture.</string>
 </dict>
 </plist>

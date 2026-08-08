@@ -6,11 +6,7 @@ plugins {
 }
 
 android {
-    // TODO: Before publishing, replace `com.example.*` — Google Play rejects it.
-    // Changing this also means moving MainActivity's package directory and
-    // registering the new application id in the Firebase console, because
-    // google-services.json is matched on package name.
-    namespace = "com.example.flutter_app_ks"
+    namespace = "com.echomeet.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -23,7 +19,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.flutter_app_ks"
+        applicationId = "com.echomeet.app"
         // minSdk 24 gives native multidex, so the old multiDexEnabled flag and
         // the androidx.multidex dependency are no longer needed.
         minSdk = flutter.minSdkVersion
