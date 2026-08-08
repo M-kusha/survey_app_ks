@@ -269,5 +269,6 @@
   "start_writting": "Schreiben Sie hier Ihre Notiz...",
   "send_reset_link": "Link zum Zurücksetzen senden",
   "reset_link_sent": "Prüfen Sie Ihre E-Mails",
-  "reset_link_sent_body": "Falls ein Konto für {email} existiert, haben wir einen Link zum Zurücksetzen des Passworts gesendet."
+  "reset_link_sent_body": "Falls ein Konto für {email} existiert, haben wir einen Link zum Zurücksetzen des Passworts gesendet.",
+  "no_company_error": "Ihr Konto ist keinem Unternehmen zugeordnet, daher kann dies nicht erstellt werden. Bitte wenden Sie sich an Ihren Administrator."
 }

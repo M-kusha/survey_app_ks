@@ -269,5 +269,6 @@
   "start_writting": "Filloni të shkruani shënimin tuaj këtu...",
   "send_reset_link": "Dërgo lidhjen e rivendosjes",
   "reset_link_sent": "Kontrolloni email-in tuaj",
-  "reset_link_sent_body": "Nëse ekziston një llogari për {email}, ju kemi dërguar një lidhje për të rivendosur fjalëkalimin."
+  "reset_link_sent_body": "Nëse ekziston një llogari për {email}, ju kemi dërguar një lidhje për të rivendosur fjalëkalimin.",
+  "no_company_error": "Llogaria juaj nuk është e lidhur me një kompani, prandaj kjo nuk mund të krijohet. Ju lutemi kontaktoni administratorin tuaj."
 }

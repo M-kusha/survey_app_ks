@@ -21,12 +21,27 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
   final AppointmentService _appointmentService = AppointmentService();
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 1));
 
+  bool _isSaving = false;
+
+  /// Creates the appointment and moves on.
+  ///
+  /// Both failure paths used to be silent: an invalid appointment hit an empty
+  /// `else {}`, and a failed write threw out of an un-caught `await`. Either
+  /// way the button appeared to do nothing at all, which is exactly what a user
+  /// with no companyId on their profile would have seen.
   Future<void> _onNextPressed() async {
-    if (_newAppointment.isValid()) {
+    if (_isSaving) return;
+
+    if (!_newAppointment.isValid()) {
+      UIUtils.showSnackBar(context, 'please_fill_all_fields'.tr());
+      return;
+    }
+
+    setState(() => _isSaving = true);
+
+    try {
       await _appointmentService.createAppointment(_newAppointment);
-
       if (!mounted) return;
-
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -34,7 +49,17 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
               Step4CreateAppointment(appointment: _newAppointment),
         ),
       );
-    } else {}
+    } on StateError {
+      // Raised when the signed-in user has no company. Worth its own message:
+      // it is a broken profile rather than anything the user did wrong here.
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'no_company_error'.tr());
+    } catch (_) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override

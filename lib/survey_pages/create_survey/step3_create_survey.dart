@@ -481,12 +481,6 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
             ],
           ),
         ),
-        Expanded(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: _buildFinishButton(),
-          ),
-        ),
       ],
     );
   }
@@ -578,8 +572,16 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
           builder: (context) => Step4CreateSurvey(survey: newSurvey),
         ),
       );
-    } catch (e) {
-      UIUtils.showSnackBar(context, 'error_occurred'.tr() + e.toString());
+    } on StateError {
+      // The signed-in user has no company. Distinct message because it is a
+      // broken profile rather than anything wrong with the survey.
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'no_company_error'.tr());
+    } catch (_) {
+      // Raw exception text used to be concatenated onto the message and shown
+      // to the user, which is neither readable nor translated.
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
     } finally {
       if (mounted) {
         setState(() {
@@ -672,6 +674,21 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
                     ),
                   ),
                 ],
+              ),
+            ),
+      // The finish button lives outside the PageView on purpose.
+      //
+      // It used to sit at the bottom of the "add a question" page, which meant
+      // it vanished the moment you added a question and were carried onto that
+      // question's card — there was no way to finish without swiping back to
+      // the last page. It was also drawn over by the "Question x/y" indicator,
+      // which is positioned 32px from the bottom of the stack above it.
+      bottomNavigationBar: _isCreatingSurvey
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: _buildFinishButton(),
               ),
             ),
     );
