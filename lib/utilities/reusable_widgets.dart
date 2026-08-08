@@ -5,35 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class UIUtils {
-  static void showSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.5,
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Text(
-              message.tr(),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: ThemeBasedAppColors.getColor(context, 'errorColor'),
-              ),
-            ),
-          ),
+  /// Shows a transient message.
+  ///
+  /// Styling comes from the theme's `snackBarTheme` rather than being rebuilt
+  /// here. The old version painted *every* message in the error colour, so
+  /// "Password updated successfully" arrived in red, and hardcoded a width of
+  /// half the screen with padding computed from the other 20% — which wrapped
+  /// badly on anything wider than a phone.
+  ///
+  /// Pass [isError] for genuine failures; they get the error colour, and only
+  /// they do.
+  static void showSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+
+    ScaffoldMessenger.of(context)
+      // Queued snackbars used to stack up behind each other; a new message
+      // should replace whatever is on screen.
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message.tr()),
+          backgroundColor: isError ? scheme.errorContainer : null,
+          showCloseIcon: true,
+          duration: Duration(seconds: isError ? 5 : 3),
         ),
-        backgroundColor: ThemeBasedAppColors.getColor(context, 'snackBarColor'),
-        padding: EdgeInsets.symmetric(
-          horizontal:
-              (MediaQuery.of(context).size.width -
-                  (MediaQuery.of(context).size.width * 0.8)) /
-              2,
-        ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20.0),
-        ),
-      ),
-    );
+      );
   }
 
   static void showLoadingIndicator(

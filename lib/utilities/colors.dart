@@ -1,46 +1,45 @@
+import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 
+/// Compatibility shim over the Material 3 theme.
+///
+/// This used to be two hand-written `Map<String, Color>` literals — one per
+/// brightness — that had drifted apart: the *light* map set `textColor: white`
+/// and `cardColor: grey[800]`, and the dark map used grey for both primary and
+/// secondary. A mistyped key returned `Colors.blue` with no complaint.
+///
+/// The keys now resolve against the real `ColorScheme`, so the handful of
+/// screens still calling this are themed correctly without having to be edited
+/// all at once. New code should use `Theme.of(context).colorScheme` or
+/// `context.appColors` directly.
+@Deprecated(
+  'Use Theme.of(context).colorScheme or context.appColors. '
+  'This exists so screens not yet migrated keep rendering correctly.',
+)
 class ThemeBasedAppColors {
-  static final Map<String, Color> _lightThemeColors = {
-    'primary': const Color(0xFF654321),
-    'secondary': const Color(0xFFFEDCBA),
-    'buttonColor': Colors.blueGrey,
-    'listTileColor': Colors.blueGrey,
-    'textColor': Colors.white,
-    'appbarColor': Colors.grey[100] ?? Colors.white,
-    'selectedColor': Colors.white,
-    'errorColor': Colors.red,
-    'snackBarColor': Colors.white,
-    'dateColor': Colors.white,
-    'listparticipatedColor': Colors.green,
-    'listnotparticipatedColor': Colors.white,
-    "cameraIconColor": Colors.blueGrey,
-    'cardColor': Colors.grey[800] ?? Colors.white,
-    "iconColor": Colors.blueGrey,
-  };
-
-  static final Map<String, Color> _darkThemeColors = {
-    'primary': const Color(0xFF123456),
-    'secondary': const Color(0xFFABCDEF),
-    'buttonColor': Colors.tealAccent,
-    'listTileColor': Colors.white,
-    'textColor': Colors.grey[900] ?? Colors.black,
-    'appbarColor': Colors.grey[900] ?? Colors.black,
-    'selectedColor': Colors.grey[900] ?? Colors.black,
-    'errorColor': Colors.red,
-    'snackBarColor': Colors.grey[900] ?? Colors.black,
-    'dateColor': Colors.grey[900] ?? Colors.black,
-    'listparticipatedColor': Colors.green,
-    'listnotparticipatedColor': Colors.white,
-    "cameraIconColor": Colors.blueGrey,
-    'cardColor': Colors.grey[800] ?? Colors.white,
-    "iconColor": Colors.blueGrey,
-  };
-
   static Color getColor(BuildContext context, String colorKey) {
-    var themeColors = Theme.of(context).brightness == Brightness.dark
-        ? _darkThemeColors
-        : _lightThemeColors;
-    return themeColors[colorKey] ?? Colors.blue;
+    final scheme = Theme.of(context).colorScheme;
+    final app = context.appColors;
+
+    return switch (colorKey) {
+      'primary' => scheme.primary,
+      'secondary' => scheme.secondary,
+      'buttonColor' => scheme.primary,
+      'listTileColor' => scheme.onSurface,
+      'textColor' => scheme.onPrimary,
+      'appbarColor' => scheme.surface,
+      'selectedColor' => scheme.primaryContainer,
+      'errorColor' => scheme.error,
+      'snackBarColor' => scheme.inverseSurface,
+      'dateColor' => scheme.onSurfaceVariant,
+      'listparticipatedColor' => app.participated,
+      'listnotparticipatedColor' => app.notParticipated,
+      'cameraIconColor' => scheme.onSurfaceVariant,
+      'cardColor' => scheme.surfaceContainerLow,
+      'iconColor' => scheme.onSurfaceVariant,
+      // Previously `Colors.blue`, which meant a typo produced a plausible
+      // colour and was never noticed. A magenta is unmistakable in review.
+      _ => const Color(0xFFFF00FF),
+    };
   }
 }

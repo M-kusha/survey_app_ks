@@ -1,5 +1,6 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/appointments/firebase/appointment_provider.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/firebase_options.dart';
@@ -20,6 +21,10 @@ Future<void> main() async {
   await UserPreferences.init();
 
   await EasyLocalization.ensureInitialized();
+
+  // Read the stored light/dark choice before the first frame, so the app does
+  // not paint in the wrong theme and then flip.
+  final savedThemeMode = await AdaptiveTheme.getThemeMode();
 
   runApp(
     MultiProvider(
@@ -45,7 +50,7 @@ Future<void> main() async {
         path: 'assets/translations',
         fallbackLocale: const Locale('en', ''),
         saveLocale: true,
-        child: const MyApp(),
+        child: MyApp(savedThemeMode: savedThemeMode),
       ),
     ),
   );
@@ -58,19 +63,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AdaptiveTheme(
-      light: ThemeData(
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFF004B96),
-          secondary: Colors.grey,
-        ),
-      ),
-      dark: ThemeData(
-        colorScheme: const ColorScheme.dark(
-          primary: Colors.grey,
-          secondary: Colors.grey,
-        ),
-      ),
-      initial: AdaptiveThemeMode.light,
+      light: AppTheme.light,
+      dark: AppTheme.dark,
+      // Restores the mode the user last chose. This previously hardcoded
+      // `light`, and `savedThemeMode` was declared but never read — so the app
+      // reset to light on every launch no matter what the settings toggle said.
+      initial: savedThemeMode ?? AdaptiveThemeMode.system,
       builder: (theme, darkTheme) => MaterialApp(
         routes: AppRoutes.routes(),
         locale: context.locale,
