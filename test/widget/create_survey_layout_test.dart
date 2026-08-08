@@ -103,4 +103,45 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   });
+
+  group('adding questions', () {
+    int pageCount(WidgetTester tester) =>
+        (tester.widget<PageView>(find.byType(PageView)).childrenDelegate
+                as SliverChildListDelegate)
+            .children
+            .length;
+
+    testWidgets('a question can be added without swiping anywhere', (
+      tester,
+    ) async {
+      await _pump(tester, const Size(390, 844));
+
+      // One page to begin with: the "add a question" placeholder.
+      expect(pageCount(tester), 1);
+
+      // The toolbar action, not the one buried on the last page of the pager.
+      await tester.tap(find.byType(OutlinedButton).last);
+      await tester.pumpAndSettle();
+
+      expect(
+        pageCount(tester),
+        2,
+        reason: 'tapping Add question did not add one',
+      );
+    });
+
+    testWidgets('more than one question can be added', (tester) async {
+      await _pump(tester, const Size(390, 844));
+
+      // The complaint that prompted this test was being stuck at a single
+      // question, because adding another meant swiping forward to an
+      // unlabelled page nobody would think to look for.
+      for (var i = 0; i < 3; i++) {
+        await tester.tap(find.byType(OutlinedButton).last);
+        await tester.pumpAndSettle();
+      }
+
+      expect(pageCount(tester), 4, reason: '3 questions + the add page');
+    });
+  });
 }

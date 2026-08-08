@@ -272,5 +272,6 @@
   "reset_link_sent_body": "Falls ein Konto für {email} existiert, haben wir einen Link zum Zurücksetzen des Passworts gesendet.",
   "no_company_error": "Ihr Konto ist keinem Unternehmen zugeordnet, daher kann dies nicht erstellt werden. Bitte wenden Sie sich an Ihren Administrator.",
   "company_name_invalid": "Bitte geben Sie einen gültigen Unternehmensnamen ein.",
-  "company_name_taken": "Ein Unternehmen mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen."
+  "company_name_taken": "Ein Unternehmen mit diesem Namen existiert bereits. Bitte wählen Sie einen anderen Namen.",
+  "add_new_question": "Frage hinzufügen"
 }

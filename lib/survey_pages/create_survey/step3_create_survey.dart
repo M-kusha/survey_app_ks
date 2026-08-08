@@ -59,6 +59,44 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
     _pageController.jumpToPage(questions.length - 1);
   }
 
+  /// Asks which kind of question to add, then adds it.
+  ///
+  /// Plain surveys only have one kind, so they skip the sheet entirely.
+  ///
+  /// Pulled out of the add-question page so the toolbar can call it too. Adding
+  /// a question used to be reachable *only* by swiping forward to an unlabelled
+  /// last page, which is not something anyone discovers — it looked as though
+  /// the survey was limited to a single question.
+  void promptAddQuestion() {
+    if (widget.survey.surveyType == SurveyType.survey) {
+      addQuestion('Single');
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in const {
+              'single_choice_question': 'Single',
+              'multiple_choice_question': 'Multiple',
+              'text_question': 'Text',
+            }.entries)
+              ListTile(
+                title: Text(entry.key.tr()),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  addQuestion(entry.value);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildQuestionCard(Map<String, dynamic> questionData) {
     String type = questionData['type'];
     String question = questionData['question'];
@@ -434,43 +472,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
                   size: 38,
                   color: getButtonColor(context),
                 ),
-                onPressed: () {
-                  if (widget.survey.surveyType == SurveyType.survey) {
-                    addQuestion('Single');
-                  } else {
-                    showModalBottomSheet(
-                      context: context,
-                      builder: (context) {
-                        return Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ListTile(
-                              title: Text('single_choice_question'.tr()),
-                              onTap: () {
-                                addQuestion('Single');
-                                Navigator.pop(context);
-                              },
-                            ),
-                            ListTile(
-                              title: Text('multiple_choice_question'.tr()),
-                              onTap: () {
-                                addQuestion('Multiple');
-                                Navigator.pop(context);
-                              },
-                            ),
-                            ListTile(
-                              title: Text('text_question'.tr()),
-                              onTap: () {
-                                addQuestion('Text');
-                                Navigator.pop(context);
-                              },
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  }
-                },
+                onPressed: promptAddQuestion,
               ),
               const SizedBox(height: 16.0),
               Text(
@@ -514,27 +516,56 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
       _handleSurveySubmission();
     }
 
-    // heightFactor: 1 makes this hug the button's height. A plain Center is an
+    // heightFactor: 1 makes this hug its children's height. A plain Center is an
     // Align with null factors, which expands to fill whatever bounded
     // constraints it is given — in a bottomNavigationBar that is the full
     // screen height, so the bar swallowed the page and only the button showed.
     return Align(
       alignment: Alignment.center,
       heightFactor: 1,
-      child: ElevatedButton(
-        style: OutlinedButton.styleFrom(
-          minimumSize: Size(250, timeFontSize * 4.0),
-          padding: EdgeInsets.symmetric(vertical: timeFontSize * 0.5),
-          side: BorderSide(color: getButtonColor(context)),
-        ),
-        onPressed: () => attemptSurveySubmission(),
-        child: Text(
-          tr('continue'),
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: timeFontSize * 1.3,
+      child: Row(
+        children: [
+          // Adding a question is a toolbar action now rather than something you
+          // have to know to swipe for. "Continue" also used to sit here alone,
+          // which read as "next question" when it actually submitted.
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: promptAddQuestion,
+              icon: const Icon(Icons.add),
+              style: OutlinedButton.styleFrom(
+                minimumSize: Size(0, timeFontSize * 3.2),
+                side: BorderSide(color: getButtonColor(context)),
+              ),
+              label: Text(
+                'add_new_question'.tr(),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: timeFontSize,
+                ),
+              ),
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: Size(0, timeFontSize * 3.2),
+                backgroundColor: getButtonColor(context),
+                foregroundColor: getTextColor(context),
+              ),
+              onPressed: () => attemptSurveySubmission(),
+              child: Text(
+                'finish'.tr(),
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: timeFontSize,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

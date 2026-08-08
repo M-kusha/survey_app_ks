@@ -272,5 +272,6 @@
   "reset_link_sent_body": "If an account exists for {email}, we've sent a link to reset your password.",
   "no_company_error": "Your account is not linked to a company, so this cannot be created. Please contact your administrator.",
   "company_name_invalid": "Please enter a valid company name.",
-  "company_name_taken": "A company with this name already exists. Please choose a different name."
+  "company_name_taken": "A company with this name already exists. Please choose a different name.",
+  "add_new_question": "Add question"
 }
