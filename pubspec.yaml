@@ -6,7 +6,8 @@ publish_to: 'none' # Ensures package is not accidentally published to pub.dev.
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.1.2 <4.0.0'
+  sdk: '>=3.9.0 <4.0.0'
+  flutter: '>=3.44.0'
 
 dependencies:
   flutter:
@@ -17,32 +18,28 @@ dependencies:
   provider: ^6.0.5
   uuid: ^4.2.1
   shared_preferences: ^2.0.17
-  firebase_storage: ^11.2.6
-  cloud_firestore: ^4.8.5
-  firebase_core: ^2.15.1
-  firebase_auth: ^4.7.3
-  flutter_local_notifications: ^17.0.0
+  firebase_storage: ^13.4.6
+  cloud_firestore: ^6.8.0
+  firebase_core: ^4.13.0
+  firebase_auth: ^6.5.7
+  flutter_local_notifications: ^22.3.0
   timeago: ^3.6.0
   adaptive_theme: ^3.4.1
   image_picker: ^1.0.4
-  persistent_bottom_nav_bar: ^5.0.2
   pdf: ^3.10.7
   password_strength: ^0.2.0
   url_launcher: ^6.2.5
-  responsive_sizer: ^3.3.0+1
-  permission_handler: ^11.3.0
-  firebase_messaging: ^14.7.19
-  http: ^1.2.1
-  carousel_slider: ^4.1.1
-  local_auth: ^2.1.8
-  local_auth_android: ^1.0.37
-  flutter_quill: ^9.3.5
-  
+  firebase_messaging: ^16.5.0
+  carousel_slider: ^5.1.2
+  local_auth: ^3.0.2
+  local_auth_android: ^2.0.9
+  flutter_quill: ^11.5.1
+
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.2
+  flutter_lints: ^6.0.0
 
 flutter:
   uses-material-design: true

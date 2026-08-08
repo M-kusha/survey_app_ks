@@ -1,3 +1,7 @@
+# Private working docs — never publish
+AUDIT.md
+/_private/
+
 # Miscellaneous
 *.class
 *.log
