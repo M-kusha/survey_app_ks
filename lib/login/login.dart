@@ -1,4 +1,6 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/login/biometrics.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:echomeet/login/user_preferences.dart';
@@ -68,22 +70,20 @@ class LoginPageState extends State<LoginPage> {
     }
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                const SizedBox(height: 60),
-                _buildWelcomeBack(),
-                const SizedBox(height: 50),
-                _buildLoginContainer(),
-                const SizedBox(height: 20),
-                _buildSocialLoginButtons(),
-                const SizedBox(height: 20),
-                _buildRegisterLink(),
-              ],
-            ),
+        child: PageBody(
+          maxWidth: 460,
+          centerVertically: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildWelcomeBack(),
+              const SizedBox(height: Spacing.xxl),
+              _buildLoginContainer(),
+              const SizedBox(height: Spacing.xl),
+              _buildSocialLoginButtons(),
+              const SizedBox(height: Spacing.lg),
+              _buildRegisterLink(),
+            ],
           ),
         ),
       ),

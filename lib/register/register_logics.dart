@@ -45,7 +45,9 @@ class RegisterLogic {
         ? await _createCompany(uid)
         : existingCompanyId;
 
-    final imageUrl = profileImage != null ? await _uploadProfileImage(uid) : null;
+    final imageUrl = profileImage != null
+        ? await _uploadProfileImage(uid)
+        : null;
 
     final userData = {
       'fullName': fullnameController.text.trim(),
