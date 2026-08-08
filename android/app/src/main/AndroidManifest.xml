@@ -3,7 +3,10 @@
     <application
         android:label="EchoMeet"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:allowBackup="false">
         <activity
           android:name="io.flutter.embedding.android.FlutterFragmentActivity"
             android:exported="true"

@@ -94,8 +94,11 @@ class RegisterLogic {
   }
 
   Future<String> _uploadProfileImage(String uid) async {
+    // Must match the path ProfileSection writes to. These used to differ by the
+    // extension, so setting an avatar at sign-up and then changing it in
+    // settings left two files in the bucket and orphaned the first.
     final storageRef = FirebaseStorage.instance.ref().child(
-      'profile_images/$uid',
+      'profile_images/$uid.jpg',
     );
     final uploadTask = storageRef.putFile(profileImage!);
     final snapshot = await uploadTask.whenComplete(() => null);
