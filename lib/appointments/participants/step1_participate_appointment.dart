@@ -79,14 +79,13 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
     final timeFontSize = getTimeFontSize(context, fontSize);
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-            widget.appointment.title,
-            style: TextStyle(
-              fontSize: timeFontSize * 1.5,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text(
+          widget.appointment.title,
+          style: TextStyle(fontSize: timeFontSize * 1.5),
+        ),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: EdgeInsets.all(timeFontSize * 1.5),
@@ -123,9 +122,7 @@ class AppointmentNamePageState extends State<AppointmentNamePage> {
                           Text(
                             widget.appointment.description,
                             textAlign: TextAlign.justify,
-                            style: TextStyle(
-                              fontSize: timeFontSize + 2,
-                            ),
+                            style: TextStyle(fontSize: timeFontSize + 2),
                           ),
                         ],
                       ),

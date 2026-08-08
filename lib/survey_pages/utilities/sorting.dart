@@ -26,22 +26,27 @@ class CustomPopupMenuButton extends StatelessWidget {
     final timeFontSize = getTimeFontSize(context, fontSize);
 
     return PopupMenuButton<int>(
-      icon: Icon(Icons.sort_by_alpha_sharp,
-          color: buttonColor, size: timeFontSize * 1.8),
+      icon: Icon(
+        Icons.sort_by_alpha_sharp,
+        color: buttonColor,
+        size: timeFontSize * 1.8,
+      ),
       offset: const Offset(0, 60),
       onSelected: onOptionSelected,
       itemBuilder: (BuildContext context) => menuItems.map((item) {
         return PopupMenuItem<int>(
           value: item.value,
           child: ListTile(
-            leading: Icon(item.icon,
-                color:
-                    selectedOption == item.value ? buttonColor : listTileColor),
+            leading: Icon(
+              item.icon,
+              color: selectedOption == item.value ? buttonColor : listTileColor,
+            ),
             title: Text(
               item.text.tr(),
               style: TextStyle(
-                color:
-                    selectedOption == item.value ? buttonColor : listTileColor,
+                color: selectedOption == item.value
+                    ? buttonColor
+                    : listTileColor,
                 fontWeight: selectedOption == item.value
                     ? FontWeight.bold
                     : FontWeight.normal,
@@ -62,6 +67,9 @@ class PopupMenuItemModel {
   final int value;
   final IconData icon;
 
-  PopupMenuItemModel(
-      {required this.text, required this.value, required this.icon});
+  PopupMenuItemModel({
+    required this.text,
+    required this.value,
+    required this.icon,
+  });
 }

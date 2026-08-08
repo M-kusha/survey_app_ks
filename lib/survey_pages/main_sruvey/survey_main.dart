@@ -49,20 +49,26 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
       _isLoading = true;
     });
 
-    await Provider.of<UserDataProvider>(context, listen: false)
-        .loadCurrentUser();
+    await Provider.of<UserDataProvider>(
+      context,
+      listen: false,
+    ).loadCurrentUser();
     if (!mounted) return;
-    final companyId = Provider.of<UserDataProvider>(context, listen: false)
-            .currentUser
-            ?.companyId ??
+    final companyId =
+        Provider.of<UserDataProvider>(
+          context,
+          listen: false,
+        ).currentUser?.companyId ??
         '';
 
     if (companyId.isNotEmpty) {
       if (!context.mounted) return;
-      Future.microtask(() => provider.loadSurveys(companyId).then((_) {
-            final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-            provider.checkParticipationForCurrentUser(userId);
-          }));
+      Future.microtask(
+        () => provider.loadSurveys(companyId).then((_) {
+          final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+          provider.checkParticipationForCurrentUser(userId);
+        }),
+      );
     }
     final isAdmin = await _firebaseServices.fetchAdminStatus();
     if (!mounted) return;
@@ -96,8 +102,10 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     final timeFontSize = getTimeFontSize(context, fontSize);
     Color buttonColor = ThemeBasedAppColors.getColor(context, 'buttonColor');
     Color appbarColor = ThemeBasedAppColors.getColor(context, 'appbarColor');
-    Color listTileColor =
-        ThemeBasedAppColors.getColor(context, 'listTileColor');
+    Color listTileColor = ThemeBasedAppColors.getColor(
+      context,
+      'listTileColor',
+    );
     return Scaffold(
       appBar: AppBar(
         leading: buildPopupMenuButton(context, buttonColor, listTileColor),
@@ -107,32 +115,35 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
                 searchController: searchController,
                 onSearchTextChanged: _onSearchTextChanged,
               )
-            : Text('surveys'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5)),
+            : Text(
+                'surveys'.tr(),
+                style: TextStyle(fontSize: timeFontSize * 1.5),
+              ),
         centerTitle: true,
         backgroundColor: appbarColor,
-        actions: [
-          buildSearchBar(buttonColor),
-        ],
+        actions: [buildSearchBar(buttonColor)],
         automaticallyImplyLeading: false,
       ),
       body: Column(
         children: [
           const SizedBox(height: 22.0),
-          buildExpandedField(
-            context,
-            isSearching,
-            searchQuery,
-          ),
+          buildExpandedField(context, isSearching, searchQuery),
         ],
       ),
-      floatingActionButton:
-          _isAdmin ? buildCreateQuestionarySurveyButton(context) : null,
+      floatingActionButton: _isAdmin
+          ? buildCreateQuestionarySurveyButton(context)
+          : null,
     );
   }
 
-  PopupMenuItem<int> buildPopupMenuItem(BuildContext context, String text,
-      int value, IconData icon, Color buttonColor, Color listTileColor) {
+  PopupMenuItem<int> buildPopupMenuItem(
+    BuildContext context,
+    String text,
+    int value,
+    IconData icon,
+    Color buttonColor,
+    Color listTileColor,
+  ) {
     bool isSelected = selectedSortOption == value;
 
     return PopupMenuItem(
@@ -147,18 +158,17 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
           ),
         ),
         trailing: isSelected
-            ? Icon(
-                Icons.check,
-                color: buttonColor,
-                size: 17.0,
-              )
+            ? Icon(Icons.check, color: buttonColor, size: 17.0)
             : null,
       ),
     );
   }
 
   PopupMenuButton<int> buildPopupMenuButton(
-      BuildContext context, Color buttonColor, Color listTileColor) {
+    BuildContext context,
+    Color buttonColor,
+    Color listTileColor,
+  ) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return PopupMenuButton<int>(
@@ -175,20 +185,42 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
       },
       itemBuilder: (BuildContext context) => <PopupMenuEntry<int>>[
         buildPopupMenuItem(
-            context, 'newest', 0, Icons.new_label, buttonColor, listTileColor),
+          context,
+          'newest',
+          0,
+          Icons.new_label,
+          buttonColor,
+          listTileColor,
+        ),
         buildPopupMenuItem(
-            context, 'oldest', 1, Icons.history, buttonColor, listTileColor),
-        buildPopupMenuItem(context, 'exp_date_asc', 4, Icons.date_range_sharp,
-            buttonColor, listTileColor),
-        buildPopupMenuItem(context, 'exp_date_des', 5, Icons.date_range,
-            buttonColor, listTileColor),
+          context,
+          'oldest',
+          1,
+          Icons.history,
+          buttonColor,
+          listTileColor,
+        ),
+        buildPopupMenuItem(
+          context,
+          'exp_date_asc',
+          4,
+          Icons.date_range_sharp,
+          buttonColor,
+          listTileColor,
+        ),
+        buildPopupMenuItem(
+          context,
+          'exp_date_des',
+          5,
+          Icons.date_range,
+          buttonColor,
+          listTileColor,
+        ),
       ],
     );
   }
 
-  Widget buildSearchBar(
-    Color buttonColor,
-  ) {
+  Widget buildSearchBar(Color buttonColor) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     return isSearching
@@ -220,7 +252,10 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
   }
 
   Widget buildExpandedField(
-      BuildContext context, bool isSearching, String searchQuery) {
+    BuildContext context,
+    bool isSearching,
+    String searchQuery,
+  ) {
     final surveyListProvider = Provider.of<SurveyDataProvider>(context);
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
@@ -287,7 +322,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
                   final survey = filteredSurveys[index];
                   final hasParticipated =
                       surveyListProvider.userParticipationStatus[survey.id] ??
-                          false;
+                      false;
                   return SurveyListItem(
                     survey: surveysForCurrentPage[index],
                     isAdmin: _isAdmin,

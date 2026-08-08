@@ -25,9 +25,7 @@ class PaginationWidget extends StatelessWidget {
           onPressed: currentPage > 1 ? onPreviousPage : null,
         ),
         const SizedBox(width: 10),
-        Text(
-          '${'page'.tr()} $currentPage of $totalPages',
-        ),
+        Text('${'page'.tr()} $currentPage of $totalPages'),
         IconButton(
           icon: const Icon(Icons.chevron_right_outlined),
           onPressed: currentPage < totalPages ? onNextPage : null,

@@ -16,9 +16,7 @@ import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await UserPreferences.init();
 
   await EasyLocalization.ensureInitialized();
@@ -29,23 +27,14 @@ Future<void> main() async {
         ChangeNotifierProvider<FontSizeProvider>(
           create: (context) => FontSizeProvider(),
         ),
-        Provider<AppointmentService>(
-          create: (_) => AppointmentService(),
-        ),
-        Provider<FirebaseServices>(
-          create: (_) => FirebaseServices(),
-        ),
-        Provider<RegisterLogic>(
-          create: (_) => RegisterLogic(),
-        ),
+        Provider<AppointmentService>(create: (_) => AppointmentService()),
+        Provider<FirebaseServices>(create: (_) => FirebaseServices()),
+        Provider<RegisterLogic>(create: (_) => RegisterLogic()),
+        ChangeNotifierProvider(create: (context) => SurveyDataProvider()),
+        ChangeNotifierProvider(create: (context) => AppointmentDataProvider()),
         ChangeNotifierProvider(
-          create: (context) => SurveyDataProvider(),
+          create: (_) => UserDataProvider()..loadCurrentUser(),
         ),
-        ChangeNotifierProvider(
-          create: (context) => AppointmentDataProvider(),
-        ),
-        ChangeNotifierProvider(
-            create: (_) => UserDataProvider()..loadCurrentUser()),
       ],
       child: EasyLocalization(
         supportedLocales: const [

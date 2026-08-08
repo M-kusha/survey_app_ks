@@ -42,8 +42,9 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
           elevation: 5,
           shadowColor: getButtonColor(context),
           margin: const EdgeInsets.all(24),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: Column(
@@ -70,7 +71,9 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
                   title: Text(
                     'confirmation_status'.tr(),
                     style: TextStyle(
-                        fontSize: fontSize, fontWeight: FontWeight.bold),
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   value: isChecked,
                   onChanged: (value) => _handleCheckboxChanged(value),
@@ -95,8 +98,10 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
   }
 
   void _showConfirmationDialog() {
-    final fontSize =
-        Provider.of<FontSizeProvider>(context, listen: false).fontSize;
+    final fontSize = Provider.of<FontSizeProvider>(
+      context,
+      listen: false,
+    ).fontSize;
 
     showDialog(
       context: context,
@@ -113,13 +118,17 @@ class AppointmentEditPageStep4State extends State<AppointmentEditPageStep4> {
         ),
         actions: <Widget>[
           TextButton(
-            child:
-                Text('cancel'.tr(), style: TextStyle(fontSize: fontSize - 2)),
+            child: Text(
+              'cancel'.tr(),
+              style: TextStyle(fontSize: fontSize - 2),
+            ),
             onPressed: () => Navigator.of(context).pop(),
           ),
           TextButton(
-            child: Text('confirm'.tr(),
-                style: TextStyle(fontSize: fontSize - 2, color: Colors.red)),
+            child: Text(
+              'confirm'.tr(),
+              style: TextStyle(fontSize: fontSize - 2, color: Colors.red),
+            ),
             onPressed: () {
               setState(() {
                 widget.appointment.confirmedTimeSlots.clear();

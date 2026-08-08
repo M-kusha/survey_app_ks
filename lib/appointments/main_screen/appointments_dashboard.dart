@@ -43,16 +43,22 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
   void _loadUserAndSurveys() async {
     setState(() => _isLoading = true);
 
-    final provider =
-        Provider.of<AppointmentDataProvider>(context, listen: false);
+    final provider = Provider.of<AppointmentDataProvider>(
+      context,
+      listen: false,
+    );
     final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    await Provider.of<UserDataProvider>(context, listen: false)
-        .loadCurrentUser();
+    await Provider.of<UserDataProvider>(
+      context,
+      listen: false,
+    ).loadCurrentUser();
     if (!mounted) return;
-    final companyId = Provider.of<UserDataProvider>(context, listen: false)
-            .currentUser
-            ?.companyId ??
+    final companyId =
+        Provider.of<UserDataProvider>(
+          context,
+          listen: false,
+        ).currentUser?.companyId ??
         '';
     if (companyId.isNotEmpty) {
       await provider.loadAppointments(companyId);
@@ -97,13 +103,13 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
                 searchController: searchController,
                 onSearchTextChanged: _onSearchTextChanged,
               )
-            : Text('appointments'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5)),
+            : Text(
+                'appointments'.tr(),
+                style: TextStyle(fontSize: timeFontSize * 1.5),
+              ),
         centerTitle: true,
         backgroundColor: getAppbarColor(context),
-        actions: [
-          buildSearchBar(),
-        ],
+        actions: [buildSearchBar()],
         automaticallyImplyLeading: false,
       ),
       body: Column(
@@ -112,22 +118,29 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
           buildExpandedField(context, isSearching, searchQuery),
         ],
       ),
-      floatingActionButton:
-          _isAdmin ? buildCreateAppointmentButton(context) : null,
+      floatingActionButton: _isAdmin
+          ? buildCreateAppointmentButton(context)
+          : null,
     );
   }
 
   PopupMenuItem<int> buildPopupMenuItem(
-      BuildContext context, String text, int value, IconData icon) {
+    BuildContext context,
+    String text,
+    int value,
+    IconData icon,
+  ) {
     bool isSelected = selectedSortOption == value;
 
     return PopupMenuItem(
       value: value,
       child: ListTile(
-        leading: Icon(icon,
-            color: isSelected
-                ? getButtonColor(context)
-                : getListTileColor(context)),
+        leading: Icon(
+          icon,
+          color: isSelected
+              ? getButtonColor(context)
+              : getListTileColor(context),
+        ),
         title: Text(
           text.tr(),
           style: TextStyle(
@@ -138,11 +151,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
           ),
         ),
         trailing: isSelected
-            ? Icon(
-                Icons.check,
-                color: getButtonColor(context),
-                size: 17.0,
-              )
+            ? Icon(Icons.check, color: getButtonColor(context), size: 17.0)
             : null,
       ),
     );
@@ -206,9 +215,13 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
   }
 
   Widget buildExpandedField(
-      BuildContext context, bool isSearching, String searchQuery) {
-    final appointmentListProvider =
-        Provider.of<AppointmentDataProvider>(context);
+    BuildContext context,
+    bool isSearching,
+    String searchQuery,
+  ) {
+    final appointmentListProvider = Provider.of<AppointmentDataProvider>(
+      context,
+    );
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
@@ -218,52 +231,64 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
       );
     }
 
-    List<Appointment> filteredAppointments =
-        appointmentListProvider.appointments.where((appoinments) {
-      final lowerCaseQuery = searchQuery.toLowerCase();
-      return appoinments.title.toLowerCase().contains(lowerCaseQuery) ||
-          appoinments.appointmentId.toLowerCase().contains(lowerCaseQuery) ||
-          format(appoinments.creationDate)
-              .toLowerCase()
-              .contains(lowerCaseQuery);
-    }).toList();
+    List<Appointment> filteredAppointments = appointmentListProvider
+        .appointments
+        .where((appoinments) {
+          final lowerCaseQuery = searchQuery.toLowerCase();
+          return appoinments.title.toLowerCase().contains(lowerCaseQuery) ||
+              appoinments.appointmentId.toLowerCase().contains(
+                lowerCaseQuery,
+              ) ||
+              format(
+                appoinments.creationDate,
+              ).toLowerCase().contains(lowerCaseQuery);
+        })
+        .toList();
     switch (selectedSortOption) {
       case 0:
-        filteredAppointments
-            .sort((a, b) => b.creationDate.compareTo(a.creationDate));
+        filteredAppointments.sort(
+          (a, b) => b.creationDate.compareTo(a.creationDate),
+        );
 
         break;
       case 1:
-        filteredAppointments
-            .sort((a, b) => a.creationDate.compareTo(b.creationDate));
+        filteredAppointments.sort(
+          (a, b) => a.creationDate.compareTo(b.creationDate),
+        );
         break;
       case 2:
         filteredAppointments.sort(
-            (a, b) => b.participationCount.compareTo(a.participationCount));
+          (a, b) => b.participationCount.compareTo(a.participationCount),
+        );
         break;
       case 3:
         filteredAppointments.sort(
-            (a, b) => a.participationCount.compareTo(b.participationCount));
+          (a, b) => a.participationCount.compareTo(b.participationCount),
+        );
         break;
       case 4:
-        filteredAppointments
-            .sort((a, b) => a.expirationDate.compareTo(b.expirationDate));
+        filteredAppointments.sort(
+          (a, b) => a.expirationDate.compareTo(b.expirationDate),
+        );
         break;
       case 5:
-        filteredAppointments
-            .sort((a, b) => b.expirationDate.compareTo(a.expirationDate));
+        filteredAppointments.sort(
+          (a, b) => b.expirationDate.compareTo(a.expirationDate),
+        );
         break;
     }
 
-    final totalPages =
-        (filteredAppointments.length / _appointmentsPerPage).ceil();
+    final totalPages = (filteredAppointments.length / _appointmentsPerPage)
+        .ceil();
     final startIndex = _currentPage * _appointmentsPerPage;
     final endIndex =
         startIndex + _appointmentsPerPage > filteredAppointments.length
-            ? filteredAppointments.length
-            : startIndex + _appointmentsPerPage;
-    final appointmentsForCurrentPage =
-        filteredAppointments.sublist(startIndex, endIndex);
+        ? filteredAppointments.length
+        : startIndex + _appointmentsPerPage;
+    final appointmentsForCurrentPage = filteredAppointments.sublist(
+      startIndex,
+      endIndex,
+    );
     if (filteredAppointments.isEmpty) {
       return Expanded(
         child: Center(
@@ -290,11 +315,13 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
                 itemCount: appointmentsForCurrentPage.length,
                 itemBuilder: (context, index) {
                   final appointment = filteredAppointments[index];
-                  bool hasParticipated = appointmentListProvider
+                  bool hasParticipated =
+                      appointmentListProvider
                           .userParticipationStatus[appointment.appointmentId] ??
                       false;
-                  bool isAnyTimeSlotConfirmed = appointmentListProvider
-                          .isAnyTimeSlotConfirmed[appointment.appointmentId] ??
+                  bool isAnyTimeSlotConfirmed =
+                      appointmentListProvider.isAnyTimeSlotConfirmed[appointment
+                          .appointmentId] ??
                       false;
 
                   return AppointmentListItem(

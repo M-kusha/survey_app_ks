@@ -40,11 +40,21 @@ class AppointmentListItem extends StatelessWidget {
     final count = appointment.participationCount;
 
     return _listItems(
-        context, isExpired, hasUserParticipated, timeFontSize, count);
+      context,
+      isExpired,
+      hasUserParticipated,
+      timeFontSize,
+      count,
+    );
   }
 
-  GestureDetector _listItems(BuildContext context, bool isExpired,
-      bool participated, double timeFontSize, int count) {
+  GestureDetector _listItems(
+    BuildContext context,
+    bool isExpired,
+    bool participated,
+    double timeFontSize,
+    int count,
+  ) {
     return GestureDetector(
       onTap: (!isExpired)
           ? () => navigateToCorrectPage(context, participated, isAdmin)
@@ -53,22 +63,32 @@ class AppointmentListItem extends StatelessWidget {
         opacity: (isExpired || participated) ? 0.8 : 1.0,
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child:
-              _buildCard(context, timeFontSize, isExpired, count, participated),
+          child: _buildCard(
+            context,
+            timeFontSize,
+            isExpired,
+            count,
+            participated,
+          ),
         ),
       ),
     );
   }
 
-  Card _buildCard(BuildContext context, double timeFontSize, bool isExpired,
-      int count, bool participated) {
+  Card _buildCard(
+    BuildContext context,
+    double timeFontSize,
+    bool isExpired,
+    int count,
+    bool participated,
+  ) {
     return Card(
       elevation: 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
         side: BorderSide(
           color: isExpired
-              ? getButtonColor(context).withOpacity(0.5)
+              ? getButtonColor(context).withValues(alpha: 0.5)
               : getButtonColor(context),
           width: 2,
         ),
@@ -90,8 +110,14 @@ class AppointmentListItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8.0),
-                _buildInfoRow(context, timeFontSize, count, isExpired,
-                    participated, isAnyTimeSLotConfirmed),
+                _buildInfoRow(
+                  context,
+                  timeFontSize,
+                  count,
+                  isExpired,
+                  participated,
+                  isAnyTimeSLotConfirmed,
+                ),
               ],
             ),
           ],
@@ -100,8 +126,13 @@ class AppointmentListItem extends StatelessWidget {
     );
   }
 
-  RichText _buildRichText(BuildContext context, double timeFontSize,
-      bool isExpired, bool hasParticipated, bool isAnyTimeSLotConfirmed) {
+  RichText _buildRichText(
+    BuildContext context,
+    double timeFontSize,
+    bool isExpired,
+    bool hasParticipated,
+    bool isAnyTimeSLotConfirmed,
+  ) {
     String statusText;
     Color statusColor;
 
@@ -144,39 +175,61 @@ class AppointmentListItem extends StatelessWidget {
     );
   }
 
-  Row _buildInfoRow(BuildContext context, double timeFontSize, int count,
-      bool isExpired, bool hasUserParticipated, bool isAnyTimeSLotConfirmed) {
+  Row _buildInfoRow(
+    BuildContext context,
+    double timeFontSize,
+    int count,
+    bool isExpired,
+    bool hasUserParticipated,
+    bool isAnyTimeSLotConfirmed,
+  ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildColumnLeft(context, timeFontSize, isExpired, hasUserParticipated,
-            isAnyTimeSLotConfirmed),
+        _buildColumnLeft(
+          context,
+          timeFontSize,
+          isExpired,
+          hasUserParticipated,
+          isAnyTimeSLotConfirmed,
+        ),
         _buildColumnRight(context, timeFontSize, count),
       ],
     );
   }
 
-  Column _buildColumnLeft(BuildContext context, double timeFontSize,
-      bool isExpired, bool hasUserParticipated, bool isAnyTimeSLotConfirmed) {
+  Column _buildColumnLeft(
+    BuildContext context,
+    double timeFontSize,
+    bool isExpired,
+    bool hasUserParticipated,
+    bool isAnyTimeSLotConfirmed,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _buildRichText(context, timeFontSize, isExpired, hasUserParticipated,
-            isAnyTimeSLotConfirmed),
+        _buildRichText(
+          context,
+          timeFontSize,
+          isExpired,
+          hasUserParticipated,
+          isAnyTimeSLotConfirmed,
+        ),
         SizedBox(height: timeFontSize),
         Text(
-            '${'expires'.tr()} ${DateFormat("dd E y").format(appointment.expirationDate)}',
-            style: TextStyle(
-              fontSize: timeFontSize,
-              fontWeight: FontWeight.bold,
-            )),
+          '${'expires'.tr()} ${DateFormat("dd E y").format(appointment.expirationDate)}',
+          style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
+        ),
       ],
     );
   }
 
   Column _buildColumnRight(
-      BuildContext context, double timeFontSize, int count) {
+    BuildContext context,
+    double timeFontSize,
+    int count,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -194,19 +247,20 @@ class AppointmentListItem extends StatelessWidget {
         SizedBox(height: timeFontSize),
         Text(
           '${'participants'.tr()}: $count',
-          style: TextStyle(
-            fontSize: timeFontSize,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
         ),
       ],
     );
   }
 
   void navigateToCorrectPage(
-      BuildContext context, bool participated, bool isAdmin) {
-    final isTimeSlotConfirmed =
-        appointment.availableTimeSlots.any((ts) => ts.isConfirmed);
+    BuildContext context,
+    bool participated,
+    bool isAdmin,
+  ) {
+    final isTimeSlotConfirmed = appointment.availableTimeSlots.any(
+      (ts) => ts.isConfirmed,
+    );
 
     if (participated || isTimeSlotConfirmed) {
       Navigator.push(

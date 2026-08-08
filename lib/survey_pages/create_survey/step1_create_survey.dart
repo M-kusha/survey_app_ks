@@ -55,9 +55,7 @@ class Step1CreateSurveyState extends State<Step1CreateSurvey> {
       appBar: AppBar(
         title: Text(
           'create_survey'.tr(),
-          style: TextStyle(
-            fontSize: fontSize * 1.5,
-          ),
+          style: TextStyle(fontSize: fontSize * 1.5),
         ),
         backgroundColor: getAppbarColor(context),
         centerTitle: true,

@@ -46,13 +46,13 @@ class ActionFieldState extends State<ActionField> {
                 widget.onSearchTextChanged(value);
               },
               decoration: InputDecoration(
-                hintStyle: TextStyle(
-                  color: getButtonColor(context),
-                ),
+                hintStyle: TextStyle(color: getButtonColor(context)),
                 border: InputBorder.none,
                 hintText: 'search'.tr(),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 1.0, horizontal: 24.0),
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 1.0,
+                  horizontal: 24.0,
+                ),
                 filled: true,
                 prefixIconColor: getButtonColor(context),
                 enabledBorder: OutlineInputBorder(
@@ -71,7 +71,9 @@ class ActionFieldState extends State<ActionField> {
               textAlign: TextAlign.center,
             ),
           )
-        : Text('${'surveys'.tr()} (${widget.searchController.text})',
-            style: TextStyle(fontSize: timeFontSize));
+        : Text(
+            '${'surveys'.tr()} (${widget.searchController.text})',
+            style: TextStyle(fontSize: timeFontSize),
+          );
   }
 }

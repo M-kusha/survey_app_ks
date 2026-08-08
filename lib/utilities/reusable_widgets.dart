@@ -16,13 +16,15 @@ class UIUtils {
               message.tr(),
               textAlign: TextAlign.center,
               style: TextStyle(
-                  color: ThemeBasedAppColors.getColor(context, 'errorColor')),
+                color: ThemeBasedAppColors.getColor(context, 'errorColor'),
+              ),
             ),
           ),
         ),
         backgroundColor: ThemeBasedAppColors.getColor(context, 'snackBarColor'),
         padding: EdgeInsets.symmetric(
-          horizontal: (MediaQuery.of(context).size.width -
+          horizontal:
+              (MediaQuery.of(context).size.width -
                   (MediaQuery.of(context).size.width * 0.8)) /
               2,
         ),
@@ -34,8 +36,10 @@ class UIUtils {
     );
   }
 
-  static void showLoadingIndicator(BuildContext context,
-      {String loadingText = "Loading..."}) {
+  static void showLoadingIndicator(
+    BuildContext context, {
+    String loadingText = "Loading...",
+  }) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -44,8 +48,10 @@ class UIUtils {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20.0),
           ),
-          backgroundColor:
-              ThemeBasedAppColors.getColor(context, 'snackBarColor'),
+          backgroundColor: ThemeBasedAppColors.getColor(
+            context,
+            'snackBarColor',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -90,20 +96,24 @@ Widget buildBottomElevatedButton({
       children: [
         ElevatedButton(
           style: ButtonStyle(
-            minimumSize:
-                WidgetStateProperty.all(Size.fromHeight(defaultButtonHeight)),
+            minimumSize: WidgetStateProperty.all(
+              Size.fromHeight(defaultButtonHeight),
+            ),
             padding: WidgetStateProperty.all(
-                EdgeInsets.symmetric(vertical: defaultFontSize * 0.5)),
-            backgroundColor: WidgetStateProperty.resolveWith<Color>(
-                (Set<WidgetState> states) {
+              EdgeInsets.symmetric(vertical: defaultFontSize * 0.5),
+            ),
+            backgroundColor: WidgetStateProperty.resolveWith<Color>((
+              Set<WidgetState> states,
+            ) {
               if (Theme.of(context).brightness == Brightness.light) {
                 return Colors.grey[100]!;
               } else {
                 return Colors.grey[900]!;
               }
             }),
-            foregroundColor: WidgetStateProperty.resolveWith<Color>(
-                (Set<WidgetState> states) {
+            foregroundColor: WidgetStateProperty.resolveWith<Color>((
+              Set<WidgetState> states,
+            ) {
               if (Theme.of(context).brightness == Brightness.light) {
                 return Colors.grey[900]!;
               } else {

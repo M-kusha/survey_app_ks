@@ -16,11 +16,12 @@ class SurveyListItem extends StatelessWidget {
   final bool isAdmin;
   final bool hasParticipated;
 
-  const SurveyListItem(
-      {super.key,
-      required this.survey,
-      required this.isAdmin,
-      required this.hasParticipated});
+  const SurveyListItem({
+    super.key,
+    required this.survey,
+    required this.isAdmin,
+    required this.hasParticipated,
+  });
 
   Color? _textColor(BuildContext context) {
     return Theme.of(context).brightness == Brightness.light
@@ -57,7 +58,7 @@ class SurveyListItem extends StatelessWidget {
                   borderRadius: BorderRadius.circular(15),
                   side: BorderSide(
                     color: isExpired
-                        ? getButtonColor(context).withOpacity(0.5)
+                        ? getButtonColor(context).withValues(alpha: 0.5)
                         : getButtonColor(context),
                     width: 2,
                   ),
@@ -76,11 +77,7 @@ class SurveyListItem extends StatelessWidget {
             ),
           ),
         ),
-        if (isAdmin)
-          adminButton(
-            context,
-            getButtonColor(context),
-          ),
+        if (isAdmin) adminButton(context, getButtonColor(context)),
       ],
     );
   }
@@ -103,23 +100,20 @@ class SurveyListItem extends StatelessWidget {
       top: -5,
       right: -8,
       child: IconButton(
-        icon: Icon(
-          Icons.admin_panel_settings,
-          color: buttonColor,
-        ),
+        icon: Icon(Icons.admin_panel_settings, color: buttonColor),
         onPressed: () async {
           showDialog(
             context: context,
             barrierDismissible: false,
             builder: (BuildContext context) {
-              return const CustomLoadingWidget(
-                loadingText: 'loading',
-              );
+              return const CustomLoadingWidget(loadingText: 'loading');
             },
           );
 
-          final provider =
-              Provider.of<SurveyDataProvider>(context, listen: false);
+          final provider = Provider.of<SurveyDataProvider>(
+            context,
+            listen: false,
+          );
           await provider.loadParticipants(survey.id);
 
           if (!context.mounted) return;
@@ -130,8 +124,12 @@ class SurveyListItem extends StatelessWidget {
     );
   }
 
-  RichText _buildRichText(BuildContext context, double timeFontSize,
-      bool isExpired, Color buttonColor) {
+  RichText _buildRichText(
+    BuildContext context,
+    double timeFontSize,
+    bool isExpired,
+    Color buttonColor,
+  ) {
     String statusText;
     Color statusColor;
 
@@ -153,8 +151,8 @@ class SurveyListItem extends StatelessWidget {
             text: survey.surveyType == SurveyType.survey
                 ? '${'survey_status'.tr()}: '
                 : survey.surveyType == SurveyType.test
-                    ? '${'test_status'.tr()}: '
-                    : 'Survey: ',
+                ? '${'test_status'.tr()}: '
+                : 'Survey: ',
             style: TextStyle(
               color: Theme.of(context).brightness == Brightness.light
                   ? _textColor(context)
@@ -181,27 +179,36 @@ class SurveyListItem extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildColumnLeft(
-            context, timeFontSize, isExpired, getButtonColor(context)),
+          context,
+          timeFontSize,
+          isExpired,
+          getButtonColor(context),
+        ),
         _buildColumnRight(context, timeFontSize),
       ],
     );
   }
 
-  Column _buildColumnLeft(BuildContext context, double timeFontSize,
-      bool isExpired, Color buttonColor) {
+  Column _buildColumnLeft(
+    BuildContext context,
+    double timeFontSize,
+    bool isExpired,
+    Color buttonColor,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _buildRichText(
-            context, timeFontSize, isExpired, getButtonColor(context)),
+          context,
+          timeFontSize,
+          isExpired,
+          getButtonColor(context),
+        ),
         SizedBox(height: timeFontSize),
         Text(
           '${'expires'.tr()} ${DateFormat('EEEE dd MMMM').format(survey.deadline)}',
-          style: TextStyle(
-            fontSize: timeFontSize,
-            fontWeight: FontWeight.bold,
-          ),
+          style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
         ),
       ],
     );
@@ -238,8 +245,10 @@ class SurveyListItem extends StatelessWidget {
   }
 
   void navigateToAdminOverview(BuildContext context) {
-    final participantsData =
-        Provider.of<SurveyDataProvider>(context, listen: false).participants;
+    final participantsData = Provider.of<SurveyDataProvider>(
+      context,
+      listen: false,
+    ).participants;
 
     if (participantsData != null) {
       if (survey.surveyType == SurveyType.survey) {
@@ -267,8 +276,12 @@ class SurveyListItem extends StatelessWidget {
     }
   }
 
-  void navigateToSurvey(BuildContext context, String userId, String userName,
-      String profileImage) {
+  void navigateToSurvey(
+    BuildContext context,
+    String userId,
+    String userName,
+    String profileImage,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(

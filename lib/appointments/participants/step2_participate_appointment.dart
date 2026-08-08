@@ -76,12 +76,14 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
       shadowColor: getButtonColor(context),
       margin: const EdgeInsets.all(8.0),
       child: ListTile(
-        leading: Icon(
-          Icons.calendar_today,
-          color: getButtonColor(context),
+        leading: Icon(Icons.calendar_today, color: getButtonColor(context)),
+        title: buildAppointmentTitle(
+          fontSize,
+          formattedDate,
+          timeFontSize,
+          startTimeString,
+          endTimeString,
         ),
-        title: buildAppointmentTitle(fontSize, formattedDate, timeFontSize,
-            startTimeString, endTimeString),
         trailing: buildTrailingButtons(context, timeFontSize, date, timeSlot),
       ),
     );
@@ -101,16 +103,22 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(formattedDate, style: TextStyle(fontSize: timeFontSize)),
-            Text('$startTimeString - $endTimeString',
-                style: TextStyle(fontSize: timeFontSize)),
+            Text(
+              '$startTimeString - $endTimeString',
+              style: TextStyle(fontSize: timeFontSize),
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget buildTrailingButtons(BuildContext context, double timeFontSize,
-      DateTime date, TimeSlot timeSlot) {
+  Widget buildTrailingButtons(
+    BuildContext context,
+    double timeFontSize,
+    DateTime date,
+    TimeSlot timeSlot,
+  ) {
     return Container(
       alignment: Alignment.center,
       width: MediaQuery.of(context).size.width < 600
@@ -123,53 +131,85 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           buildIconButton(
-              Icons.check_circle_outline_outlined,
-              widget.appointment.participants.any((p) =>
+            Icons.check_circle_outline_outlined,
+            widget.appointment.participants.any(
+                  (p) =>
                       p.userName == widget.userName &&
                       p.date == date &&
                       p.timeSlot == timeSlot &&
-                      p.status == 'joined')
-                  ? Colors.green
-                  : Colors.grey, () {
-            setState(() {
-              updateParticipantStatus(
-                  widget.userName, date, timeSlot, 'joined');
-            });
-          }, 'will_participate'.tr()),
+                      p.status == 'joined',
+                )
+                ? Colors.green
+                : Colors.grey,
+            () {
+              setState(() {
+                updateParticipantStatus(
+                  widget.userName,
+                  date,
+                  timeSlot,
+                  'joined',
+                );
+              });
+            },
+            'will_participate'.tr(),
+          ),
           buildIconButton(
-              Icons.help_outline_outlined,
-              widget.appointment.participants.any((p) =>
+            Icons.help_outline_outlined,
+            widget.appointment.participants.any(
+                  (p) =>
                       p.userName == widget.userName &&
                       p.date == date &&
                       p.timeSlot == timeSlot &&
-                      p.status == 'maybe')
-                  ? Colors.blue
-                  : Colors.grey, () {
-            setState(() {
-              updateParticipantStatus(widget.userName, date, timeSlot, 'maybe');
-            });
-          }, 'maybe_participate'.tr()),
+                      p.status == 'maybe',
+                )
+                ? Colors.blue
+                : Colors.grey,
+            () {
+              setState(() {
+                updateParticipantStatus(
+                  widget.userName,
+                  date,
+                  timeSlot,
+                  'maybe',
+                );
+              });
+            },
+            'maybe_participate'.tr(),
+          ),
           buildIconButton(
-              Icons.cancel_outlined,
-              widget.appointment.participants.any((p) =>
+            Icons.cancel_outlined,
+            widget.appointment.participants.any(
+                  (p) =>
                       p.userName == widget.userName &&
                       p.date == date &&
                       p.timeSlot == timeSlot &&
-                      p.status == 'declined')
-                  ? Colors.red
-                  : Colors.grey, () {
-            setState(() {
-              updateParticipantStatus(
-                  widget.userName, date, timeSlot, 'declined');
-            });
-          }, 'will_not_participate'.tr()),
+                      p.status == 'declined',
+                )
+                ? Colors.red
+                : Colors.grey,
+            () {
+              setState(() {
+                updateParticipantStatus(
+                  widget.userName,
+                  date,
+                  timeSlot,
+                  'declined',
+                );
+              });
+            },
+            'will_not_participate'.tr(),
+          ),
         ],
       ),
     );
   }
 
   Widget buildIconButton(
-      IconData icon, Color color, VoidCallback onTap, String tooltipMessage) {
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+    String tooltipMessage,
+  ) {
     final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
@@ -178,10 +218,7 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
       decoration: BoxDecoration(
         color: Theme.of(context).primaryColor,
         borderRadius: BorderRadius.circular(16.0),
-        border: Border.all(
-          color: Theme.of(context).primaryColor,
-          width: 2.0,
-        ),
+        border: Border.all(color: Theme.of(context).primaryColor, width: 2.0),
       ),
       textStyle: TextStyle(
         color: Colors.white,
@@ -192,18 +229,18 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
         borderRadius: BorderRadius.circular(20.0),
         child: InkWell(
           onTap: onTap,
-          child: Icon(
-            icon,
-            color: color,
-            size: timeFontSize * 1.8,
-          ),
+          child: Icon(icon, color: color, size: timeFontSize * 1.8),
         ),
       ),
     );
   }
 
   void updateParticipantStatus(
-      String userName, DateTime date, TimeSlot timeSlot, String status) async {
+    String userName,
+    DateTime date,
+    TimeSlot timeSlot,
+    String status,
+  ) async {
     if (userId == null) {
       return;
     }
@@ -225,18 +262,27 @@ class AppontmentParticipateState extends State<AppontmentParticipate> {
       });
     } else {
       setState(() {
-        widget.appointment.participants.add(AppointmentParticipants(
+        widget.appointment.participants.add(
+          AppointmentParticipants(
             userName: userName,
             date: date,
             timeSlot: timeSlot,
             status: status,
             userId: userId!,
             participated: true,
-            profileImageUrl: ''));
+            profileImageUrl: '',
+          ),
+        );
       });
     }
 
-    _appointmentService.updateParticipantStatus(userId!,
-        widget.appointment.appointmentId, userName, date, timeSlot, status);
+    _appointmentService.updateParticipantStatus(
+      userId!,
+      widget.appointment.appointmentId,
+      userName,
+      date,
+      timeSlot,
+      status,
+    );
   }
 }

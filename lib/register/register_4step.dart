@@ -62,7 +62,8 @@ class Register4stepState extends State<Register4step> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-            builder: (context) => const RegistrationSuccessPage()),
+          builder: (context) => const RegistrationSuccessPage(),
+        ),
         (Route<dynamic> route) => false,
       );
     } on FirebaseAuthException catch (e) {
@@ -84,25 +85,19 @@ class Register4stepState extends State<Register4step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          'select_company'.tr(),
-        ),
+        title: Text('select_company'.tr()),
         centerTitle: true,
         backgroundColor: getAppbarColor(context),
       ),
       body: _isSaving
           ? const Center(
-              child: CustomLoadingWidget(
-              loadingText: 'saving_regisration',
-            ))
+              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
+            )
           : Center(
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    _buildCompanyList(),
-                  ],
+                  children: [const SizedBox(height: 20), _buildCompanyList()],
                 ),
               ),
             ),
@@ -132,7 +127,9 @@ class Register4stepState extends State<Register4step> {
                         hintText: 'search_company'.tr(),
                         border: InputBorder.none,
                         contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10, horizontal: 20),
+                          vertical: 10,
+                          horizontal: 20,
+                        ),
                         focusedBorder: OutlineInputBorder(
                           borderSide: BorderSide(
                             color: getButtonColor(context), // Color(0xFFE8E8E8
@@ -176,16 +173,16 @@ class Register4stepState extends State<Register4step> {
 
     return Expanded(
       child: _isLoading
-          ? const CustomLoadingWidget(
-              loadingText: 'loading',
-            )
+          ? const CustomLoadingWidget(loadingText: 'loading')
           : ListView.builder(
               itemCount: columnCount,
               itemBuilder: (context, columnIndex) {
                 final start = columnIndex * 15;
                 final end = (columnIndex + 1) * 15;
                 final companies = _filteredCompanies.sublist(
-                    start, end > itemCount ? itemCount : end);
+                  start,
+                  end > itemCount ? itemCount : end,
+                );
 
                 return Column(
                   children: [
@@ -209,32 +206,32 @@ class Register4stepState extends State<Register4step> {
   }
 
   Widget _buildCompanyTile(Map<String, dynamic> company) => Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            Card(
-              elevation: isSelected(company['id']) ? 5 : 1,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-                side: BorderSide(
-                  color: isSelected(company['id'])
-                      ? getButtonColor(context)
-                      : Colors.transparent,
-                  width: 2,
-                ),
-              ),
-              child: ListTile(
-                leading: Icon(Icons.business, color: getButtonColor(context)),
-                title: Text(company['name']),
-                trailing: isSelected(company['id'])
-                    ? Icon(Icons.check, color: getButtonColor(context))
-                    : null,
-                onTap: () => selectCompany(company['id']),
-              ),
+    padding: const EdgeInsets.all(12.0),
+    child: Column(
+      children: [
+        Card(
+          elevation: isSelected(company['id']) ? 5 : 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: BorderSide(
+              color: isSelected(company['id'])
+                  ? getButtonColor(context)
+                  : Colors.transparent,
+              width: 2,
             ),
-          ],
+          ),
+          child: ListTile(
+            leading: Icon(Icons.business, color: getButtonColor(context)),
+            title: Text(company['name']),
+            trailing: isSelected(company['id'])
+                ? Icon(Icons.check, color: getButtonColor(context))
+                : null,
+            onTap: () => selectCompany(company['id']),
+          ),
         ),
-      );
+      ],
+    ),
+  );
 
   bool isSelected(String id) => _selectedCompanyId == id;
 

@@ -70,7 +70,7 @@ class QuestionCardState extends State<QuestionCard>
       style: TextStyle(
         fontSize: 16,
         color: Theme.of(context).brightness == Brightness.light
-            ? Colors.black.withOpacity(0.8)
+            ? Colors.black.withValues(alpha: 0.8)
             : Colors.white,
         fontWeight: FontWeight.bold,
       ),
@@ -101,40 +101,48 @@ class QuestionCardState extends State<QuestionCard>
         final selected = userAnswers.contains(index);
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 8.0),
-          child: _buildOption(index, option, selected,
-              isSingleChoice: isSingleChoice),
+          child: _buildOption(
+            index,
+            option,
+            selected,
+            isSingleChoice: isSingleChoice,
+          ),
         );
       }).toList(),
     );
   }
 
-  Widget _buildOption(int index, String option, bool selected,
-      {bool isSingleChoice = false}) {
+  Widget _buildOption(
+    int index,
+    String option,
+    bool selected, {
+    bool isSingleChoice = false,
+  }) {
     return Card(
       shadowColor: getButtonColor(context),
       elevation: selected ? 3.0 : 1.0,
-      color: selected ? getButtonColor(context).withOpacity(0.5) : null,
+      color: selected ? getButtonColor(context).withValues(alpha: 0.5) : null,
       child: ListTile(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         leading: CircleAvatar(
           backgroundColor: selected
               ? getButtonColor(context)
               : Theme.of(context).primaryColorLight,
           child: selected
-              ? Icon(Icons.check,
+              ? Icon(
+                  Icons.check,
                   color: getTextColor(context),
                   size: 20.0,
-                  semanticLabel: 'Selected')
-              : Text('${index + 1}',
-                  style: const TextStyle(color: Colors.black)),
+                  semanticLabel: 'Selected',
+                )
+              : Text(
+                  '${index + 1}',
+                  style: const TextStyle(color: Colors.black),
+                ),
         ),
         title: Text(
           option,
-          style: TextStyle(
-            color: selected ? getTextColor(context) : null,
-          ),
+          style: TextStyle(color: selected ? getTextColor(context) : null),
         ),
         onTap: () => _handleOptionTap(index, isSingleChoice),
       ),
@@ -162,9 +170,7 @@ class QuestionCardState extends State<QuestionCard>
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: TextField(
         decoration: InputDecoration(
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           hintText: 'enter_your_answer_here'.tr(),
         ),
         onChanged: (value) {

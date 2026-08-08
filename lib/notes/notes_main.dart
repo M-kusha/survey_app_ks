@@ -56,9 +56,12 @@ class TodoListState extends State<TodoList> {
     _filterNotes();
   }
 
-  _displayDialog(BuildContext context) async {
+  Future<void> _displayDialog(BuildContext context) async {
     return DialogUtils.displayAddNoteDialog(
-        context, textEditingController, _backend);
+      context,
+      textEditingController,
+      _backend,
+    );
   }
 
   void _filterNotes() {
@@ -92,13 +95,14 @@ class TodoListState extends State<TodoList> {
                 searchController: searchController,
                 onSearchTextChanged: _onSearchTextChanged,
               )
-            : Text('notes'.tr(),
-                style: theme.textTheme.titleLarge!
-                    .copyWith(fontSize: timeFontSize)),
+            : Text(
+                'notes'.tr(),
+                style: theme.textTheme.titleLarge!.copyWith(
+                  fontSize: timeFontSize,
+                ),
+              ),
         centerTitle: true,
-        actions: [
-          _buildSearchBar(theme.primaryColor),
-        ],
+        actions: [_buildSearchBar(theme.primaryColor)],
         automaticallyImplyLeading: false,
         elevation: 0,
         backgroundColor: theme.scaffoldBackgroundColor,
@@ -130,7 +134,11 @@ class TodoListState extends State<TodoList> {
               var doc = _filteredNotes[index];
               bool completed = doc['completed'] ?? false;
               return _buildNotesItem(
-                  doc['title'], completed, doc.reference, theme);
+                doc['title'],
+                completed,
+                doc.reference,
+                theme,
+              );
             },
           ),
         ),
@@ -140,14 +148,18 @@ class TodoListState extends State<TodoList> {
   }
 
   Widget _buildNotesItem(
-      String title, bool completed, DocumentReference docRef, ThemeData theme) {
+    String title,
+    bool completed,
+    DocumentReference docRef,
+    ThemeData theme,
+  ) {
     return InkWell(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (context) => DetailedNotePage(
-          noteId: docRef.id,
-          title: title,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) =>
+              DetailedNotePage(noteId: docRef.id, title: title),
         ),
-      )),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Card(

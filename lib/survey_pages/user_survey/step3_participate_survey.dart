@@ -30,14 +30,15 @@ class Step3ParticipateSurveyState extends State<Step3ParticipateSurvey> {
 
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-            widget.survey.surveyType == SurveyType.survey
-                ? 'survey_finished'.tr()
-                : 'test_finished'.tr(),
-            style: TextStyle(fontSize: timeFontSize * 1.5),
-          ),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text(
+          widget.survey.surveyType == SurveyType.survey
+              ? 'survey_finished'.tr()
+              : 'test_finished'.tr(),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
+        ),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -48,7 +49,8 @@ class Step3ParticipateSurveyState extends State<Step3ParticipateSurvey> {
                 elevation: 5,
                 shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15)),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(
@@ -59,8 +61,9 @@ class Step3ParticipateSurveyState extends State<Step3ParticipateSurvey> {
                             ? 'thank_you'.tr()
                             : 'thank_you_participation'.tr(),
                         style: TextStyle(
-                            fontSize: timeFontSize + 2,
-                            fontWeight: FontWeight.bold),
+                          fontSize: timeFontSize + 2,
+                          fontWeight: FontWeight.bold,
+                        ),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),

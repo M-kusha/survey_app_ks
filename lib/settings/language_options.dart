@@ -81,27 +81,32 @@ class LanguageOptionsWidgetState extends State<LanguageOptionsWidget> {
           if (_isLanguageExpanded)
             Column(
               children: locales
-                  .map((locale) => ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: getCameraColor(context),
-                          child: Text(
-                            locale.languageCode.toUpperCase(),
-                            style: TextStyle(
-                                fontSize: fontSizeProvider.fontSize - 4,
-                                color: getTextColor(context)),
+                  .map(
+                    (locale) => ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: getCameraColor(context),
+                        child: Text(
+                          locale.languageCode.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: fontSizeProvider.fontSize - 4,
+                            color: getTextColor(context),
                           ),
                         ),
-                        title: Text(
-                          _getLanguageFullName(locale),
-                          style: TextStyle(fontSize: fontSizeProvider.fontSize),
-                        ),
-                        trailing: locale == currentLocale
-                            ? Icon(Icons.check_circle,
-                                color: getButtonColor(context),
-                                size: fontSizeProvider.fontSize + 10)
-                            : null,
-                        onTap: () => _changeLanguage(context, locale),
-                      ))
+                      ),
+                      title: Text(
+                        _getLanguageFullName(locale),
+                        style: TextStyle(fontSize: fontSizeProvider.fontSize),
+                      ),
+                      trailing: locale == currentLocale
+                          ? Icon(
+                              Icons.check_circle,
+                              color: getButtonColor(context),
+                              size: fontSizeProvider.fontSize + 10,
+                            )
+                          : null,
+                      onTap: () => _changeLanguage(context, locale),
+                    ),
+                  )
                   .toList(),
             ),
         ],

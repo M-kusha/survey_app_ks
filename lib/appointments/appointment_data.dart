@@ -39,7 +39,8 @@ class AppointmentParticipants {
       userName: map['userName'] as String? ?? 'Unknown',
       date: DateTime.parse(map['date'] as String? ?? '1970-01-01T00:00:00Z'),
       timeSlot: TimeSlot.fromFirestore(
-          map['timeSlot'] as Map<String, dynamic>? ?? {}),
+        map['timeSlot'] as Map<String, dynamic>? ?? {},
+      ),
       status: map['status'] as String? ?? 'Unknown',
       participated: map['participated'] as bool? ?? false,
       profileImageUrl: map['profileImageUrl'] as String? ?? '',
@@ -74,7 +75,8 @@ class TimeSlot {
       start: DateTime.parse(map['start'] as String? ?? '1970-01-01T00:00:00Z'),
       end: DateTime.parse(map['end'] as String? ?? '1970-01-01T00:00:00Z'),
       expirationDate: DateTime.parse(
-          map['expirationDate'] as String? ?? '1970-01-01T00:00:00Z'),
+        map['expirationDate'] as String? ?? '1970-01-01T00:00:00Z',
+      ),
       isConfirmed: map['isConfirmed'] as bool? ?? false,
     );
   }
@@ -113,18 +115,20 @@ class Appointment {
       title: map['title'],
       description: map['description'],
       availableDates: List<DateTime>.from(
-          (map['availableDates'] as List<dynamic>)
-              .map((d) => DateTime.parse(d))),
+        (map['availableDates'] as List<dynamic>).map((d) => DateTime.parse(d)),
+      ),
       participants: (map['participants'] as List<dynamic>).map((p) {
         return AppointmentParticipants.fromFirestore(p);
       }).toList(),
-      availableTimeSlots:
-          (map['availableTimeSlots'] as List<dynamic>).map((ts) {
+      availableTimeSlots: (map['availableTimeSlots'] as List<dynamic>).map((
+        ts,
+      ) {
         return TimeSlot.fromFirestore(ts);
       }).toList(),
       appointmentId: map['appointmentId'],
-      confirmedTimeSlots:
-          (map['confirmedTimeSlots'] as List<dynamic>).map((ts) {
+      confirmedTimeSlots: (map['confirmedTimeSlots'] as List<dynamic>).map((
+        ts,
+      ) {
         return TimeSlot.fromFirestore(ts);
       }).toList(),
       expirationDate: DateTime.parse(map['expirationDate']),
@@ -140,12 +144,14 @@ class Appointment {
       'description': description,
       'availableDates': availableDates.map((d) => d.toIso8601String()).toList(),
       'participants': participants.map((p) => p.toFirestore()).toList(),
-      'availableTimeSlots':
-          availableTimeSlots.map((ts) => ts.toFirestore()).toList(),
+      'availableTimeSlots': availableTimeSlots
+          .map((ts) => ts.toFirestore())
+          .toList(),
       'appointmentId': appointmentId,
       'expirationDate': expirationDate.toIso8601String(),
-      'confirmedTimeSlots':
-          confirmedTimeSlots.map((ts) => ts.toFirestore()).toList(),
+      'confirmedTimeSlots': confirmedTimeSlots
+          .map((ts) => ts.toFirestore())
+          .toList(),
       'participationCount': participationCount,
       'creationDate': creationDate,
     };

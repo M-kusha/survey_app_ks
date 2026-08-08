@@ -37,8 +37,9 @@ class PasswordChangertate extends State<PasswordChanger> {
   void _updateStrength(String password) {
     bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
     bool hasLowercase = password.contains(RegExp(r'[a-z]'));
-    bool hasDigitsOrSpecialCharacters =
-        password.contains(RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'));
+    bool hasDigitsOrSpecialCharacters = password.contains(
+      RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'),
+    );
     final length = password.length;
 
     double strength = 0.0;
@@ -50,7 +51,9 @@ class PasswordChangertate extends State<PasswordChanger> {
     if (hasUppercase &&
         hasLowercase &&
         hasDigitsOrSpecialCharacters &&
-        length > 6) strength = 1.0;
+        length > 6) {
+      strength = 1.0;
+    }
 
     setState(() {
       _strength = strength;
@@ -72,7 +75,7 @@ class PasswordChangertate extends State<PasswordChanger> {
   Color _getConfirmPasswordBorderColor() {
     bool passwordsMatch =
         _newPasswordController.text == _confirmPasswordController.text &&
-            _newPasswordController.text.isNotEmpty;
+        _newPasswordController.text.isNotEmpty;
 
     return passwordsMatch ? Colors.green : Colors.grey;
   }
@@ -82,8 +85,10 @@ class PasswordChangertate extends State<PasswordChanger> {
     String? email = user?.email;
 
     try {
-      var credential =
-          EmailAuthProvider.credential(email: email!, password: password);
+      var credential = EmailAuthProvider.credential(
+        email: email!,
+        password: password,
+      );
       var authResult = await user!.reauthenticateWithCredential(credential);
       return authResult.user != null;
     } catch (e) {
@@ -100,8 +105,9 @@ class PasswordChangertate extends State<PasswordChanger> {
         _isSaving = true;
       });
 
-      bool isValidOldPassword =
-          await _validateCurrentPassword(_oldPasswordController.text);
+      bool isValidOldPassword = await _validateCurrentPassword(
+        _oldPasswordController.text,
+      );
       if (!isValidOldPassword) {
         if (!mounted) return;
         UIUtils.showSnackBar(context, 'invalid_old_password'.tr());
@@ -139,23 +145,26 @@ class PasswordChangertate extends State<PasswordChanger> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text('set_new_password'.tr()),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text('set_new_password'.tr()),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: _isSaving
           ? const Center(
-              child: CustomLoadingWidget(
-              loadingText: 'saving_password',
-            ))
+              child: CustomLoadingWidget(loadingText: 'saving_password'),
+            )
           : SingleChildScrollView(
               child: Center(
                 child: Column(
                   children: [
                     Card(
                       shadowColor: getButtonColor(
-                          context), // Card with shadow (elevation
+                        context,
+                      ), // Card with shadow (elevation
                       margin: const EdgeInsets.symmetric(
-                          vertical: 50.0, horizontal: 25.0),
+                        vertical: 50.0,
+                        horizontal: 25.0,
+                      ),
                       elevation: 5,
                       child: Padding(
                         padding: const EdgeInsets.all(20.0),
@@ -164,8 +173,10 @@ class PasswordChangertate extends State<PasswordChanger> {
                           children: [
                             const SizedBox(height: 20),
                             Padding(
-                              padding:
-                                  const EdgeInsets.only(left: 8.0, bottom: 8.0),
+                              padding: const EdgeInsets.only(
+                                left: 8.0,
+                                bottom: 8.0,
+                              ),
                               child: Text(
                                 'change_password_title'.tr(),
                                 style: const TextStyle(
@@ -181,12 +192,14 @@ class PasswordChangertate extends State<PasswordChanger> {
                               decoration: InputDecoration(
                                 labelText: 'old_password'.tr(),
                                 border: const OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: const OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 suffixIcon: IconButton(
@@ -213,16 +226,16 @@ class PasswordChangertate extends State<PasswordChanger> {
                               obscureText: !_isPasswordVisible,
                               decoration: InputDecoration(
                                 labelText: 'set_your_password'.tr(),
-                                hintStyle: const TextStyle(
-                                  fontSize: 10,
-                                ),
+                                hintStyle: const TextStyle(fontSize: 10),
                                 border: const OutlineInputBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12)),
+                                  borderRadius: BorderRadius.all(
+                                    Radius.circular(12),
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: const BorderRadius.all(
-                                      Radius.circular(12)),
+                                    Radius.circular(12),
+                                  ),
                                   borderSide: BorderSide(
                                     color: _getBorderColorBasedOnStrength(
                                       _strength,
@@ -257,7 +270,8 @@ class PasswordChangertate extends State<PasswordChanger> {
                                 labelText: 'confirm_password'.tr(),
                                 border: OutlineInputBorder(
                                   borderRadius: const BorderRadius.all(
-                                      Radius.circular(12)),
+                                    Radius.circular(12),
+                                  ),
                                   borderSide: BorderSide(
                                     color: _getConfirmPasswordBorderColor(),
                                     width: 1.0,
@@ -265,7 +279,8 @@ class PasswordChangertate extends State<PasswordChanger> {
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: const BorderRadius.all(
-                                      Radius.circular(12)),
+                                    Radius.circular(12),
+                                  ),
                                   borderSide: BorderSide(
                                     color: _getConfirmPasswordBorderColor(),
                                     width: 2.0,

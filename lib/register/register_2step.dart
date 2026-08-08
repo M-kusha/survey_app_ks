@@ -11,8 +11,11 @@ class Register2step extends StatefulWidget {
   final RegisterLogic registerLogic;
   final ProfileType profileType;
 
-  const Register2step(
-      {super.key, required this.registerLogic, required this.profileType});
+  const Register2step({
+    super.key,
+    required this.registerLogic,
+    required this.profileType,
+  });
 
   @override
   State<Register2step> createState() => _Register2stepState();
@@ -29,7 +32,8 @@ class _Register2stepState extends State<Register2step> {
       widget.registerLogic.companyNameController;
 
   bool _areFieldsValid() {
-    bool isValid = _fullnameController.text.isNotEmpty &&
+    bool isValid =
+        _fullnameController.text.isNotEmpty &&
         _birthdateController.text.isNotEmpty &&
         _emailController.text.isNotEmpty;
 
@@ -42,9 +46,7 @@ class _Register2stepState extends State<Register2step> {
   }
 
   bool _validateEmail(String email) {
-    final emailRegex = RegExp(
-      r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+',
-    );
+    final emailRegex = RegExp(r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+');
     return emailRegex.hasMatch(email);
   }
 
@@ -79,8 +81,9 @@ class _Register2stepState extends State<Register2step> {
 
   Future<void> _pickImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? pickedImage =
-        await picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedImage = await picker.pickImage(
+      source: ImageSource.gallery,
+    );
 
     if (pickedImage != null) {
       setState(() {
@@ -99,11 +102,7 @@ class _Register2stepState extends State<Register2step> {
             ? FileImage(widget.registerLogic.profileImage!) as ImageProvider
             : null,
         child: widget.registerLogic.profileImage == null
-            ? Icon(
-                Icons.camera_alt,
-                size: 40,
-                color: getTextColor(context),
-              )
+            ? Icon(Icons.camera_alt, size: 40, color: getTextColor(context))
             : null,
       ),
     );
@@ -113,9 +112,10 @@ class _Register2stepState extends State<Register2step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text('basic_information'.tr()),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text('basic_information'.tr()),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: Center(
         child: Card(
           shadowColor: getButtonColor(context),
@@ -154,13 +154,18 @@ class _Register2stepState extends State<Register2step> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
-                      prefixIcon: Icon(Icons.calendar_today,
-                          color: getButtonColor(context)),
+                      prefixIcon: Icon(
+                        Icons.calendar_today,
+                        color: getButtonColor(context),
+                      ),
                     ),
                     onTap: () {
                       final DateTime currentDate = DateTime.now();
-                      final DateTime minDate = DateTime(currentDate.year - 18,
-                          currentDate.month, currentDate.day);
+                      final DateTime minDate = DateTime(
+                        currentDate.year - 18,
+                        currentDate.month,
+                        currentDate.day,
+                      );
                       showDatePicker(
                         context: context,
                         initialDate: minDate,
@@ -168,8 +173,9 @@ class _Register2stepState extends State<Register2step> {
                         lastDate: minDate,
                       ).then((value) {
                         if (value != null) {
-                          _birthdateController.text =
-                              DateFormat('d MMMM yyyy').format(value);
+                          _birthdateController.text = DateFormat(
+                            'd MMMM yyyy',
+                          ).format(value);
                         }
                       });
                     },
@@ -185,8 +191,10 @@ class _Register2stepState extends State<Register2step> {
                       border: const OutlineInputBorder(
                         borderRadius: BorderRadius.all(Radius.circular(12)),
                       ),
-                      prefixIcon:
-                          Icon(Icons.email, color: getButtonColor(context)),
+                      prefixIcon: Icon(
+                        Icons.email,
+                        color: getButtonColor(context),
+                      ),
                     ),
                   ),
                 ),
@@ -198,8 +206,10 @@ class _Register2stepState extends State<Register2step> {
                       controller: _companyNameController,
                       decoration: InputDecoration(
                         labelText: 'company_name'.tr(),
-                        prefixIcon: Icon(Icons.business,
-                            color: getButtonColor(context)),
+                        prefixIcon: Icon(
+                          Icons.business,
+                          color: getButtonColor(context),
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),

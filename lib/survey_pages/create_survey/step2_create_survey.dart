@@ -24,7 +24,7 @@ class Step2CreateSurvey extends StatefulWidget {
 }
 
 class Step2CreateSurveyState extends State<Step2CreateSurvey> {
-  CarouselController carouselController = CarouselController();
+  CarouselSliderController carouselController = CarouselSliderController();
   DateTime _expirationDate = DateTime.now().add(const Duration(days: 1));
   int selectedTimeLimit = 0;
   int typeIndex = 0;
@@ -97,8 +97,9 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
                 Text(
                   'tap_to_change'.tr(),
                   style: TextStyle(
-                      fontSize: timeFontSize * 0.8,
-                      color: getListTileColor(context)),
+                    fontSize: timeFontSize * 0.8,
+                    color: getListTileColor(context),
+                  ),
                 ),
               ],
             ),
@@ -129,12 +130,11 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
               DropdownButton<SurveyType>(
                 value: widget.survey.surveyType,
                 items: getSurveyTypeOptions(context),
-                style:
-                    TextStyle(color: getListTileColor(context), fontSize: 16),
-                underline: Container(
-                  height: 1,
-                  color: getButtonColor(context),
+                style: TextStyle(
+                  color: getListTileColor(context),
+                  fontSize: 16,
                 ),
+                underline: Container(height: 1, color: getButtonColor(context)),
                 onChanged: (SurveyType? newValue) {
                   setState(() {
                     widget.survey.surveyType = newValue!;
@@ -146,8 +146,9 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
                 'choose_survey_type'.tr(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                    fontSize: timeFontSize * 0.8,
-                    color: getListTileColor(context)),
+                  fontSize: timeFontSize * 0.8,
+                  color: getListTileColor(context),
+                ),
               ),
             ],
           ),
@@ -202,7 +203,8 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
   }
 
   List<DropdownMenuItem<SurveyType>> getSurveyTypeOptions(
-      BuildContext context) {
+    BuildContext context,
+  ) {
     return SurveyType.values.map((type) {
       String label;
       switch (type) {
@@ -213,10 +215,7 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
           label = "testing_survey".tr();
           break;
       }
-      return DropdownMenuItem(
-        value: type,
-        child: Text(label),
-      );
+      return DropdownMenuItem(value: type, child: Text(label));
     }).toList();
   }
 
@@ -242,9 +241,7 @@ class Step2CreateSurveyState extends State<Step2CreateSurvey> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => CreateTrainingSurveyStep3(
-          survey: widget.survey,
-        ),
+        builder: (context) => CreateTrainingSurveyStep3(survey: widget.survey),
       ),
     );
   }

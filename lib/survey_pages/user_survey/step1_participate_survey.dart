@@ -5,33 +5,47 @@ import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 
-class Step1ParticipateSurvey extends StatelessWidget {
+class Step1ParticipateSurvey extends StatefulWidget {
   final Survey survey;
   final Participant participant;
   final String imageProfile;
 
-  const Step1ParticipateSurvey(
-      {super.key,
-      required this.survey,
-      required this.participant,
-      required this.imageProfile});
+  const Step1ParticipateSurvey({
+    super.key,
+    required this.survey,
+    required this.participant,
+    required this.imageProfile,
+  });
 
   @override
-  Widget build(BuildContext context) {
-    if (survey.surveyType == SurveyType.survey) {
-      Future.microtask(() {
+  State<Step1ParticipateSurvey> createState() => _Step1ParticipateSurveyState();
+}
+
+class _Step1ParticipateSurveyState extends State<Step1ParticipateSurvey> {
+  @override
+  void initState() {
+    super.initState();
+    // A plain survey has no rules to read, so skip straight to the questions.
+    // Done once after the first frame rather than from build(), which can run
+    // many times and would queue a duplicate navigation on each rebuild.
+    if (widget.survey.surveyType == SurveyType.survey) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (context) => Step2ParticipateSurvey(
-              survey: survey,
-              participant: participant,
+              survey: widget.survey,
+              participant: widget.participant,
               imageProfile: '',
             ),
           ),
         );
       });
     }
+  }
 
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('survey_participation_rules'.tr()),
@@ -50,20 +64,11 @@ class Step1ParticipateSurvey extends StatelessWidget {
                 child: Column(
                   children: [
                     const SizedBox(height: 10),
-                    _buildWelcomeCard(
-                      context,
-                      getButtonColor(context),
-                    ),
+                    _buildWelcomeCard(context, getButtonColor(context)),
                     const SizedBox(height: 10),
-                    _buildRulesCard(
-                      context,
-                      getButtonColor(context),
-                    ),
-                    if (survey.timeLimitPerQuestion > 0)
-                      _buildTimerCard(
-                        context,
-                        getButtonColor(context),
-                      ),
+                    _buildRulesCard(context, getButtonColor(context)),
+                    if (widget.survey.timeLimitPerQuestion > 0)
+                      _buildTimerCard(context, getButtonColor(context)),
                     const SizedBox(height: 10),
                   ],
                 ),
@@ -77,13 +82,15 @@ class Step1ParticipateSurvey extends StatelessWidget {
         child: buildBottomElevatedButton(
           context: context,
           onPressed: () {
-            Navigator.of(context).push(MaterialPageRoute(
-              builder: (context) => Step2ParticipateSurvey(
-                survey: survey,
-                participant: participant,
-                imageProfile: imageProfile,
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => Step2ParticipateSurvey(
+                  survey: widget.survey,
+                  participant: widget.participant,
+                  imageProfile: widget.imageProfile,
+                ),
               ),
-            ));
+            );
           },
           buttonText: 'start_survey'.tr(),
         ),
@@ -95,23 +102,18 @@ class Step1ParticipateSurvey extends StatelessWidget {
     return Card(
       elevation: 5.0,
       shadowColor: buttonColor,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12.0),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              '${'welcome'.tr()}${participant.name}!',
+              '${'welcome'.tr()}${widget.participant.name}!',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 10),
-            Text(
-              'read_rules'.tr(),
-              textAlign: TextAlign.center,
-            ),
+            Text('read_rules'.tr(), textAlign: TextAlign.center),
           ],
         ),
       ),
@@ -141,7 +143,7 @@ class Step1ParticipateSurvey extends StatelessWidget {
   }
 
   Widget _buildRulesBasedOnSurveyType() {
-    switch (survey.surveyType) {
+    switch (widget.survey.surveyType) {
       case SurveyType.test:
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,17 +166,18 @@ class Step1ParticipateSurvey extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(top: 20),
       elevation: 4.0,
-      shadowColor: Colors.red.withOpacity(0.5), // Red shadow for emphasis
+      shadowColor: Colors.red.withValues(alpha: 0.5), // Red shadow for emphasis
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Center(
           // Center the timer rule text
           child: Text(
-            '${'time_limit_text_1'.tr()} ${survey.timeLimitPerQuestion} ${'time_limit_text_2'.tr()}',
+            '${'time_limit_text_1'.tr()} ${widget.survey.timeLimitPerQuestion} ${'time_limit_text_2'.tr()}',
             style: const TextStyle(
-                fontStyle: FontStyle.italic,
-                color: Colors.red), // Red text for urgency
+              fontStyle: FontStyle.italic,
+              color: Colors.red,
+            ), // Red text for urgency
           ),
         ),
       ),

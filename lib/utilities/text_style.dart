@@ -12,21 +12,13 @@ IconThemeData myIconTheme = const IconThemeData(
   size: 30,
 );
 
-Divider dividerSettings = const Divider(
-  height: 20,
-);
+Divider dividerSettings = const Divider(height: 20);
 
-SizedBox sizedBoxSettings = const SizedBox(
-  height: 10,
-);
+SizedBox sizedBoxSettings = const SizedBox(height: 10);
 
-SizedBox sizedBoxSettingsSmall = const SizedBox(
-  height: 10,
-);
+SizedBox sizedBoxSettingsSmall = const SizedBox(height: 10);
 
-SizedBox sizeSettingsLarge = const SizedBox(
-  height: 40,
-);
+SizedBox sizeSettingsLarge = const SizedBox(height: 40);
 
 Color getButtonColor(BuildContext context) {
   return ThemeBasedAppColors.getColor(context, 'buttonColor');

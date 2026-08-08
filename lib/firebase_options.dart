@@ -51,7 +51,8 @@ class DefaultFirebaseOptions {
     appId: '1:913078029574:android:60812c5ad1286c5976a287',
     messagingSenderId: '913078029574',
     projectId: 'survey-app-ks',
-    databaseURL: 'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'survey-app-ks.appspot.com',
   );
 
@@ -60,7 +61,8 @@ class DefaultFirebaseOptions {
     appId: '1:913078029574:ios:83c80a76f7cd3e4d76a287',
     messagingSenderId: '913078029574',
     projectId: 'survey-app-ks',
-    databaseURL: 'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'survey-app-ks.appspot.com',
     iosBundleId: 'com.example.flutterAppKs',
   );
@@ -70,7 +72,8 @@ class DefaultFirebaseOptions {
     appId: '1:913078029574:ios:ccd3cfcd5b0868b076a287',
     messagingSenderId: '913078029574',
     projectId: 'survey-app-ks',
-    databaseURL: 'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
+    databaseURL:
+        'https://survey-app-ks-default-rtdb.europe-west1.firebasedatabase.app',
     storageBucket: 'survey-app-ks.appspot.com',
     iosBundleId: 'com.example.flutterAppKs.RunnerTests',
   );

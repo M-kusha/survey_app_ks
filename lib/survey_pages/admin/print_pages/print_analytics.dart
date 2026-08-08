@@ -79,9 +79,10 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
               child: pw.Text(
                 '${'analytics_off'.tr()} ${widget.survey.surveyName}',
                 style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColors.blueGrey),
+                  fontSize: 20,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blueGrey,
+                ),
               ),
             ),
           ),
@@ -124,7 +125,9 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
 
                         return pw.Padding(
                           padding: const pw.EdgeInsets.symmetric(
-                              vertical: 5, horizontal: 10),
+                            vertical: 5,
+                            horizontal: 10,
+                          ),
                           child: pw.Container(
                             height: 40,
                             decoration: pw.BoxDecoration(
@@ -140,8 +143,8 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
                               children: [
                                 pw.Padding(
                                   padding: const pw.EdgeInsets.only(
-                                      left:
-                                          10), // Adjust text padding as needed
+                                    left: 10,
+                                  ), // Adjust text padding as needed
                                   child: pw.Text(
                                     option,
                                     style: optionTextStyle,
@@ -154,10 +157,10 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
                                     color: percentage >= 75
                                         ? PdfColors.green
                                         : percentage >= 50
-                                            ? PdfColors.blueGrey
-                                            : percentage >= 25
-                                                ? PdfColors.orange
-                                                : PdfColors.red,
+                                        ? PdfColors.blueGrey
+                                        : percentage >= 25
+                                        ? PdfColors.orange
+                                        : PdfColors.red,
                                     borderRadius: pw.BorderRadius.circular(5),
                                   ),
                                   child: pw.Stack(
@@ -207,15 +210,10 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('pdf_print'.tr()),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text('pdf_print'.tr()), centerTitle: true),
       body: _pdfDocument == null
           ? const Center(child: CircularProgressIndicator())
-          : PdfPreview(
-              build: (format) => _pdfDocument!.save(),
-            ),
+          : PdfPreview(build: (format) => _pdfDocument!.save()),
     );
   }
 }

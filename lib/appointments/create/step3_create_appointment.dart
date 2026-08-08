@@ -30,9 +30,8 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => Step4CreateAppointment(
-            appointment: _newAppointment,
-          ),
+          builder: (context) =>
+              Step4CreateAppointment(appointment: _newAppointment),
         ),
       );
     } else {}
@@ -43,18 +42,18 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
     super.didChangeDependencies();
     _newAppointment =
         ModalRoute.of(context)!.settings.arguments as Appointment? ??
-            Appointment(
-              title: '',
-              description: '',
-              availableDates: [],
-              availableTimeSlots: [],
-              appointmentId: '',
-              confirmedTimeSlots: [],
-              expirationDate: DateTime.now(),
-              participationCount: 0,
-              participants: [],
-              creationDate: DateTime.now(),
-            );
+        Appointment(
+          title: '',
+          description: '',
+          availableDates: [],
+          availableTimeSlots: [],
+          appointmentId: '',
+          confirmedTimeSlots: [],
+          expirationDate: DateTime.now(),
+          participationCount: 0,
+          participants: [],
+          creationDate: DateTime.now(),
+        );
   }
 
   // function to show date picker
@@ -132,14 +131,13 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
 
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-            'create_appointment'.tr(),
-            style: TextStyle(
-              fontSize: timeFontSize * 1.5,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text(
+          'create_appointment'.tr(),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
+        ),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -165,7 +163,8 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
                 elevation: 5,
                 shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15)),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: InkWell(
                   onTap: () => _selectExpirationDate(context),
                   child: Padding(
@@ -183,16 +182,18 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
                           DateFormat("EEEE, d MMMM y").format(_expirationDate),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              fontSize: timeFontSize * 1.1,
-                              fontWeight: FontWeight.bold,
-                              color: getListTileColor(context)),
+                            fontSize: timeFontSize * 1.1,
+                            fontWeight: FontWeight.bold,
+                            color: getListTileColor(context),
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'tap_to_change'.tr(),
                           style: TextStyle(
-                              fontSize: timeFontSize * 0.8,
-                              color: getListTileColor(context)),
+                            fontSize: timeFontSize * 0.8,
+                            color: getListTileColor(context),
+                          ),
                         ),
                       ],
                     ),

@@ -44,8 +44,9 @@ class _ProfileSectionState extends State<ProfileSection> {
       String filePath = 'profile_images/$userId.jpg';
       await FirebaseStorage.instance.ref(filePath).putFile(file);
 
-      String downloadURL =
-          await FirebaseStorage.instance.ref(filePath).getDownloadURL();
+      String downloadURL = await FirebaseStorage.instance
+          .ref(filePath)
+          .getDownloadURL();
 
       await FirebaseFirestore.instance.collection('users').doc(userId).update({
         'profileImage': downloadURL,
@@ -70,7 +71,8 @@ class _ProfileSectionState extends State<ProfileSection> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-              child: CustomLoadingWidget(loadingText: 'loading'));
+            child: CustomLoadingWidget(loadingText: 'loading'),
+          );
         }
 
         if (!snapshot.hasData) {
@@ -100,33 +102,38 @@ class _ProfileSectionState extends State<ProfileSection> {
                               width: fontSize * 6,
                               height: fontSize * 6,
                               fit: BoxFit.cover,
-                              loadingBuilder: (BuildContext context,
-                                  Widget child,
-                                  ImageChunkEvent? loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return SizedBox(
-                                  width: fontSize * 6,
-                                  height: fontSize * 6,
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      value:
-                                          loadingProgress.expectedTotalBytes !=
+                              loadingBuilder:
+                                  (
+                                    BuildContext context,
+                                    Widget child,
+                                    ImageChunkEvent? loadingProgress,
+                                  ) {
+                                    if (loadingProgress == null) return child;
+                                    return SizedBox(
+                                      width: fontSize * 6,
+                                      height: fontSize * 6,
+                                      child: Center(
+                                        child: CircularProgressIndicator(
+                                          value:
+                                              loadingProgress
+                                                      .expectedTotalBytes !=
                                                   null
                                               ? loadingProgress
-                                                      .cumulativeBytesLoaded /
-                                                  loadingProgress
-                                                      .expectedTotalBytes!
+                                                        .cumulativeBytesLoaded /
+                                                    loadingProgress
+                                                        .expectedTotalBytes!
                                               : null,
-                                    ),
-                                  ),
-                                );
-                              },
+                                        ),
+                                      ),
+                                    );
+                                  },
                             ),
                           ),
                         if (_isUploading)
                           CircularProgressIndicator(
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                getButtonColor(context)),
+                              getButtonColor(context),
+                            ),
                           ),
                         if (userProfilePic == null && !_isUploading)
                           Icon(

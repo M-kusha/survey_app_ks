@@ -97,12 +97,14 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       leading: _userHasParticipated
           ? IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: _navigateToHomePage)
+              onPressed: _navigateToHomePage,
+            )
           : canPop
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: () => Navigator.of(context).pop())
-              : null,
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(context).pop(),
+            )
+          : null,
     );
   }
 
@@ -110,15 +112,20 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(widget.appointment.title,
-            style: TextStyle(fontSize: fontSize * 1.5)),
+        Text(
+          widget.appointment.title,
+          style: TextStyle(fontSize: fontSize * 1.5),
+        ),
         const SizedBox(width: 8),
       ],
     );
   }
 
   Widget _buildBody(
-      BuildContext context, bool isButtonDisabled, double fontSize) {
+    BuildContext context,
+    bool isButtonDisabled,
+    double fontSize,
+  ) {
     return Stack(
       children: [
         Column(
@@ -135,7 +142,10 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   }
 
   Widget _buildTabBar(
-      BuildContext context, bool isButtonDisabled, double fontSize) {
+    BuildContext context,
+    bool isButtonDisabled,
+    double fontSize,
+  ) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25.0),
       child: Row(
@@ -176,7 +186,7 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
         overlayColor: WidgetStateColor.resolveWith(
           (states) => isButtonDisabled
               ? Colors.transparent
-              : Colors.grey.withOpacity(0.1),
+              : Colors.grey.withValues(alpha: 0.1),
         ),
       ),
       child: Text(
@@ -194,19 +204,20 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-            flex: 2,
-            child: Container(
-                height: 2,
-                color: participateSelected
-                    ? getButtonColor(context)
-                    : Colors.grey)),
+          flex: 2,
+          child: Container(
+            height: 2,
+            color: participateSelected ? getButtonColor(context) : Colors.grey,
+          ),
+        ),
         Expanded(flex: 0, child: Container(height: 2, color: Colors.black)),
         Expanded(
-            flex: 2,
-            child: Container(
-                height: 2,
-                color:
-                    overviewSelected ? getButtonColor(context) : Colors.grey)),
+          flex: 2,
+          child: Container(
+            height: 2,
+            color: overviewSelected ? getButtonColor(context) : Colors.grey,
+          ),
+        ),
       ],
     );
   }
@@ -233,8 +244,9 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
       child: MultiProvider(
         providers: [
           StreamProvider<List<TimeSlot>>.value(
-            value: appointmentService
-                .streamConfirmedTimeSlots(widget.appointment.appointmentId),
+            value: appointmentService.streamConfirmedTimeSlots(
+              widget.appointment.appointmentId,
+            ),
             initialData: const [],
           ),
         ],
@@ -254,8 +266,9 @@ class UserSelectCategoriesState extends State<UserSelectCategories> {
   }
 
   void _onNextPressed() async {
-    appointmentService
-        .updateParticipationCount(widget.appointment.appointmentId);
+    appointmentService.updateParticipationCount(
+      widget.appointment.appointmentId,
+    );
     setState(() {
       overviewSelected = true;
       participateSelected = false;

@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 
 class DialogUtils {
   static Future<void> displayAddNoteDialog(
-      BuildContext context,
-      TextEditingController textEditingController,
-      TodoListBackend backend) async {
+    BuildContext context,
+    TextEditingController textEditingController,
+    TodoListBackend backend,
+  ) async {
     return showDialog(
       context: context,
       builder: (context) {
@@ -14,9 +15,7 @@ class DialogUtils {
           title: Text('add_note'.tr()),
           content: TextField(
             controller: textEditingController,
-            decoration: InputDecoration(
-              hintText: 'write_note'.tr(),
-            ),
+            decoration: InputDecoration(hintText: 'write_note'.tr()),
           ),
           actions: <Widget>[
             ElevatedButton(

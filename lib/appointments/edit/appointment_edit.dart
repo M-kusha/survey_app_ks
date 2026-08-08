@@ -32,7 +32,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
   late PageController _pageController;
   late List<Widget> _pages;
   int _currentPageIndex = 0;
-  get _appointmentService => AppointmentService();
+  AppointmentService get _appointmentService => AppointmentService();
 
   @override
   void initState() {
@@ -67,9 +67,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
       appBar: AppBar(
         title: Text(
           ' ${'appointment_edit'.tr()} ${widget.appointment.title}',
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
-          ),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
         ),
         centerTitle: true,
       ),

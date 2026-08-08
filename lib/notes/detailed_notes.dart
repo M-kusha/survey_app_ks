@@ -9,8 +9,11 @@ class DetailedNotePage extends StatefulWidget {
   final String noteId;
   final String title;
 
-  const DetailedNotePage(
-      {super.key, required this.noteId, required this.title});
+  const DetailedNotePage({
+    super.key,
+    required this.noteId,
+    required this.title,
+  });
 
   @override
   DetailedNotePageState createState() => DetailedNotePageState();
@@ -27,8 +30,9 @@ class DetailedNotePageState extends State<DetailedNotePage> {
   }
 
   void _initializeController() async {
-    final loadedController =
-        await _notesBackend.loadNoteController(widget.noteId);
+    final loadedController = await _notesBackend.loadNoteController(
+      widget.noteId,
+    );
     if (mounted) {
       setState(() {
         _controller = loadedController;
@@ -47,15 +51,10 @@ class DetailedNotePageState extends State<DetailedNotePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${'edit_note'.tr()} ${widget.title}',
-        ),
+        title: Text('${'edit_note'.tr()} ${widget.title}'),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _onSavePressed,
-          ),
+          IconButton(icon: const Icon(Icons.save), onPressed: _onSavePressed),
         ],
       ),
       body: Column(
@@ -63,11 +62,9 @@ class DetailedNotePageState extends State<DetailedNotePage> {
           Card(
             elevation: 5,
             shadowColor: getButtonColor(context),
-            child: QuillToolbar.simple(
-              configurations: QuillSimpleToolbarConfigurations(
-                controller: _controller,
-                sharedConfigurations: const QuillSharedConfigurations(),
-              ),
+            child: QuillSimpleToolbar(
+              controller: _controller,
+              config: const QuillSimpleToolbarConfig(),
             ),
           ),
           Expanded(
@@ -77,17 +74,16 @@ class DetailedNotePageState extends State<DetailedNotePage> {
                 elevation: 5,
                 shadowColor: getButtonColor(context),
                 child: QuillEditor.basic(
-                  configurations: QuillEditorConfigurations(
+                  controller: _controller,
+                  config: QuillEditorConfig(
                     placeholder: 'start_writting'.tr(),
                     padding: const EdgeInsets.all(8),
-                    controller: _controller,
                     scrollable: true,
-                    sharedConfigurations: const QuillSharedConfigurations(),
                   ),
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );

@@ -13,11 +13,12 @@ class Register3step extends StatefulWidget {
   final ProfileType profileType;
   final String? companyId;
 
-  const Register3step(
-      {super.key,
-      required this.registerLogic,
-      required this.profileType,
-      this.companyId});
+  const Register3step({
+    super.key,
+    required this.registerLogic,
+    required this.profileType,
+    this.companyId,
+  });
 
   @override
   Register3stepState createState() => Register3stepState();
@@ -41,8 +42,9 @@ class Register3stepState extends State<Register3step> {
   void _updateStrength(String password) {
     bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
     bool hasLowercase = password.contains(RegExp(r'[a-z]'));
-    bool hasDigitsOrSpecialCharacters =
-        password.contains(RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'));
+    bool hasDigitsOrSpecialCharacters = password.contains(
+      RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'),
+    );
     final length = password.length;
 
     double strength = 0.0;
@@ -54,7 +56,9 @@ class Register3stepState extends State<Register3step> {
     if (hasUppercase &&
         hasLowercase &&
         hasDigitsOrSpecialCharacters &&
-        length > 6) strength = 1.0;
+        length > 6) {
+      strength = 1.0;
+    }
 
     setState(() {
       _strength = strength;
@@ -76,7 +80,7 @@ class Register3stepState extends State<Register3step> {
   Color _getConfirmPasswordBorderColor() {
     bool passwordsMatch =
         _passwordController.text == _confirmPasswordController.text &&
-            _passwordController.text.isNotEmpty;
+        _passwordController.text.isNotEmpty;
 
     return passwordsMatch ? Colors.green : Colors.grey;
   }
@@ -132,7 +136,8 @@ class Register3stepState extends State<Register3step> {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(
-            builder: (context) => const RegistrationSuccessPage()),
+          builder: (context) => const RegistrationSuccessPage(),
+        ),
         (Route<dynamic> route) => false,
       );
     } on FirebaseAuthException catch (e) {
@@ -154,20 +159,23 @@ class Register3stepState extends State<Register3step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text('set_your_password'.tr()),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text('set_your_password'.tr()),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: _isSaving
           ? const Center(
-              child: CustomLoadingWidget(
-              loadingText: 'saving_regisration',
-            ))
+              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
+            )
           : Center(
               child: Card(
                 shadowColor: getButtonColor(
-                    context), // ThemeBasedAppColors.getColor(context, 'buttonColor'
+                  context,
+                ), // ThemeBasedAppColors.getColor(context, 'buttonColor'
                 margin: const EdgeInsets.symmetric(
-                    vertical: 50.0, horizontal: 25.0),
+                  vertical: 50.0,
+                  horizontal: 25.0,
+                ),
                 elevation: 5,
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
@@ -195,24 +203,22 @@ class Register3stepState extends State<Register3step> {
                         obscureText: !_isPasswordVisible,
                         decoration: InputDecoration(
                           labelText: 'set_your_password'.tr(),
-                          hintStyle: const TextStyle(
-                            fontSize: 10,
-                          ),
+                          hintStyle: const TextStyle(fontSize: 10),
                           border: OutlineInputBorder(
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(12)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
+                            ),
                             borderSide: BorderSide(
                               color: _getConfirmPasswordBorderColor(),
                               width: 1.0,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(12)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
+                            ),
                             borderSide: BorderSide(
-                              color: _getBorderColorBasedOnStrength(
-                                _strength,
-                              ),
+                              color: _getBorderColorBasedOnStrength(_strength),
                               width: 2.0,
                             ),
                           ),
@@ -242,16 +248,18 @@ class Register3stepState extends State<Register3step> {
                         decoration: InputDecoration(
                           labelText: 'confirm_password'.tr(),
                           border: OutlineInputBorder(
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(12)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
+                            ),
                             borderSide: BorderSide(
                               color: _getConfirmPasswordBorderColor(),
                               width: 1.0,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius:
-                                const BorderRadius.all(Radius.circular(12)),
+                            borderRadius: const BorderRadius.all(
+                              Radius.circular(12),
+                            ),
                             borderSide: BorderSide(
                               color: _getConfirmPasswordBorderColor(),
                               width: 2.0,

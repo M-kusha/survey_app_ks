@@ -25,10 +25,11 @@ class NotesBackend {
       final data = docSnapshot.data() as Map<String, dynamic>;
       final content = data['content'] as List<dynamic>?;
       return quill.QuillController(
-          document: content != null
-              ? quill.Document.fromJson(content)
-              : quill.Document(),
-          selection: const TextSelection.collapsed(offset: 0));
+        document: content != null
+            ? quill.Document.fromJson(content)
+            : quill.Document(),
+        selection: const TextSelection.collapsed(offset: 0),
+      );
     }
 
     return quill.QuillController.basic();
@@ -36,7 +37,8 @@ class NotesBackend {
 
   Future<void> saveNote(String noteId, quill.QuillController controller) async {
     final content = controller.document.toDelta().toJson();
-    await getNoteDocumentReference(noteId)
-        .set({'content': content}, SetOptions(merge: true));
+    await getNoteDocumentReference(
+      noteId,
+    ).set({'content': content}, SetOptions(merge: true));
   }
 }

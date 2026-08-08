@@ -51,8 +51,9 @@ class BottomNavigationState extends State<BottomNavigation> {
         showUnselectedLabels: true,
         selectedFontSize: 12, // Adjust font size if necessary
         unselectedFontSize: 12,
-        selectedItemColor:
-            getButtonColor(context), // Saturated color for light theme
+        selectedItemColor: getButtonColor(
+          context,
+        ), // Saturated color for light theme
         unselectedItemColor: Theme.of(context).brightness == Brightness.dark
             ? Colors.grey[600] // Muted for dark theme
             : Colors.grey[500],

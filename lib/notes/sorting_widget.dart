@@ -18,31 +18,32 @@ class SortingWidget extends StatelessWidget {
     final buttonColor = getButtonColor(context);
 
     return CustomPopupMenuButton(
-        buttonColor: buttonColor,
-        selectedOption: selectedSortOption,
-        onOptionSelected: onSortOptionSelected,
-        menuItems: [
-          PopupMenuItemModel(
-            text: 'sort_newest'.tr(),
-            value: 0,
-            icon: Icons.new_releases,
-          ),
-          PopupMenuItemModel(
-            text: 'sort_oldest'.tr(),
-            value: 1,
-            icon: Icons.history,
-          ),
-          PopupMenuItemModel(
-            text: 'sort_completed'.tr(),
-            value: 2,
-            icon: Icons.check_circle,
-          ),
-          PopupMenuItemModel(
-            text: 'sort_uncompleted'.tr(),
-            value: 3,
-            icon: Icons.remove_circle,
-          ),
-        ],
-        listTileColor: getListTileColor(context));
+      buttonColor: buttonColor,
+      selectedOption: selectedSortOption,
+      onOptionSelected: onSortOptionSelected,
+      menuItems: [
+        PopupMenuItemModel(
+          text: 'sort_newest'.tr(),
+          value: 0,
+          icon: Icons.new_releases,
+        ),
+        PopupMenuItemModel(
+          text: 'sort_oldest'.tr(),
+          value: 1,
+          icon: Icons.history,
+        ),
+        PopupMenuItemModel(
+          text: 'sort_completed'.tr(),
+          value: 2,
+          icon: Icons.check_circle,
+        ),
+        PopupMenuItemModel(
+          text: 'sort_uncompleted'.tr(),
+          value: 3,
+          icon: Icons.remove_circle,
+        ),
+      ],
+      listTileColor: getListTileColor(context),
+    );
   }
 }

@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 class NumberCarouselSlider extends StatefulWidget {
   final Function(int)? onNumberChanged;
   final int startValue;
-  final CarouselController carouselController;
+  final CarouselSliderController carouselController;
 
   const NumberCarouselSlider({
     this.onNumberChanged,
@@ -49,10 +49,7 @@ class _NumberCarouselSliderState extends State<NumberCarouselSlider> {
         return Builder(
           builder: (BuildContext context) {
             return Padding(
-              padding: const EdgeInsets.only(
-                left: 40,
-                right: 40,
-              ),
+              padding: const EdgeInsets.only(left: 40, right: 40),
               child: Card(
                 shadowColor: getButtonColor(context),
                 elevation: 5,
@@ -60,7 +57,9 @@ class _NumberCarouselSliderState extends State<NumberCarouselSlider> {
                   child: Text(
                     seconds == 0 ? "Unlimited" : "$seconds sec",
                     style: TextStyle(
-                        fontSize: fontSize, color: getListTileColor(context)),
+                      fontSize: fontSize,
+                      color: getListTileColor(context),
+                    ),
                   ),
                 ),
               ),

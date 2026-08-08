@@ -6,8 +6,11 @@ class ImpressumOptionsWidget extends StatefulWidget {
   final IconData icon;
   final String title;
 
-  const ImpressumOptionsWidget(
-      {super.key, required this.icon, required this.title});
+  const ImpressumOptionsWidget({
+    super.key,
+    required this.icon,
+    required this.title,
+  });
 
   @override
   ImpressumOptionsWidgetState createState() => ImpressumOptionsWidgetState();
@@ -31,13 +34,13 @@ class ImpressumOptionsWidgetState extends State<ImpressumOptionsWidget> {
                 Row(
                   children: [
                     Icon(widget.icon, size: fontSize + 15),
-                    const SizedBox(
-                      width: 10,
-                    ),
+                    const SizedBox(width: 10),
                     Text(
                       widget.title,
                       style: TextStyle(
-                          fontSize: fontSize, fontWeight: FontWeight.bold),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),

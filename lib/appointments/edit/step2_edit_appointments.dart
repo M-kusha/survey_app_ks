@@ -25,33 +25,56 @@ class AppointmentEditPageStep2 extends StatefulWidget {
 class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
   Future<void> _showDatePicker(int index) async {
     final DateTime? pickedDateRange = await showDatePicker(
-        context: context,
-        initialDate: DateTime.now(),
-        firstDate: DateTime.now(),
-        lastDate: DateTime(2101));
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
 
     if (pickedDateRange != null && mounted) {
-      final TimeOfDay? pickedStartTime =
-          await showTimePicker(context: context, initialTime: TimeOfDay.now());
+      final TimeOfDay? pickedStartTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.now(),
+      );
 
       if (pickedStartTime != null && mounted) {
         final TimeOfDay? pickedEndTime = await showTimePicker(
-            context: context, initialTime: pickedStartTime);
+          context: context,
+          initialTime: pickedStartTime,
+        );
 
         if (pickedEndTime != null && mounted) {
           _updateTimeSlots(
-              pickedDateRange, pickedStartTime, pickedEndTime, index);
+            pickedDateRange,
+            pickedStartTime,
+            pickedEndTime,
+            index,
+          );
         }
       }
     }
   }
 
-  void _updateTimeSlots(DateTime pickedDateRange, TimeOfDay pickedStartTime,
-      TimeOfDay pickedEndTime, int index) {
-    final startDateTime = DateTime(pickedDateRange.year, pickedDateRange.month,
-        pickedDateRange.day, pickedStartTime.hour, pickedStartTime.minute);
-    final endDateTime = DateTime(pickedDateRange.year, pickedDateRange.month,
-        pickedDateRange.day, pickedEndTime.hour, pickedEndTime.minute);
+  void _updateTimeSlots(
+    DateTime pickedDateRange,
+    TimeOfDay pickedStartTime,
+    TimeOfDay pickedEndTime,
+    int index,
+  ) {
+    final startDateTime = DateTime(
+      pickedDateRange.year,
+      pickedDateRange.month,
+      pickedDateRange.day,
+      pickedStartTime.hour,
+      pickedStartTime.minute,
+    );
+    final endDateTime = DateTime(
+      pickedDateRange.year,
+      pickedDateRange.month,
+      pickedDateRange.day,
+      pickedEndTime.hour,
+      pickedEndTime.minute,
+    );
     setState(() {
       widget.appointment.availableDates[index] = pickedDateRange;
       widget.appointment.availableTimeSlots[index].start = startDateTime;
@@ -81,7 +104,9 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
 
   Widget _buildDateButton(DateTime date, int index) {
     final timeFontSize = getTimeFontSize(
-        context, Provider.of<FontSizeProvider>(context).fontSize);
+      context,
+      Provider.of<FontSizeProvider>(context).fontSize,
+    );
 
     return InkWell(
       onTap: () => _showDatePicker(index),
@@ -125,8 +150,9 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
                     '${DateFormat.jm().format(widget.appointment.availableTimeSlots[index].start)} - ${DateFormat.jm().format(widget.appointment.availableTimeSlots[index].end)}',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: timeFontSize,
-                        color: getListTileColor(context)),
+                      fontSize: timeFontSize,
+                      color: getListTileColor(context),
+                    ),
                   ),
                 ],
               ),
@@ -147,7 +173,9 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
 
   Widget buildAddDatesButton(BuildContext context) {
     final timeFontSize = getTimeFontSize(
-        context, Provider.of<FontSizeProvider>(context).fontSize);
+      context,
+      Provider.of<FontSizeProvider>(context).fontSize,
+    );
 
     return FloatingActionButton(
       onPressed: _addDate,
@@ -159,7 +187,9 @@ class AppointmentEditPageStep2State extends State<AppointmentEditPageStep2> {
   @override
   Widget build(BuildContext context) {
     final timeFontSize = getTimeFontSize(
-        context, Provider.of<FontSizeProvider>(context).fontSize);
+      context,
+      Provider.of<FontSizeProvider>(context).fontSize,
+    );
 
     return Scaffold(
       body: Column(

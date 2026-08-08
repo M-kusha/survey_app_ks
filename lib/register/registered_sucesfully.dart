@@ -23,7 +23,10 @@ class RegistrationSuccessPageState extends State<RegistrationSuccessPage> {
       } else {
         _timer.cancel();
         Navigator.pushNamedAndRemoveUntil(
-            context, '/login', (Route<dynamic> route) => false);
+          context,
+          '/login',
+          (Route<dynamic> route) => false,
+        );
       }
     });
   }
@@ -70,19 +73,18 @@ class RegistrationSuccessPageState extends State<RegistrationSuccessPage> {
                 Text(
                   "${tr("you_will_be_redirected")} $_counter ${tr("registration_seconds")}.",
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 18,
-                  ),
+                  style: const TextStyle(fontSize: 18),
                 ),
                 const SizedBox(height: 40),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pushNamedAndRemoveUntil(
-                        context, '/login', (Route<dynamic> route) => false);
+                      context,
+                      '/login',
+                      (Route<dynamic> route) => false,
+                    );
                   },
-                  child: Text(
-                    tr("back_to_login"),
-                  ),
+                  child: Text(tr("back_to_login")),
                 ),
               ],
             ),

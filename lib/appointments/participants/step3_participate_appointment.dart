@@ -32,8 +32,10 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
 
   @override
   Widget build(BuildContext context) {
-    final fontSize =
-        Provider.of<FontSizeProvider>(context, listen: false).fontSize;
+    final fontSize = Provider.of<FontSizeProvider>(
+      context,
+      listen: false,
+    ).fontSize;
     final confirmedTimeSlots = Provider.of<List<TimeSlot>>(context);
 
     return Scaffold(
@@ -44,10 +46,12 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
           final date = widget.appointment.availableDates.length > index
               ? widget.appointment.availableDates[index]
               : DateTime.now();
-          final isConfirmed = confirmedTimeSlots.any((cts) =>
-              cts.start == timeSlot.start &&
-              cts.end == timeSlot.end &&
-              cts.isConfirmed);
+          final isConfirmed = confirmedTimeSlots.any(
+            (cts) =>
+                cts.start == timeSlot.start &&
+                cts.end == timeSlot.end &&
+                cts.isConfirmed,
+          );
 
           return buildTimeSlotCard(
             context,
@@ -101,9 +105,10 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
     return Text(
       '${DateFormat.jm().format(timeSlot.start)} - ${DateFormat.jm().format(timeSlot.end)}',
       style: TextStyle(
-          fontSize: fontSize * 1.0,
-          fontWeight: FontWeight.bold,
-          color: Colors.grey),
+        fontSize: fontSize * 1.0,
+        fontWeight: FontWeight.bold,
+        color: Colors.grey,
+      ),
     );
   }
 
@@ -111,11 +116,9 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: getButtonColor(context).withOpacity(0.1),
+        color: getButtonColor(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: getButtonColor(context),
-        ),
+        border: Border.all(color: getButtonColor(context)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -142,25 +145,27 @@ class ParticipantOverviewPageState extends State<ParticipantOverviewPage>
   Widget buildLeadingIcon(BuildContext context, bool isConfirmed) {
     return CircleAvatar(
       backgroundColor: getButtonColor(context),
-      child: Icon(
-        isConfirmed ? Icons.alarm_on_outlined : Icons.alarm,
-      ),
+      child: Icon(isConfirmed ? Icons.alarm_on_outlined : Icons.alarm),
     );
   }
 
   void navigateToTimeSlotParticipantsPage(
-      BuildContext context, TimeSlot timeSlot) {
+    BuildContext context,
+    TimeSlot timeSlot,
+  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => StreamProvider<List<TimeSlot>>.value(
           initialData: const [],
-          value: _appointmentService
-              .streamConfirmedTimeSlots(widget.appointment.appointmentId),
+          value: _appointmentService.streamConfirmedTimeSlots(
+            widget.appointment.appointmentId,
+          ),
           child: TimeSlotParticipantsPage(
-              appointment: widget.appointment,
-              timeSlot: timeSlot,
-              isAdmin: widget.isAdmin),
+            appointment: widget.appointment,
+            timeSlot: timeSlot,
+            isAdmin: widget.isAdmin,
+          ),
         ),
       ),
     );

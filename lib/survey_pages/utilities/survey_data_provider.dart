@@ -52,15 +52,21 @@ class SurveyDataProvider extends ChangeNotifier {
 
     List<Future> checks = [];
     for (var survey in _surveys) {
-      checks.add(FirebaseFirestore.instance
-          .collection('surveys')
-          .doc(survey.id)
-          .collection('participants')
-          .doc(userId)
-          .get()
-          .then((doc) => userParticipationStatus[survey.id] = doc.exists &&
-              (doc.data() as Map<String, dynamic>)['participantSubmitted'] ==
-                  true));
+      checks.add(
+        FirebaseFirestore.instance
+            .collection('surveys')
+            .doc(survey.id)
+            .collection('participants')
+            .doc(userId)
+            .get()
+            .then(
+              (doc) => userParticipationStatus[survey.id] =
+                  doc.exists &&
+                  (doc.data()
+                          as Map<String, dynamic>)['participantSubmitted'] ==
+                      true,
+            ),
+      );
     }
 
     await Future.wait(checks);
@@ -115,8 +121,10 @@ class UserDataProvider extends ChangeNotifier {
   Future<void> loadCurrentUser() async {
     String userId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    DocumentSnapshot userDoc =
-        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .get();
     if (userDoc.exists) {
       _currentUser = UserModel.fromFirestore(userDoc);
       notifyListeners();

@@ -44,10 +44,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
 
   void _onNextPressed() async {
     if (_titleController.text.isEmpty || _descriptionController.text.isEmpty) {
-      UIUtils.showSnackBar(
-        context,
-        'create_appointment_error_snackbar'.tr(),
-      );
+      UIUtils.showSnackBar(context, 'create_appointment_error_snackbar'.tr());
     } else if (_formKey.currentState!.validate()) {
       Navigator.pushNamed(
         context,
@@ -66,9 +63,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
       appBar: AppBar(
         title: Text(
           'create_appointment'.tr(),
-          style: TextStyle(
-            fontSize: timeFontSize * 1.5,
-          ),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
         ),
         centerTitle: true,
       ),
@@ -139,10 +134,11 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
                               keyboardType: TextInputType.multiline,
                               textInputAction: TextInputAction.newline,
                               decoration: InputDecoration(
-                                hintText:
-                                    'create_appointment_description_hint'.tr(),
-                                hintStyle:
-                                    TextStyle(fontSize: timeFontSize * 1.2),
+                                hintText: 'create_appointment_description_hint'
+                                    .tr(),
+                                hintStyle: TextStyle(
+                                  fontSize: timeFontSize * 1.2,
+                                ),
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {

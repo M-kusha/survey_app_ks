@@ -37,14 +37,13 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
 
     return Scaffold(
       appBar: AppBar(
-          title: Text(
-            'create_survey'.tr(),
-            style: TextStyle(
-              fontSize: timeFontSize * 1.5,
-            ),
-          ),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text(
+          'create_survey'.tr(),
+          style: TextStyle(fontSize: timeFontSize * 1.5),
+        ),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -53,7 +52,8 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
               elevation: 5,
               shadowColor: getButtonColor(context),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15)),
+                borderRadius: BorderRadius.circular(15),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -70,9 +70,10 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
                           : 'test_created_successfully'.tr(),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                          fontSize: timeFontSize * 1.2,
-                          fontWeight: FontWeight.bold,
-                          color: getListTileColor(context)),
+                        fontSize: timeFontSize * 1.2,
+                        fontWeight: FontWeight.bold,
+                        color: getListTileColor(context),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(
@@ -91,19 +92,26 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
                       ),
                       child: InkWell(
                         onTap: () => copyToClipboard(
-                            context, widget.survey.id, timeFontSize),
+                          context,
+                          widget.survey.id,
+                          timeFontSize,
+                        ),
                         child: Container(
                           decoration: BoxDecoration(
                             color: getAppbarColor(context),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           padding: const EdgeInsets.symmetric(
-                              vertical: 12, horizontal: 20),
+                            vertical: 12,
+                            horizontal: 20,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.content_copy,
-                                  size: timeFontSize * 1.2),
+                              Icon(
+                                Icons.content_copy,
+                                size: timeFontSize * 1.2,
+                              ),
                               const SizedBox(width: 10),
                               Text(
                                 widget.survey.surveyType == SurveyType.survey
@@ -132,11 +140,13 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
     );
   }
 
-  Widget buildInformationCard(BuildContext context,
-      {required String title,
-      required String subtitle,
-      required IconData iconData,
-      required double fontSize}) {
+  Widget buildInformationCard(
+    BuildContext context, {
+    required String title,
+    required String subtitle,
+    required IconData iconData,
+    required double fontSize,
+  }) {
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -150,9 +160,13 @@ class Step4CreateSurveyState extends State<Step4CreateSurvey> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title,
-                      style: TextStyle(
-                          fontSize: fontSize, fontWeight: FontWeight.bold)),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: fontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   const SizedBox(height: 8),
                   Text(subtitle, style: TextStyle(fontSize: fontSize)),
                 ],

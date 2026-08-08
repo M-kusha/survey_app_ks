@@ -36,9 +36,10 @@ class Register1stepState extends State<Register1step> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Text('register'.tr()),
-          centerTitle: true,
-          backgroundColor: getAppbarColor(context)),
+        title: Text('register'.tr()),
+        centerTitle: true,
+        backgroundColor: getAppbarColor(context),
+      ),
       body: Center(
         child: Card(
           shadowColor: getButtonColor(context), // Use the color
@@ -98,9 +99,7 @@ class Register1stepState extends State<Register1step> {
           onPressed: () {
             Navigator.of(context).pop();
           },
-          child: Text(
-            'login_title'.tr(),
-          ),
+          child: Text('login_title'.tr()),
         ),
       ],
     );
@@ -113,12 +112,13 @@ class UserTypeCard extends StatelessWidget {
   final VoidCallback onTap;
   final Color color;
 
-  const UserTypeCard(
-      {super.key,
-      required this.userType,
-      required this.icon,
-      required this.onTap,
-      required this.color});
+  const UserTypeCard({
+    super.key,
+    required this.userType,
+    required this.icon,
+    required this.onTap,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {

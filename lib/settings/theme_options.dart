@@ -10,8 +10,11 @@ class ThemeOptionsWidget extends StatefulWidget {
   final IconData icon;
   final String title;
 
-  const ThemeOptionsWidget(
-      {super.key, required this.icon, required this.title});
+  const ThemeOptionsWidget({
+    super.key,
+    required this.icon,
+    required this.title,
+  });
 
   @override
   ThemeOptionsWidgetState createState() => ThemeOptionsWidgetState();
@@ -36,42 +39,46 @@ class ThemeOptionsWidgetState extends State<ThemeOptionsWidget> {
     Color buttonColor = getButtonColor(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Row(
-          children: [
-            Icon(widget.icon, size: fontSize + 15),
-            const SizedBox(
-              width: 10,
-            ),
-            Text(
-              widget.title,
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(seconds: 1),
-          child: Transform.scale(
-            scale: 0.7,
-            child: CupertinoSwitch(
-              activeColor: buttonColor,
-              trackColor: Colors.grey,
-              value: _light,
-              onChanged: (value) {
-                setState(() {
-                  _light = value;
-                  if (_light) {
-                    AdaptiveTheme.of(context).setDark();
-                  } else {
-                    AdaptiveTheme.of(context).setLight();
-                  }
-                  SettingsController().saveThemeBool(_light);
-                });
-              },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(widget.icon, size: fontSize + 15),
+              const SizedBox(width: 10),
+              Text(
+                widget.title,
+                style: TextStyle(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          AnimatedSwitcher(
+            duration: const Duration(seconds: 1),
+            child: Transform.scale(
+              scale: 0.7,
+              child: CupertinoSwitch(
+                activeTrackColor: buttonColor,
+                inactiveTrackColor: Colors.grey,
+                value: _light,
+                onChanged: (value) {
+                  setState(() {
+                    _light = value;
+                    if (_light) {
+                      AdaptiveTheme.of(context).setDark();
+                    } else {
+                      AdaptiveTheme.of(context).setLight();
+                    }
+                    SettingsController().saveThemeBool(_light);
+                  });
+                },
+              ),
             ),
           ),
-        ),
-      ]),
+        ],
+      ),
     );
   }
 }

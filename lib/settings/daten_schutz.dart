@@ -6,8 +6,11 @@ class DatenSchutzOptionsWidget extends StatefulWidget {
   final IconData icon;
   final String title;
 
-  const DatenSchutzOptionsWidget(
-      {super.key, required this.icon, required this.title});
+  const DatenSchutzOptionsWidget({
+    super.key,
+    required this.icon,
+    required this.title,
+  });
 
   @override
   DatenSchutzOptionsWidgetState createState() =>
@@ -32,13 +35,13 @@ class DatenSchutzOptionsWidgetState extends State<DatenSchutzOptionsWidget> {
                 Row(
                   children: [
                     Icon(widget.icon, size: fontSize + 15),
-                    const SizedBox(
-                      width: 10,
-                    ),
+                    const SizedBox(width: 10),
                     Text(
                       widget.title,
                       style: TextStyle(
-                          fontSize: fontSize, fontWeight: FontWeight.bold),
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),

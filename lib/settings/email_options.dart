@@ -8,11 +8,7 @@ class EmailOptions extends StatelessWidget {
   final IconData icon;
   final String title;
 
-  const EmailOptions({
-    super.key,
-    required this.icon,
-    required this.title,
-  });
+  const EmailOptions({super.key, required this.icon, required this.title});
 
   @override
   Widget build(BuildContext context) {
@@ -26,9 +22,7 @@ class EmailOptions extends StatelessWidget {
           Row(
             children: [
               Icon(icon, size: fontSize + 15),
-              const SizedBox(
-                width: 10,
-              ),
+              const SizedBox(width: 10),
               Text(
                 title,
                 style: TextStyle(
@@ -41,8 +35,8 @@ class EmailOptions extends StatelessWidget {
           Transform.scale(
             scale: 0.7,
             child: CupertinoSwitch(
-              activeColor: buttonColor,
-              trackColor: Colors.grey,
+              activeTrackColor: buttonColor,
+              inactiveTrackColor: Colors.grey,
               value: true,
               onChanged: (bool newValue) {},
             ),

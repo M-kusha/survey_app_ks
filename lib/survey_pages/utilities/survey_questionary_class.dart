@@ -180,10 +180,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
 
-enum SurveyType {
-  survey,
-  test,
-}
+enum SurveyType { survey, test }
 
 class Survey {
   String surveyName;
@@ -249,9 +246,7 @@ class Survey {
       questions: questions,
       id: uniqueId,
       participants: participants,
-      deadline: DateTime.now().add(
-        const Duration(days: 7),
-      ),
+      deadline: DateTime.now().add(const Duration(days: 7)),
       companyId: '',
     );
   }
@@ -284,8 +279,11 @@ class Survey {
     List<Participant> participants = [];
     if (data['participants'] != null) {
       participants = (data['participants'] as List)
-          .map((participantData) => Participant.fromFirestore(
-              participantData as Map<String, dynamic>))
+          .map(
+            (participantData) => Participant.fromFirestore(
+              participantData as Map<String, dynamic>,
+            ),
+          )
           .toList();
     }
 
@@ -332,7 +330,7 @@ class Participant {
     this.participations = const [],
   });
 
-  toFirestoreMap() {
+  Map<String, dynamic> toFirestoreMap() {
     return {
       'userId': userId,
       'name': name,
@@ -356,11 +354,13 @@ class Participant {
       textAnswer: data['textAnswer'] as String? ?? '',
       participantSubmitted: data['participantSubmitted'] as bool? ?? false,
       imageProfile: data['imageProfile'] as String? ?? '',
-      textAnswersReviewed:
-          Map<String, bool>.from(data['textAnswersReviewed'] ?? {}),
+      textAnswersReviewed: Map<String, bool>.from(
+        data['textAnswersReviewed'] ?? {},
+      ),
       totalCorrectAnswers: data['totalCorrectAnswers'] ?? 0,
-      participations:
-          List<Map<String, dynamic>>.from(data['participations'] ?? []),
+      participations: List<Map<String, dynamic>>.from(
+        data['participations'] ?? [],
+      ),
     );
   }
 }

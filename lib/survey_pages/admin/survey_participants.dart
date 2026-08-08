@@ -13,11 +13,12 @@ class SurveyParticipantsPage extends StatefulWidget {
   final Survey survey;
   final String surveyId;
 
-  const SurveyParticipantsPage(
-      {super.key,
-      required this.participants,
-      required this.survey,
-      required this.surveyId});
+  const SurveyParticipantsPage({
+    super.key,
+    required this.participants,
+    required this.survey,
+    required this.surveyId,
+  });
 
   @override
   SurveyParticipantsPageState createState() => SurveyParticipantsPageState();
@@ -107,23 +108,28 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                 : null,
             child: participant.imageProfile.isEmpty
                 ? participant.imageProfile.isNotEmpty
-                    ? const CustomLoadingWidget()
-                    : Text(
-                        participant.name[0],
-                        style: TextStyle(fontSize: fontSize),
-                      )
+                      ? const CustomLoadingWidget()
+                      : Text(
+                          participant.name[0],
+                          style: TextStyle(fontSize: fontSize),
+                        )
                 : null,
           ),
-          title: Text(participant.name,
-              style:
-                  TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold)),
+          title: Text(
+            participant.name,
+            style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
+          ),
           subtitle: Text(
-              '${'correct_answers'.tr()} ${participant.totalCorrectAnswers}/ ${widget.survey.questions.length}'),
-          trailing: Text('(${participant.score.toStringAsFixed(1)}%)',
-              style: TextStyle(
-                  fontSize: fontSize,
-                  fontWeight: FontWeight.bold,
-                  color: scoreColor)),
+            '${'correct_answers'.tr()} ${participant.totalCorrectAnswers}/ ${widget.survey.questions.length}',
+          ),
+          trailing: Text(
+            '(${participant.score.toStringAsFixed(1)}%)',
+            style: TextStyle(
+              fontSize: fontSize,
+              fontWeight: FontWeight.bold,
+              color: scoreColor,
+            ),
+          ),
         ),
       ),
     );
@@ -155,7 +161,10 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 
   PopupMenuButton<int> buildPopupMenuButton(
-      BuildContext context, Color buttonColor, Color listTileColor) {
+    BuildContext context,
+    Color buttonColor,
+    Color listTileColor,
+  ) {
     return PopupMenuButton<int>(
       icon: Icon(Icons.sort, color: buttonColor),
       onSelected: (value) => setState(() => selectedSortOption = value),

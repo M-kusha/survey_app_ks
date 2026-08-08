@@ -79,7 +79,8 @@ class AppointmentEditPageStep3State extends State<AppointmentEditPageStep3> {
                 elevation: 5,
                 shadowColor: getButtonColor(context),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15)),
+                  borderRadius: BorderRadius.circular(15),
+                ),
                 child: InkWell(
                   onTap: () => _selectExpirationDate(context),
                   child: Padding(
@@ -97,16 +98,18 @@ class AppointmentEditPageStep3State extends State<AppointmentEditPageStep3> {
                           DateFormat("EEEE, d MMMM y").format(_expirationDate),
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                              fontSize: timeFontSize * 1.1,
-                              fontWeight: FontWeight.bold,
-                              color: getListTileColor(context)),
+                            fontSize: timeFontSize * 1.1,
+                            fontWeight: FontWeight.bold,
+                            color: getListTileColor(context),
+                          ),
                         ),
                         const SizedBox(height: 8),
                         Text(
                           'tap_to_change'.tr(),
                           style: TextStyle(
-                              fontSize: timeFontSize * 0.8,
-                              color: getListTileColor(context)),
+                            fontSize: timeFontSize * 0.8,
+                            color: getListTileColor(context),
+                          ),
                         ),
                       ],
                     ),

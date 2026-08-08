@@ -34,17 +34,11 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
       return;
     }
 
-    _answerCounts = List.generate(
-      widget.survey.questions.length,
-      (index) {
-        Map<String, dynamic> questionData = widget.survey.questions[index];
+    _answerCounts = List.generate(widget.survey.questions.length, (index) {
+      Map<String, dynamic> questionData = widget.survey.questions[index];
 
-        return List.generate(
-          questionData['options'].length,
-          (index) => 0,
-        );
-      },
-    );
+      return List.generate(questionData['options'].length, (index) => 0);
+    });
 
     for (var participant in widget.participants) {
       participant.surveyAnswers.forEach((surveyId, answers) {
@@ -131,18 +125,27 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
             widget.survey.questions[questionIndex];
 
         return _buildQuestionCard(
-            context, questionData, questionIndex, fontSize);
+          context,
+          questionData,
+          questionIndex,
+          fontSize,
+        );
       },
     );
   }
 
-  Widget _buildQuestionCard(BuildContext context,
-      Map<String, dynamic> questionData, int questionIndex, double fontSize) {
+  Widget _buildQuestionCard(
+    BuildContext context,
+    Map<String, dynamic> questionData,
+    int questionIndex,
+    double fontSize,
+  ) {
     String question = questionData['question'];
     List<dynamic> options = questionData['options'];
 
-    int totalVotesForQuestion =
-        _answerCounts[questionIndex].reduce((a, b) => a + b);
+    int totalVotesForQuestion = _answerCounts[questionIndex].reduce(
+      (a, b) => a + b,
+    );
 
     return Card(
       elevation: 4.0,
@@ -164,8 +167,13 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
             ),
             const SizedBox(height: 20),
             ...List<Widget>.generate(options.length, (optionIndex) {
-              return _buildOptionRow(context, questionIndex, optionIndex,
-                  fontSize, totalVotesForQuestion);
+              return _buildOptionRow(
+                context,
+                questionIndex,
+                optionIndex,
+                fontSize,
+                totalVotesForQuestion,
+              );
             }),
           ],
         ),
@@ -173,8 +181,13 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
     );
   }
 
-  Widget _buildOptionRow(BuildContext context, int questionIndex,
-      int optionIndex, double fontSize, int totalVotesForQuestion) {
+  Widget _buildOptionRow(
+    BuildContext context,
+    int questionIndex,
+    int optionIndex,
+    double fontSize,
+    int totalVotesForQuestion,
+  ) {
     String option =
         widget.survey.questions[questionIndex]['options'][optionIndex];
     int voteCount = _answerCounts[questionIndex][optionIndex];
@@ -262,9 +275,10 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
           Text(
             '${percentage.toStringAsFixed(1)}%',
             style: TextStyle(
-                fontSize: fontSize * 0.75,
-                color: barColor,
-                fontWeight: FontWeight.bold),
+              fontSize: fontSize * 0.75,
+              color: barColor,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -272,7 +286,9 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
   }
 
   Color _dynamicColorBasedOnPercentage(
-      BuildContext context, double percentage) {
+    BuildContext context,
+    double percentage,
+  ) {
     if (percentage >= 75) {
       return Colors.green;
     } else if (percentage >= 50) {

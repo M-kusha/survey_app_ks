@@ -44,8 +44,8 @@ class RegisterLogic {
       'createdAt': FieldValue.serverTimestamp(),
       if (profileType == ProfileType.company && selectedCompanyName != null)
         'companyName': selectedCompanyName,
-      if (companyId != null) 'companyId': companyId,
-      if (imageUrl != null) 'profileImage': imageUrl,
+      'companyId': ?companyId,
+      'profileImage': ?imageUrl,
     };
 
     await FirebaseFirestore.instance.collection('users').doc(uid).set(userData);
@@ -61,23 +61,23 @@ class RegisterLogic {
   }
 
   Future<List<Map<String, dynamic>>> searchCompanies(String query) async {
-    final querySnapshot =
-        await FirebaseFirestore.instance.collection('companies').get();
+    final querySnapshot = await FirebaseFirestore.instance
+        .collection('companies')
+        .get();
     return querySnapshot.docs
-        .map((doc) => {
-              'id': doc.id,
-              'name': doc.data()['name'] as String,
-            })
-        .where((company) => company['name']
-            .toString()
-            .toLowerCase()
-            .contains(query.toLowerCase()))
+        .map((doc) => {'id': doc.id, 'name': doc.data()['name'] as String})
+        .where(
+          (company) => company['name'].toString().toLowerCase().contains(
+            query.toLowerCase(),
+          ),
+        )
         .toList();
   }
 
   Future<String> _uploadProfileImage(String uid) async {
-    final storageRef =
-        FirebaseStorage.instance.ref().child('profile_images/$uid');
+    final storageRef = FirebaseStorage.instance.ref().child(
+      'profile_images/$uid',
+    );
     final uploadTask = storageRef.putFile(profileImage!);
     final snapshot = await uploadTask.whenComplete(() => null);
     return await snapshot.ref.getDownloadURL();

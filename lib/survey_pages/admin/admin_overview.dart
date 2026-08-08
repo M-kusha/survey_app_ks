@@ -10,11 +10,12 @@ class AdminOverviewPage extends StatefulWidget {
   final Survey survey;
   final List<Participant> participants;
 
-  const AdminOverviewPage(
-      {super.key,
-      required this.surveyId,
-      required this.survey,
-      required this.participants});
+  const AdminOverviewPage({
+    super.key,
+    required this.surveyId,
+    required this.survey,
+    required this.participants,
+  });
 
   @override
   AdminOverviewPageState createState() => AdminOverviewPageState();
@@ -28,8 +29,10 @@ class AdminOverviewPageState extends State<AdminOverviewPage> {
     super.initState();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<SurveyDataProvider>(context, listen: false)
-          .loadParticipants(widget.surveyId);
+      Provider.of<SurveyDataProvider>(
+        context,
+        listen: false,
+      ).loadParticipants(widget.surveyId);
     });
   }
 

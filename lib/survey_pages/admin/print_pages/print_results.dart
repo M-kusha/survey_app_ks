@@ -52,8 +52,10 @@ class PDFResultsState extends State<PDFResults> {
   }
 
   Future<pw.Document> _generatePdf() async {
-    var fontSizeProvider =
-        Provider.of<FontSizeProvider>(context, listen: false);
+    var fontSizeProvider = Provider.of<FontSizeProvider>(
+      context,
+      listen: false,
+    );
     var fontSize = fontSizeProvider.fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
     final pdf = pw.Document();
@@ -61,16 +63,19 @@ class PDFResultsState extends State<PDFResults> {
     List<pw.Widget> answerWidgets = [];
     List<pw.Widget> textAnswerWidgets = [];
 
-    for (int index = 0;
-        index < widget.participant.surveyAnswers.length;
-        index++) {
+    for (
+      int index = 0;
+      index < widget.participant.surveyAnswers.length;
+      index++
+    ) {
       String surveyId = widget.participant.surveyAnswers.keys.elementAt(index);
       Map<String, dynamic> questionData =
           widget.survey.questions[int.parse(surveyId.substring(1))];
       List<dynamic> answers = widget.participant.surveyAnswers[surveyId] ?? [];
       String question = questionData['question'];
-      List<String>? options =
-          questionData['options']?.map<String>((e) => e.toString()).toList();
+      List<String>? options = questionData['options']
+          ?.map<String>((e) => e.toString())
+          .toList();
       String uniqueQuestionKey = "${widget.survey.id}-$surveyId";
 
       if (questionData['type'] == 'Text') {
@@ -92,8 +97,9 @@ class PDFResultsState extends State<PDFResults> {
                   child: pw.Text(
                     answers.join(', '),
                     style: pw.TextStyle(
-                      color:
-                          isAnswerConfirmed ? PdfColors.white : PdfColors.black,
+                      color: isAnswerConfirmed
+                          ? PdfColors.white
+                          : PdfColors.black,
                       fontSize: 18,
                     ),
                     textAlign: pw.TextAlign.center,
@@ -110,14 +116,16 @@ class PDFResultsState extends State<PDFResults> {
       } else {
         List<pw.Widget> optionWidgets = [];
 
-        for (int optionIndex = 0;
-            optionIndex < options!.length;
-            optionIndex++) {
+        for (
+          int optionIndex = 0;
+          optionIndex < options!.length;
+          optionIndex++
+        ) {
           String option = options[optionIndex];
           bool isSelected = answers.contains(optionIndex);
           bool isCorrect = false;
-          List<int>? correctAnswers =
-              questionData['correctAnswers']?.cast<int>();
+          List<int>? correctAnswers = questionData['correctAnswers']
+              ?.cast<int>();
           int singleCorrectAnswer = questionData['correctAnswer'] ?? -1;
 
           if (questionData['type'] == "Single") {
@@ -130,8 +138,8 @@ class PDFResultsState extends State<PDFResults> {
           PdfColor bgColor = isCorrect
               ? PdfColors.green
               : isSelected
-                  ? PdfColors.red300
-                  : PdfColors.grey200;
+              ? PdfColors.red300
+              : PdfColors.grey200;
 
           optionWidgets.add(
             pw.Container(
@@ -181,24 +189,25 @@ class PDFResultsState extends State<PDFResults> {
 
     pdf.addPage(
       _buildPdfPage(
-          widget.participant.name, widget.participant.score, answerWidgets),
+        widget.participant.name,
+        widget.participant.score,
+        answerWidgets,
+      ),
     );
 
-    pdf.addPage(
-      _buildTextAnswersPage(textAnswerWidgets),
-    );
+    pdf.addPage(_buildTextAnswersPage(textAnswerWidgets));
 
     return pdf;
   }
 
   pw.Widget _buildQuestionCard(
-      String question, pw.Widget answerDisplay, double timeFontSize) {
+    String question,
+    pw.Widget answerDisplay,
+    double timeFontSize,
+  ) {
     return pw.Container(
       decoration: pw.BoxDecoration(
-        border: pw.Border.all(
-          color: PdfColors.grey,
-          width: 1,
-        ),
+        border: pw.Border.all(color: PdfColors.grey, width: 1),
         borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
       ),
       margin: const pw.EdgeInsets.all(7),
@@ -234,7 +243,10 @@ class PDFResultsState extends State<PDFResults> {
   }
 
   pw.MultiPage _buildPdfPage(
-      String name, double score, List<pw.Widget> answerWidgets) {
+    String name,
+    double score,
+    List<pw.Widget> answerWidgets,
+  ) {
     return pw.MultiPage(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       pageFormat: PdfPageFormat.a4,
@@ -305,15 +317,10 @@ class PDFResultsState extends State<PDFResults> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('pdf_print'.tr()),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: Text('pdf_print'.tr()), centerTitle: true),
       body: _pdfDocument == null
           ? const Center(child: CircularProgressIndicator())
-          : PdfPreview(
-              build: (format) => _pdfDocument!.save(),
-            ),
+          : PdfPreview(build: (format) => _pdfDocument!.save()),
     );
   }
 }

@@ -30,8 +30,9 @@ class AppointmentEditPageStep1State extends State<AppointmentEditPageStep1> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.appointment.title);
-    _descriptionController =
-        TextEditingController(text: widget.appointment.description);
+    _descriptionController = TextEditingController(
+      text: widget.appointment.description,
+    );
   }
 
   @override
