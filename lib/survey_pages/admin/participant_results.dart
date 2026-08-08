@@ -2,6 +2,8 @@ import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_results.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -30,33 +32,65 @@ class ParticipantAnswersPage extends StatefulWidget {
 class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   Map<String, dynamic> textQuestionStatus = {};
   FirebaseSurveyService firebaseSurveyService = FirebaseSurveyService();
-  void confirmCorrectAnswer(String surveyId, String questionId,
-      String participantId, bool isCorrect) async {
-    String uniqueQuestionKey = '$surveyId-$questionId';
+  Future<void> confirmCorrectAnswer(
+    String surveyId,
+    String questionId,
+    String participantId,
+    bool isCorrect,
+  ) async {
+    final reviews = Map<String, bool>.from(
+      widget.participant.textAnswersReviewed,
+    )..['$surveyId-$questionId'] = isCorrect;
 
-    final newTextAnswersReviewed =
-        Map<String, bool>.from(widget.participant.textAnswersReviewed)
-          ..[uniqueQuestionKey] = isCorrect;
-    final totalQuestions = widget.survey.questions.length;
-    final valuePerQuestion = 100 / totalQuestions;
-    final newCorrectAnswersCount = isCorrect
-        ? widget.participant.totalCorrectAnswers + 1
-        : widget.participant.totalCorrectAnswers;
-    final newScore = isCorrect
-        ? widget.participant.score + valuePerQuestion
-        : widget.participant.score;
+    // Re-grade the whole submission instead of nudging the stored totals.
+    // Adding a fixed slice per verdict meant marking one answer correct twice
+    // counted it twice, and reversing a verdict never took the marks back off.
+    final grade = SurveyScorer.grade(
+      surveyId: surveyId,
+      questions: widget.survey.questions,
+      answers: widget.participant.surveyAnswers,
+      textReviews: reviews,
+    );
+
+    final previous = (
+      reviews: widget.participant.textAnswersReviewed,
+      score: widget.participant.score,
+      correct: widget.participant.totalCorrectAnswers,
+    );
 
     setState(() {
-      widget.participant.totalCorrectAnswers = newCorrectAnswersCount;
-      widget.participant.score = newScore;
-      widget.participant.textAnswersReviewed = newTextAnswersReviewed;
+      widget.participant.textAnswersReviewed = reviews;
+      widget.participant.score = grade.percentage;
+      widget.participant.totalCorrectAnswers = grade.correctCount;
     });
 
-    await firebaseSurveyService.updateTextAnswersReviewed(
-        surveyId, participantId, newTextAnswersReviewed);
-    await firebaseSurveyService.updateScore(surveyId, participantId, newScore);
-    await firebaseSurveyService.updateCorrectAnswersCount(
-        surveyId, participantId, newCorrectAnswersCount);
+    try {
+      await firebaseSurveyService.updateTextAnswersReviewed(
+        surveyId,
+        participantId,
+        reviews,
+      );
+      await firebaseSurveyService.updateScore(
+        surveyId,
+        participantId,
+        grade.percentage,
+      );
+      await firebaseSurveyService.updateCorrectAnswersCount(
+        surveyId,
+        participantId,
+        grade.correctCount,
+      );
+    } catch (_) {
+      // Roll the optimistic update back so the reviewer never sees a mark that
+      // was not actually persisted.
+      if (!mounted) return;
+      setState(() {
+        widget.participant.textAnswersReviewed = previous.reviews;
+        widget.participant.score = previous.score;
+        widget.participant.totalCorrectAnswers = previous.correct;
+      });
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
   }
 
   @override
@@ -119,14 +153,20 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   ) {
     List<dynamic> answers = widget.participant.surveyAnswers[surveyId] ?? [];
     String question = questionData['question'];
-    List<String> options = (questionData['options'] as List<dynamic>?)
+    List<String> options =
+        (questionData['options'] as List<dynamic>?)
             ?.map((e) => e.toString())
             .toList() ??
         ['True', 'False'];
     Widget answerDisplay;
     if (questionData['type'] == 'Text') {
       answerDisplay = buildTextAnswerDisplay(
-          questionData, surveyId, answers, widget.participant.userId, fontSize);
+        questionData,
+        surveyId,
+        answers,
+        widget.participant.userId,
+        fontSize,
+      );
     } else {
       answerDisplay = buildOptionsAnswerDisplay(options, answers, questionData);
     }
@@ -140,8 +180,11 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
             Container(
               constraints: BoxConstraints(
                 minWidth: double.infinity,
-                minHeight: getTimeFontSize(context,
-                        Provider.of<FontSizeProvider>(context).fontSize) *
+                minHeight:
+                    getTimeFontSize(
+                      context,
+                      Provider.of<FontSizeProvider>(context).fontSize,
+                    ) *
                     3,
               ),
               child: Padding(
@@ -149,8 +192,10 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                 child: Text(
                   question,
                   style: TextStyle(
-                    fontSize: getTimeFontSize(context,
-                        Provider.of<FontSizeProvider>(context).fontSize),
+                    fontSize: getTimeFontSize(
+                      context,
+                      Provider.of<FontSizeProvider>(context).fontSize,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: _textColor(context),
                   ),
@@ -186,22 +231,31 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         color: bgColor,
         child: ListTile(
-          title: Text(answers.join(', '),
-              style: TextStyle(color: Colors.black, fontSize: fontSize)),
+          title: Text(
+            answers.join(', '),
+            style: TextStyle(color: Colors.black, fontSize: fontSize),
+          ),
           trailing: isReviewed
               ? Icon(Icons.check, color: getCardColor(context))
               : IconButton(
                   icon: const Icon(Icons.check, color: Colors.grey),
                   onPressed: () => confirmCorrectAnswer(
-                      widget.survey.id, questionId, participantId, true),
+                    widget.survey.id,
+                    questionId,
+                    participantId,
+                    true,
+                  ),
                 ),
         ),
       ),
     );
   }
 
-  Widget buildOptionsAnswerDisplay(List<String> options, List<dynamic> answers,
-      Map<String, dynamic> questionData) {
+  Widget buildOptionsAnswerDisplay(
+    List<String> options,
+    List<dynamic> answers,
+    Map<String, dynamic> questionData,
+  ) {
     bool isSingleChoice = questionData['type'] == "Single";
 
     List<dynamic>? correctAnswers;
@@ -229,8 +283,10 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
               correctAnswers != null && correctAnswers.contains(optionIndex);
         }
 
-        Widget leadingIcon =
-            Icon(Icons.radio_button_unchecked, color: getCardColor(context));
+        Widget leadingIcon = Icon(
+          Icons.radio_button_unchecked,
+          color: getCardColor(context),
+        );
         Color bgColor = Colors.grey[200]!;
 
         if (isSelected) {
@@ -268,7 +324,7 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                     ),
                   ),
                   if (isSelected)
-                    Icon(Icons.person, color: getCardColor(context))
+                    Icon(Icons.person, color: getCardColor(context)),
                 ],
               ),
             ),
@@ -282,10 +338,7 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          child: buildScoreData(),
-        ),
+        Container(padding: const EdgeInsets.all(16), child: buildScoreData()),
         IconButton(
           onPressed: () async {
             Navigator.of(context).push(
@@ -299,14 +352,16 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
             );
           },
           icon: const Icon(Icons.print),
-        )
+        ),
       ],
     );
   }
 
   Widget buildScoreData() {
-    final fontSize =
-        Provider.of<FontSizeProvider>(context, listen: false).fontSize;
+    final fontSize = Provider.of<FontSizeProvider>(
+      context,
+      listen: false,
+    ).fontSize;
     final timeFontSize = getTimeFontSize(context, fontSize);
 
     TextSpan buildTextSpan(String text, {Color? color, bool isBold = false}) {

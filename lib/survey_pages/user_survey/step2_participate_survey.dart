@@ -4,6 +4,7 @@ import 'package:echomeet/survey_pages/user_survey/question_card.dart';
 import 'package:echomeet/survey_pages/user_survey/step3_participate_survey.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
@@ -61,8 +62,9 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
     _remainingTime = seconds;
     _questionTimer?.cancel();
     if (_isTimed) {
-      _questionTimer =
-          Timer.periodic(const Duration(seconds: 1), (Timer timer) {
+      _questionTimer = Timer.periodic(const Duration(seconds: 1), (
+        Timer timer,
+      ) {
         if (_remainingTime > 0) {
           setState(() => _remainingTime--);
         } else {
@@ -77,7 +79,9 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
     if (_isTimed &&
         _pageController.page!.round() < widget.survey.questions.length - 1) {
       _pageController.nextPage(
-          duration: const Duration(milliseconds: 300), curve: Curves.easeInOut);
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
     }
 
     if (_pageController.page!.round() == widget.survey.questions.length - 1) {
@@ -103,7 +107,8 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-              '${"welcome".tr()} ${widget.participant.name.split(' ')[0]}'),
+            '${"welcome".tr()} ${widget.participant.name.split(' ')[0]}',
+          ),
           centerTitle: true,
           automaticallyImplyLeading:
               widget.survey.surveyType == SurveyType.survey,
@@ -148,7 +153,7 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
           style: TextStyle(
             fontSize: 18,
             color: Theme.of(context).brightness == Brightness.light
-                ? Colors.black.withOpacity(0.8)
+                ? Colors.black.withValues(alpha: 0.8)
                 : Colors.white,
             fontWeight: FontWeight.bold,
           ),
@@ -158,13 +163,13 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
   }
 
   Widget _buildSurveyContent() {
-    return Stack(children: [
-      _buildPageView(),
-      _buildNavigationControls(),
-      const SizedBox(
-        height: 50,
-      )
-    ]);
+    return Stack(
+      children: [
+        _buildPageView(),
+        _buildNavigationControls(),
+        const SizedBox(height: 50),
+      ],
+    );
   }
 
   Widget _buildPageView() {
@@ -213,7 +218,9 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
       icon: const Icon(Icons.arrow_back),
       onPressed: _currentPage.value > 0
           ? () => _pageController.previousPage(
-              duration: const Duration(milliseconds: 300), curve: Curves.ease)
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.ease,
+            )
           : null,
     );
   }
@@ -232,7 +239,9 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
       onPressed: () {
         if (_currentPage.value < widget.survey.questions.length - 1) {
           _pageController.nextPage(
-              duration: const Duration(milliseconds: 300), curve: Curves.ease);
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.ease,
+          );
         } else {
           _submitAnswers();
         }
@@ -247,11 +256,12 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
     Map<String, List<dynamic>> surveyAnswersMap = {};
 
     for (int i = 0; i < widget.survey.questions.length; i++) {
-      surveyAnswersMap['Q$i'] = _userAnswers[i];
+      surveyAnswersMap[SurveyScorer.answerKey(i)] = _userAnswers[i];
     }
 
-    bool isAnyQuestionNotChosen =
-        _userAnswers.any((answers) => answers.isEmpty);
+    bool isAnyQuestionNotChosen = _userAnswers.any(
+      (answers) => answers.isEmpty,
+    );
     if (!timerActive && isAnyQuestionNotChosen) {
       UIUtils.showSnackBar(context, 'please_answer_all_questions'.tr());
 
@@ -259,102 +269,43 @@ class Step2ParticipateSurveyState extends State<Step2ParticipateSurvey> {
       return;
     }
 
-    int totalCorrectAnswers = calculateCorrectAnswers();
+    // Score and correct-answer count come from a single grading pass, so the
+    // two figures stored in Firestore can never contradict each other.
+    final grade = SurveyScorer.grade(
+      surveyId: widget.survey.id,
+      questions: widget.survey.questions,
+      answers: surveyAnswersMap,
+      textReviews: widget.participant.textAnswersReviewed,
+    );
 
-    double score = calculateScore();
-    widget.participant.score = score;
+    widget.participant.score = grade.percentage;
     widget.participant.surveyAnswers = surveyAnswersMap;
-    widget.participant.participantSubmitted;
-    widget.participant.totalCorrectAnswers = totalCorrectAnswers;
+    widget.participant.participantSubmitted = true;
+    widget.participant.totalCorrectAnswers = grade.correctCount;
 
     try {
       await FirebaseSurveyService().submitSurveyAnswers(
         surveyId: widget.survey.id,
         participant: widget.participant,
         answers: surveyAnswersMap,
-        score: score,
+        score: grade.percentage,
         imageProfile: widget.imageProfile,
         textAnswersReviewed: widget.participant.textAnswersReviewed,
-        totalCorrectAnswers: totalCorrectAnswers,
+        totalCorrectAnswers: grade.correctCount,
       );
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(MaterialPageRoute(
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
           builder: (context) => Step3ParticipateSurvey(
-              participant: widget.participant, survey: widget.survey)));
+            participant: widget.participant,
+            survey: widget.survey,
+          ),
+        ),
+      );
     } catch (e) {
+      if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
-    } finally {
       setState(() {});
     }
-  }
-
-  // calculate correct answers
-
-  int calculateCorrectAnswers() {
-    int totalCorrectAnswers = 0;
-
-    for (int i = 0; i < widget.survey.questions.length; i++) {
-      Map<String, dynamic> question = widget.survey.questions[i];
-      List<dynamic> userAnswers = _userAnswers[i];
-
-      if (userAnswers.isNotEmpty) {
-        bool isCorrect = false;
-
-        if (question['type'] == 'Single') {
-          if (userAnswers.first == question['correctAnswer']) {
-            isCorrect = true;
-          }
-        } else if (question['type'] == 'Multiple') {
-          List<dynamic> correctAnswers = question['correctAnswers'];
-          Set<dynamic> userAnswersSet = Set.from(userAnswers);
-          Set<dynamic> correctAnswersSet = Set.from(correctAnswers);
-
-          if (userAnswersSet.length == correctAnswersSet.length &&
-              userAnswersSet.containsAll(correctAnswersSet)) {
-            isCorrect = true;
-          }
-        }
-
-        if (isCorrect) {
-          totalCorrectAnswers++;
-        }
-      }
-    }
-
-    return totalCorrectAnswers;
-  }
-
-  double calculateScore() {
-    double totalScore = 0.0;
-
-    for (int i = 0; i < widget.survey.questions.length; i++) {
-      Map<String, dynamic> question = widget.survey.questions[i];
-      List<dynamic> userAnswers = _userAnswers[i];
-
-      if (userAnswers.isNotEmpty) {
-        double questionScore = 0.0;
-
-        if (question['type'] == 'Single') {
-          if (userAnswers.first == question['correctAnswer']) {
-            questionScore = 1.0;
-          }
-        } else if (question['type'] == 'Multiple') {
-          List<dynamic> correctAnswers = question['correctAnswers'];
-          Set<dynamic> userAnswersSet = Set.from(userAnswers);
-          Set<dynamic> correctAnswersSet = Set.from(correctAnswers);
-
-          int correctCount =
-              userAnswersSet.intersection(correctAnswersSet).length;
-
-          if (correctCount > 0) {
-            questionScore = correctCount / correctAnswersSet.length;
-          }
-        }
-
-        totalScore += questionScore / widget.survey.questions.length;
-      }
-    }
-
-    return totalScore * 100;
   }
 }
