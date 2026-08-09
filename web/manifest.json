@@ -1,11 +1,11 @@
 {
-    "name": "flutter_app_ks",
-    "short_name": "flutter_app_ks",
+    "name": "Echomeet",
+    "short_name": "Echomeet",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#00306B",
+    "theme_color": "#004B96",
+    "description": "Shared notes, meeting scheduling and surveys for small companies.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

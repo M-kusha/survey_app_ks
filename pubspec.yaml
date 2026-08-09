@@ -41,6 +41,46 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# Launcher icons, generated from the sources tool/generate_icon.dart draws.
+#
+#     flutter test tool/generate_icon.dart   # redraw the sources
+#     dart run flutter_launcher_icons        # fan them out to every platform
+#
+# The generated per-platform files are committed, because a checkout has to
+# build without anyone knowing this step exists.
+flutter_launcher_icons:
+  image_path: assets/icon/icon.png
+
+  android: true
+  # Adaptive icons are two layers the launcher masks to whatever shape it likes
+  # — circle, squircle, teardrop. The foreground is transparent with the mark
+  # held well inside the safe area, since the outer third can be cropped.
+  adaptive_icon_background: assets/icon/icon_background.png
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
+  # Monochrome themed icons on Android 13+, where the launcher recolours the
+  # silhouette to match the wallpaper.
+  adaptive_icon_monochrome: assets/icon/icon_foreground.png
+
+  ios: true
+  # The App Store rejects icons with an alpha channel outright.
+  remove_alpha_ios: true
+
+  web:
+    generate: true
+    image_path: assets/icon/icon.png
+    background_color: "#00306B"
+    theme_color: "#004B96"
+
+  windows:
+    generate: true
+    image_path: assets/icon/icon.png
+    icon_size: 256
+
+  macos:
+    generate: true
+    image_path: assets/icon/icon.png
 
 flutter:
   uses-material-design: true
