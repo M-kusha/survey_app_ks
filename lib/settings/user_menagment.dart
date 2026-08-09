@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
@@ -25,10 +28,13 @@ class UserManagementPage extends StatefulWidget {
 class UserManagementPageState extends State<UserManagementPage> {
   final _service = FirebaseSurveyService();
   final _searchController = TextEditingController();
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _membersSubscription;
 
   List<UserModel> _users = [];
+  Set<String> _bannedUserIds = {};
   bool _loading = true;
   String? _errorKey;
+  int _loadGeneration = 0;
 
   bool _canManagePeople = false;
 
@@ -41,19 +47,27 @@ class UserManagementPageState extends State<UserManagementPage> {
 
   @override
   void dispose() {
+    ++_loadGeneration;
+    unawaited(_membersSubscription?.cancel());
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _load() async {
+    final generation = ++_loadGeneration;
+    final previousSubscription = _membersSubscription;
+    _membersSubscription = null;
     setState(() {
       _loading = true;
       _errorKey = null;
     });
 
     try {
+      await previousSubscription?.cancel();
+      if (!mounted || generation != _loadGeneration) return;
+
       final companyId = await FirebaseServices().currentCompanyId();
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       if (companyId == null) {
         setState(() {
@@ -63,8 +77,8 @@ class UserManagementPageState extends State<UserManagementPage> {
         return;
       }
 
-      final snapshot = await _service.fetchUsersByCompanyId(companyId);
       final canManagePeople = await FirebaseServices().canManagePeople();
+      if (!mounted || generation != _loadGeneration) return;
 
       final banned = {
         for (final member in await CompanyAdminService().bannedMembers(
@@ -72,30 +86,58 @@ class UserManagementPageState extends State<UserManagementPage> {
         ))
           member.userId,
       };
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       setState(() {
         _canManagePeople = canManagePeople;
-        _users =
-            snapshot.docs
-                .map(UserModel.fromFirestore)
-                .map((user) => user..banned = banned.contains(user.id))
-                .toList()
-              ..sort((a, b) {
-                final rank = _rank(a.role).compareTo(_rank(b.role));
-                return rank != 0
-                    ? rank
-                    : a.name.toLowerCase().compareTo(b.name.toLowerCase());
-              });
+        _bannedUserIds = banned;
+      });
+
+      _membersSubscription = _service
+          .watchUsersByCompanyId(companyId)
+          .listen(
+            (snapshot) => _applyMembers(snapshot, generation),
+            onError: (Object _) => _handleMembersError(generation),
+          );
+    } catch (_) {
+      _handleMembersError(generation);
+    }
+  }
+
+  void _applyMembers(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    int generation,
+  ) {
+    if (!mounted || generation != _loadGeneration) return;
+
+    try {
+      final users =
+          snapshot.docs
+              .map(UserModel.fromFirestore)
+              .map((user) => user..banned = _bannedUserIds.contains(user.id))
+              .toList()
+            ..sort((a, b) {
+              final rank = _rank(a.role).compareTo(_rank(b.role));
+              return rank != 0
+                  ? rank
+                  : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            });
+      setState(() {
+        _users = users;
         _loading = false;
+        _errorKey = null;
       });
     } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _errorKey = 'error_occurred';
-        _loading = false;
-      });
+      _handleMembersError(generation);
     }
+  }
+
+  void _handleMembersError(int generation) {
+    if (!mounted || generation != _loadGeneration) return;
+    setState(() {
+      _errorKey = 'error_occurred';
+      _loading = false;
+    });
   }
 
   static int _rank(String role) => switch (role) {
@@ -151,7 +193,10 @@ class UserManagementPageState extends State<UserManagementPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    setState(() => user.banned = true);
+    setState(() {
+      _bannedUserIds.add(user.id);
+      user.banned = true;
+    });
 
     try {
       await CompanyAdminService().ban(
@@ -162,7 +207,12 @@ class UserManagementPageState extends State<UserManagementPage> {
       );
     } catch (_) {
       if (!mounted) return;
-      setState(() => user.banned = false);
+      setState(() {
+        _bannedUserIds.remove(user.id);
+        for (final entry in _users) {
+          if (entry.id == user.id) entry.banned = false;
+        }
+      });
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     }
   }

@@ -1,7 +1,11 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
+import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/survey_pages/admin/participant_results.dart';
@@ -59,6 +63,71 @@ class SurveyParticipantsPage extends StatefulWidget {
 
 class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   ParticipantFilter _filter = ParticipantFilter.all;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _membersSubscription;
+  Map<String, ({String storedReference, int revision})> _memberAvatars =
+      const {};
+  int _memberGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _watchMemberAvatars(widget.survey.companyId);
+  }
+
+  @override
+  void didUpdateWidget(covariant SurveyParticipantsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.survey.companyId != widget.survey.companyId) {
+      _watchMemberAvatars(widget.survey.companyId);
+    }
+  }
+
+  void _watchMemberAvatars(String companyId) {
+    final generation = ++_memberGeneration;
+    final previousSubscription = _membersSubscription;
+    _membersSubscription = null;
+    unawaited(previousSubscription?.cancel());
+    _memberAvatars = const {};
+
+    final id = companyId.trim();
+    if (id.isEmpty) return;
+    _membersSubscription = FirebaseFirestore.instance
+        .collection('memberDirectory')
+        .where('companyId', isEqualTo: id)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (!mounted || generation != _memberGeneration) return;
+            final avatars =
+                <String, ({String storedReference, int revision})>{};
+            for (final document in snapshot.docs) {
+              final data = document.data();
+              final storedReference = data['profileImage'];
+              if (storedReference is! String ||
+                  storedReference.trim().isEmpty) {
+                continue;
+              }
+              avatars[document.id] = (
+                storedReference: storedReference.trim(),
+                revision: readProfileImageRevision(
+                  data['profileImageRevision'],
+                ),
+              );
+            }
+            setState(() => _memberAvatars = avatars);
+          },
+          onError: (Object _) {
+            // Historical participant snapshots remain the read-only fallback.
+          },
+        );
+  }
+
+  @override
+  void dispose() {
+    ++_memberGeneration;
+    unawaited(_membersSubscription?.cancel());
+    super.dispose();
+  }
 
   SurveyGrade _gradeFor(Participant participant) =>
       _authoritativeGrade(widget.survey, participant);
@@ -199,22 +268,30 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
       padding: const EdgeInsets.only(bottom: Spacing.xxl),
       itemCount: participants.length,
       separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
-      itemBuilder: (context, index) => _ParticipantRow(
-        survey: widget.survey,
-        participant: participants[index],
-        rank: index + 1,
-        onTap: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ParticipantAnswersPage(
-              participant: participants[index],
-              survey: widget.survey,
+      itemBuilder: (context, index) {
+        final participant = participants[index];
+        final currentAvatar = _memberAvatars[participant.userId];
+        return _ParticipantRow(
+          survey: widget.survey,
+          participant: participant,
+          avatarStoredReference:
+              currentAvatar?.storedReference ?? participant.imageProfile,
+          avatarRevision:
+              currentAvatar?.revision ?? participant.profileImageRevision,
+          rank: index + 1,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ParticipantAnswersPage(
+                participant: participant,
+                survey: widget.survey,
 
-              userId: participants[index].userId,
+                userId: participant.userId,
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -398,12 +475,16 @@ class _ParticipantRow extends StatelessWidget {
   const _ParticipantRow({
     required this.survey,
     required this.participant,
+    required this.avatarStoredReference,
+    required this.avatarRevision,
     required this.rank,
     required this.onTap,
   });
 
   final Survey survey;
   final Participant participant;
+  final String avatarStoredReference;
+  final int avatarRevision;
   final int rank;
   final VoidCallback onTap;
 
@@ -442,7 +523,11 @@ class _ParticipantRow extends StatelessWidget {
               ),
             ),
           ),
-          _Avatar(participant: participant),
+          _Avatar(
+            participant: participant,
+            storedReference: avatarStoredReference,
+            revision: avatarRevision,
+          ),
           const SizedBox(width: Spacing.md),
           Expanded(
             child: Column(
@@ -486,9 +571,15 @@ class _ParticipantRow extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.participant});
+  const _Avatar({
+    required this.participant,
+    required this.storedReference,
+    required this.revision,
+  });
 
   final Participant participant;
+  final String storedReference;
+  final int revision;
 
   @override
   Widget build(BuildContext context) {
@@ -514,8 +605,8 @@ class _Avatar extends StatelessWidget {
                 ),
               ),
               AuthenticatedProfileImage(
-                storedReference: participant.imageProfile,
-                refreshKey: participant.profileImageRevision,
+                storedReference: storedReference,
+                refreshKey: revision,
               ),
             ],
           ),

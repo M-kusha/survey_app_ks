@@ -152,11 +152,13 @@ class FirebaseSurveyService {
     }
   }
 
-  Future<QuerySnapshot> fetchUsersByCompanyId(String companyId) {
-    return FirebaseFirestore.instance
+  Stream<QuerySnapshot<Map<String, dynamic>>> watchUsersByCompanyId(
+    String companyId,
+  ) {
+    return _firestore
         .collection('memberDirectory')
         .where('companyId', isEqualTo: companyId)
-        .get();
+        .snapshots();
   }
 
   Future<void> updateUserRole(String userId, String newRole) async {
