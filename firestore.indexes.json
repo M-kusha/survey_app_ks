@@ -8,6 +8,24 @@
         { "fieldPath": "timeSlot.start", "order": "ASCENDING" },
         { "fieldPath": "timeSlot.end", "order": "ASCENDING" }
       ]
+    },
+    {
+      "//": "companyAdminIds() in the notification functions: who to tell when somebody asks to join. Equality on companyId plus an 'in' on role is two fields, so it needs this.",
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "role", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "CompanyAdminService.pendingCount, which drives the approvals banner.",
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "companyId", "order": "ASCENDING" },
+        { "fieldPath": "membership", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

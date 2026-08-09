@@ -33,31 +33,67 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
+    // A banned member is signed in and has a profile, and is still refused
+    // everything that goes through here — reading the company's surveys,
+    // answering one, voting on a meeting. The one thing left open is their own
+    // user document, so the app can tell them why nothing works.
+    //
+    // Written as an `in` test rather than `profile().banned != true` because
+    // reading a field that was never written is an error in rules, and every
+    // account created before this existed has no such field.
+    function notBanned() {
+      return !('banned' in profile()) || profile().banned != true;
+    }
+
     function hasProfile() {
       return signedIn()
-        && exists(/databases/$(database)/documents/users/$(uid()));
+        && exists(/databases/$(database)/documents/users/$(uid()))
+        && notBanned();
     }
 
     function myCompanyId() {
       return profile().companyId;
     }
 
-    // Mirrors FirebaseServices.fetchAdminStatus on the client.
-    function isAdmin() {
+    // Two levels of privilege, deliberately separate.
+    //
+    // `isStaff` is about *content* — writing surveys and meetings, seeing
+    // results, marking written answers. Moderators are staff.
+    //
+    // `isCompanyAdmin` is about *people* — roles, bans, removals. Moderators
+    // are not, and that is the whole point: a moderator who can promote is an
+    // admin with extra steps. This split is enforced here rather than in the
+    // UI, because a rule is the only version of it an attacker cannot skip.
+    function isStaff() {
       return hasProfile()
         && profile().role in ['admin', 'moderator', 'superadmin'];
     }
 
-    // Same company as the caller. A null companyId never matches, so documents
-    // written before companyId existed stay invisible rather than public.
-    function sameCompany(companyId) {
+    function isCompanyAdmin() {
       return hasProfile()
-        && companyId != null
-        && myCompanyId() == companyId;
+        && profile().role in ['admin', 'superadmin'];
     }
 
+    // Same company as the caller, *and* entitled to be there.
+    //
+    // A null companyId never matches, so documents written before companyId
+    // existed stay invisible rather than public. Pending and banned members
+    // fail here too, which is the whole access model in one function: they can
+    // sign in, keep their notes and go and find another company, but the
+    // content of this one is closed to them.
+    function sameCompany(companyId) {
+      return activeIn(companyId);
+    }
+
+    /// Content privilege inside one company. Named `adminOf` throughout the
+    /// content rules below; it includes moderators.
     function adminOf(companyId) {
-      return isAdmin() && sameCompany(companyId);
+      return isStaff() && sameCompany(companyId);
+    }
+
+    /// People privilege inside one company. Admins and the owner only.
+    function companyAdminOf(companyId) {
+      return isCompanyAdmin() && sameCompany(companyId);
     }
 
     // True when the caller created this company, which is how "I am registering
@@ -71,6 +107,56 @@ service cloud.firestore {
 
     function fieldUnchanged(field) {
       return request.resource.data[field] == resource.data[field];
+    }
+
+    // ---------- membership ----------
+    //
+    // A ban is a document under the company, not a flag on the person:
+    // `companies/{c}/bans/{uid}`. That is what lets the account outlive it. The
+    // banned member keeps their login, their notes and their ability to go and
+    // join somewhere else, and the company keeps a list it can work from — one
+    // it does not lose the moment that person moves on, which a flag on the
+    // user document would.
+    function bannedFrom(companyId) {
+      return companyId != null
+        && companyId != ''
+        && exists(
+             /databases/$(database)/documents/companies/$(companyId)/bans/$(uid())
+           );
+    }
+
+    // Joining is either immediate or it waits, and the company decides which.
+    // A missing `joinPolicy` reads as open, so companies created before this
+    // existed keep behaving exactly as they did.
+    function joinPolicyOf(companyId) {
+      return 'joinPolicy' in get(
+               /databases/$(database)/documents/companies/$(companyId)
+             ).data
+        ? get(/databases/$(database)/documents/companies/$(companyId))
+            .data.joinPolicy
+        : 'open';
+    }
+
+    // What a new joiner's membership must be set to. Written as a rule rather
+    // than trusted from the client: otherwise anyone could join a company that
+    // requires approval and mark themselves approved in the same write.
+    function requiredJoinStatus(companyId) {
+      return joinPolicyOf(companyId) == 'open' ? 'active' : 'pending';
+    }
+
+    // Absent means active, so accounts that predate approvals are unaffected.
+    function membershipOf(data) {
+      return 'membership' in data ? data.membership : 'active';
+    }
+
+    // Full access to a company's content: a member, approved, not banned.
+    function activeIn(companyId) {
+      return hasProfile()
+        && companyId != null
+        && companyId != ''
+        && myCompanyId() == companyId
+        && membershipOf(profile()) == 'active'
+        && !bannedFrom(companyId);
     }
 
     // ---------- companies ----------
@@ -96,11 +182,55 @@ service cloud.firestore {
 
       // Renaming a company is a superadmin action and must never reassign
       // ownership.
-      allow update: if adminOf(companyId)
-        && fieldUnchanged('createdBy');
+      // The join policy is people-work, not content-work, so a moderator may
+      // not flip a company open.
+      //
+      // Scheduling or calling off the company's own destruction is narrower
+      // still: only the person who created it. An admin runs the place; ending
+      // it is the owner's alone.
+      allow update: if companyAdminOf(companyId)
+        && fieldUnchanged('createdBy')
+        && (
+          !('joinPolicy' in request.resource.data)
+          || request.resource.data.joinPolicy in ['open', 'approval']
+        )
+        && (
+          ('deletionScheduledFor' in request.resource.data)
+            == ('deletionScheduledFor' in resource.data)
+          || resource.data.createdBy == uid()
+        );
 
-      // Deleting a company would strand every user pointing at it.
-      allow delete: if false;
+      // A company can only be destroyed by its owner, only after being
+      // scheduled, and only once the week has actually run out.
+      //
+      // The waiting period is enforced here rather than left to a countdown in
+      // the app. A grace period that exists only in the client is a grace
+      // period until somebody sends the request themselves — and this one
+      // deletes everybody's work, not just the owner's.
+      allow delete: if companyAdminOf(companyId)
+        && resource.data.createdBy == uid()
+        && 'deletionScheduledFor' in resource.data
+        && request.time >= resource.data.deletionScheduledFor;
+
+      // ---------- bans ----------
+      //
+      // One document per banned person, under the company that banned them.
+      match /bans/{bannedUserId} {
+        // The person themselves can read their own ban, which is how the app
+        // can say "you are banned from Acme" instead of failing silently and
+        // looking broken. Staff can read the whole list — that is the list an
+        // admin unbans people from.
+        allow read: if signedIn()
+          && (bannedUserId == uid() || adminOf(companyId));
+
+        // Writing one is admin-only, and a ban may not be aimed at yourself:
+        // an admin who bans themselves locks their own company.
+        allow create, delete: if companyAdminOf(companyId)
+          && bannedUserId != uid();
+
+        // Nothing to amend. Lifting a ban is a delete.
+        allow update: if false;
+      }
     }
 
     // ---------- company name locks ----------
@@ -120,8 +250,13 @@ service cloud.firestore {
         && request.resource.data.createdBy == uid()
         && request.resource.data.companyId is string;
 
-      // Never reassign or release a name — that is the whole constraint.
-      allow update, delete: if false;
+      // Never reassign a name — that is the whole constraint.
+      allow update: if false;
+
+      // Released only by whoever reserved it, and only as part of closing that
+      // company down. Without this the name would stay locked for ever against
+      // a company that no longer exists.
+      allow delete: if signedIn() && resource.data.createdBy == uid();
     }
 
     // ---------- users ----------
@@ -136,27 +271,108 @@ service cloud.firestore {
       // companyId names a company this same user just created; joining an
       // existing company forces 'user'. Without this, anyone could pick any
       // company at sign-up and hand themselves admin over it.
+      //
+      // A new member's `membership` is dictated by the company's join policy,
+      // not chosen by the client — otherwise "approval required" would be a
+      // suggestion that anyone could decline by editing one field of their own
+      // sign-up payload. Someone already banned from a company cannot register
+      // straight back into it either.
       allow create: if signedIn()
         && userId == uid()
         && (
-          request.resource.data.role == 'user'
+          (
+            request.resource.data.role == 'user'
+            && (
+              request.resource.data.companyId == ''
+              || (
+                !bannedFrom(request.resource.data.companyId)
+                && membershipOf(request.resource.data)
+                     == requiredJoinStatus(request.resource.data.companyId)
+              )
+            )
+          )
           || (
             request.resource.data.role == 'superadmin'
             && createdCompany(request.resource.data.companyId)
+            && membershipOf(request.resource.data) == 'active'
           )
         );
 
       // You may edit your own profile but never your own role or company.
-      // An admin may change a colleague's role, but not their company.
+      // An admin may change a *colleague's* role, but not their company, and
+      // may not grant superadmin.
+      //
+      // The `userId != uid()` on the second branch is load-bearing. Without it
+      // the two branches were an OR, so an admin editing their own document
+      // satisfied the admin branch — which carries no `fieldUnchanged('role')`
+      // — and could award themselves any role they liked. Since `isAdmin()`
+      // includes moderators, that was a path from the lowest elevated role
+      // straight to superadmin.
+      //
+      // Restricting the assignable set closes the other half: superadmin means
+      // "created this company", which is established at sign-up by
+      // createdCompany() and must not be grantable afterwards by anyone.
       allow update: if signedIn() && (
+        // -- your own profile: name, birthday, avatar
         (
           userId == uid()
           && fieldUnchanged('role')
           && fieldUnchanged('companyId')
+          // Approving yourself would make "approval required" meaningless.
+          && membershipOf(request.resource.data) == membershipOf(resource.data)
         )
+
+        // -- joining a company
+        //
+        // Only from having none, only as a plain user, only if that company has
+        // not banned you, and only at whatever membership its policy dictates.
+        // This is the path a banned or removed member takes to start again
+        // somewhere else, which is why it exists at all.
         || (
-          adminOf(resource.data.companyId)
+          userId == uid()
+          && resource.data.companyId == ''
+          && request.resource.data.companyId != ''
+          && request.resource.data.role == 'user'
+          && !bannedFrom(request.resource.data.companyId)
+          && membershipOf(request.resource.data)
+               == requiredJoinStatus(request.resource.data.companyId)
+        )
+
+        // -- leaving a company
+        //
+        // Available to a banned member, a pending one, or anyone who simply
+        // wants out. The owner is excluded: a superadmin walking away would
+        // leave their company with nobody able to administer it.
+        || (
+          userId == uid()
+          && resource.data.role != 'superadmin'
+          && request.resource.data.companyId == ''
+          && request.resource.data.role == 'user'
+        )
+
+        // -- an admin managing a colleague
+        //
+        // Roles, and approving a pending join. `adminOf` would have let a
+        // moderator promote people, which is the line the user drew and the
+        // reason `companyAdminOf` is a separate function.
+        || (
+          userId != uid()
+          && companyAdminOf(resource.data.companyId)
           && fieldUnchanged('companyId')
+          && request.resource.data.role in ['admin', 'moderator', 'user']
+          && membershipOf(request.resource.data) in ['active', 'pending']
+        )
+
+        // -- an admin removing a colleague
+        //
+        // The one case where somebody else may change your company, and only
+        // ever to empty. Anything else would be moving a colleague into another
+        // company without their say.
+        || (
+          userId != uid()
+          && companyAdminOf(resource.data.companyId)
+          && request.resource.data.companyId == ''
+          && request.resource.data.role == 'user'
         )
       );
 

@@ -1,14 +1,16 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/main_screen/appointments_dashboard.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/membership/app_banner.dart';
 import 'package:echomeet/notes/notes_main.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/language_button.dart';
+import 'package:echomeet/core/widgets/sign_out_button.dart';
+import 'package:echomeet/core/widgets/theme_toggle_button.dart';
 import 'package:echomeet/settings/settings.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 
-/// A navigation destination, described once and rendered by whichever control
-/// suits the current window size.
 class _Destination {
   const _Destination(this.icon, this.selectedIcon, this.labelKey);
 
@@ -18,21 +20,25 @@ class _Destination {
 }
 
 const _destinations = <_Destination>[
-  _Destination(Icons.notes_outlined, Icons.notes, 'notes'),
-  _Destination(Icons.schedule_outlined, Icons.schedule, 'appointments'),
-  _Destination(Icons.quiz_outlined, Icons.quiz, 'survey'),
-  _Destination(Icons.settings_outlined, Icons.settings, 'settings'),
+  _Destination(Icons.edit_note_rounded, Icons.sticky_note_2_rounded, 'notes'),
+  _Destination(
+    Icons.calendar_today_outlined,
+    Icons.calendar_month_rounded,
+    'appointments',
+  ),
+  _Destination(
+    Icons.insert_chart_outlined_rounded,
+    Icons.insert_chart_rounded,
+    'survey',
+  ),
+  _Destination(Icons.settings_outlined, Icons.settings_rounded, 'settings'),
 ];
 
-/// Root shell. Shows a bottom bar on phones and a navigation rail on anything
-/// wider, with labels on the rail once there is room for them.
 class BottomNavigation extends StatefulWidget {
   const BottomNavigation({super.key, this.initialIndex = 0, this.pages});
 
   final int initialIndex;
 
-  /// Overrides the tab contents. Only used by tests — the real pages all reach
-  /// for Firebase in `initState`, which a widget test has no way to satisfy.
   final List<Widget>? pages;
 
   @override
@@ -42,18 +48,14 @@ class BottomNavigation extends StatefulWidget {
 class _BottomNavigationState extends State<BottomNavigation> {
   late int _currentIndex = widget.initialIndex;
 
-  // Built once and kept alive by the IndexedStack below. Swapping the child
-  // widget on every tab change, as this used to, disposed the other tabs'
-  // State — so notes scroll position, filters and search were wiped every time
-  // you left the tab and came back.
-  static const _defaultPages = <Widget>[
+  List<Widget> _defaultPages(Locale _) => [
     TodoList(),
     AppointmentPageUI(),
     QuestionarySurveyPageUI(),
     SettingsPageUI(),
   ];
 
-  List<Widget> get _pages => widget.pages ?? _defaultPages;
+  List<Widget> _pages(Locale locale) => widget.pages ?? _defaultPages(locale);
 
   void _onDestinationSelected(int index) {
     setState(() => _currentIndex = index);
@@ -62,7 +64,17 @@ class _BottomNavigationState extends State<BottomNavigation> {
   @override
   Widget build(BuildContext context) {
     final windowSize = context.windowSize;
-    final body = IndexedStack(index: _currentIndex, children: _pages);
+
+    final locale = Localizations.localeOf(context);
+
+    final body = Column(
+      children: [
+        if (widget.pages == null) const AppBanner(),
+        Expanded(
+          child: IndexedStack(index: _currentIndex, children: _pages(locale)),
+        ),
+      ],
+    );
 
     if (windowSize.usesBottomNavigation) {
       return Scaffold(
@@ -82,65 +94,197 @@ class _BottomNavigationState extends State<BottomNavigation> {
     );
   }
 
+  Widget _cappedScale({required BuildContext context, required Widget child}) {
+    final media = MediaQuery.of(context);
+    return MediaQuery(
+      data: media.copyWith(
+        textScaler: media.textScaler.clamp(maxScaleFactor: 1.15),
+      ),
+      child: child,
+    );
+  }
+
   Widget _buildBottomBar(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return BottomNavigationBar(
-      type: BottomNavigationBarType.fixed,
-      backgroundColor: isDark ? Colors.grey[900] : Colors.grey[300],
-      currentIndex: _currentIndex,
-      onTap: _onDestinationSelected,
-      showSelectedLabels: true,
-      showUnselectedLabels: true,
-      selectedFontSize: 12,
-      unselectedFontSize: 12,
-      selectedItemColor: getButtonColor(context),
-      unselectedItemColor: isDark ? Colors.grey[600] : Colors.grey[500],
-      items: [
-        for (final destination in _destinations)
-          BottomNavigationBarItem(
-            icon: Icon(destination.icon),
-            activeIcon: Icon(destination.selectedIcon),
-            label: destination.labelKey.tr(),
-          ),
-      ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+        ),
+      ),
+      child: _cappedScale(
+        context: context,
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: _onDestinationSelected,
+          height: 66,
+          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+          destinations: [
+            for (final destination in _destinations)
+              NavigationDestination(
+                icon: Icon(destination.icon),
+                selectedIcon: Icon(destination.selectedIcon),
+                label: destination.labelKey.tr(),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildRail(BuildContext context, {required bool extended}) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     return SafeArea(
-      child: NavigationRail(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _onDestinationSelected,
-        extended: extended,
-        // Labels are redundant next to an extended rail, which already shows
-        // them inline.
-        labelType: extended
-            ? NavigationRailLabelType.none
-            : NavigationRailLabelType.all,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        indicatorColor: getButtonColor(context).withValues(alpha: 0.15),
-        selectedIconTheme: IconThemeData(color: getButtonColor(context)),
-        selectedLabelTextStyle: TextStyle(
-          color: getButtonColor(context),
-          fontWeight: FontWeight.bold,
-        ),
-        leading: Padding(
-          padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
-          child: Icon(
-            Icons.calendar_month_outlined,
-            color: getButtonColor(context),
-            size: 28,
+      child: _cappedScale(
+        context: context,
+        child: NavigationRail(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: _onDestinationSelected,
+          extended: extended,
+
+          labelType: extended
+              ? NavigationRailLabelType.none
+              : NavigationRailLabelType.all,
+          leading: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              Spacing.md,
+              Spacing.lg,
+              Spacing.md,
+              Spacing.xl,
+            ),
+            child: _RailBrand(extended: extended),
+          ),
+          destinations: [
+            for (final destination in _destinations)
+              NavigationRailDestination(
+                icon: Icon(destination.icon),
+                selectedIcon: Icon(destination.selectedIcon),
+                label: Text(destination.labelKey.tr()),
+              ),
+          ],
+
+          trailing: Expanded(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.lg),
+                child: _RailFooter(extended: extended),
+              ),
+            ),
+          ),
+
+          indicatorColor: scheme.secondaryContainer,
+          selectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.onSurface,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
         ),
-        destinations: [
-          for (final destination in _destinations)
-            NavigationRailDestination(
-              icon: Icon(destination.icon),
-              selectedIcon: Icon(destination.selectedIcon),
-              label: Text(destination.labelKey.tr()),
-            ),
-        ],
       ),
+    );
+  }
+}
+
+class _RailFooter extends StatelessWidget {
+  const _RailFooter({required this.extended});
+
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final controls = <Widget>[
+      const ThemeToggleButton(),
+      const LanguageButton(),
+      const SignOutButton(),
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.md,
+            vertical: Spacing.md,
+          ),
+          child: Divider(
+            height: 1,
+            color: scheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+
+        if (extended)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              for (final control in controls)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.xs),
+                  child: control,
+                ),
+            ],
+          )
+        else
+          for (final control in controls)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
+              child: control,
+            ),
+      ],
+    );
+  }
+}
+
+class _RailBrand extends StatelessWidget {
+  const _RailBrand({required this.extended});
+
+  final bool extended;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final glyph = Container(
+      height: 34,
+      width: 34,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(11),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primary, scheme.tertiary],
+        ),
+      ),
+      child: Icon(
+        Icons.calendar_month_rounded,
+        color: scheme.onPrimary,
+        size: 19,
+      ),
+    );
+
+    if (!extended) return glyph;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        glyph,
+        const SizedBox(width: Spacing.md),
+        Text(
+          'app_title'.tr(),
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontFamily: AppTheme.displayFontFamily,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.2,
+          ),
+        ),
+      ],
     );
   }
 }

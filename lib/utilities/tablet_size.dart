@@ -4,11 +4,9 @@ double getTimeFontSize(BuildContext context, double fontSize) {
   final mediaQuery = MediaQuery.of(context);
   double timeFontSize = fontSize;
   if (mediaQuery.size.shortestSide >= 600) {
-    // tablet
-    timeFontSize += 4; // increase font size by 4 points
+    timeFontSize += 4;
   } else {
-    // phone
-    timeFontSize -= 2; // decrease font size by 2 points
+    timeFontSize -= 2;
   }
   return timeFontSize;
 }

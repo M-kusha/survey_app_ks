@@ -1,313 +1,554 @@
-import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/appointments/main_screen/appointment_search_field.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/membership/company_admin_service.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
+import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+
+const _assignableRoles = ['admin', 'moderator', 'user'];
 
 class UserManagementPage extends StatefulWidget {
-  final String userId;
   const UserManagementPage({super.key, required this.userId});
+
+  final String userId;
 
   @override
   UserManagementPageState createState() => UserManagementPageState();
 }
 
 class UserManagementPageState extends State<UserManagementPage> {
-  List<UserModel> userList = [];
-  String searchQuery = '';
-  FirebaseSurveyService firebaseSurveyService = FirebaseSurveyService();
-  int currentPage = 1;
-  int itemsPerPage = 10;
-  bool isLoading = false;
-  bool isSearching = false;
-  void _onSearchTextChanged(String text) async {
-    setState(() {
-      searchQuery = text;
-    });
-  }
+  final _service = FirebaseSurveyService();
+  final _searchController = TextEditingController();
 
-  TextEditingController searchController = TextEditingController();
+  List<UserModel> _users = [];
+  bool _loading = true;
+  String? _error;
 
-  final Map<String, String> roleLabelsToValues = {
-    'Admin': 'admin',
-    'Moderator': 'moderator',
-    'User': 'user',
-  };
+  bool _canManagePeople = false;
 
   @override
   void initState() {
     super.initState();
-
-    loadUsers();
+    _searchController.addListener(() => setState(() {}));
+    _load();
   }
 
-  void loadUsers() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
     setState(() {
-      isLoading = true;
+      _loading = true;
+      _error = null;
     });
 
-    final companyId = await FirebaseServices().currentCompanyId();
-    if (!mounted) return;
+    try {
+      final companyId = await FirebaseServices().currentCompanyId();
+      if (!mounted) return;
 
-    // Falling back to a placeholder id here used to query a company that does
-    // not exist, so a missing companyId rendered as "no users" rather than as
-    // the error it actually is.
-    if (companyId == null) {
+      if (companyId == null) {
+        setState(() {
+          _error = 'no_company_on_profile'.tr();
+          _loading = false;
+        });
+        return;
+      }
+
+      final snapshot = await _service.fetchUsersByCompanyId(companyId);
+      final canManagePeople = await FirebaseServices().canManagePeople();
+
+      final banned = {
+        for (final member in await CompanyAdminService().bannedMembers(
+          companyId,
+        ))
+          member.userId,
+      };
+      if (!mounted) return;
+
       setState(() {
-        userList = [];
-        isLoading = false;
+        _canManagePeople = canManagePeople;
+        _users =
+            snapshot.docs
+                .map(UserModel.fromFirestore)
+                .map((user) => user..banned = banned.contains(user.id))
+                .toList()
+              ..sort((a, b) {
+                final rank = _rank(a.role).compareTo(_rank(b.role));
+                return rank != 0
+                    ? rank
+                    : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+              });
+        _loading = false;
       });
-      UIUtils.showSnackBar(context, 'error_occurred'.tr());
-      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _loading = false;
+      });
     }
-
-    final querySnapshot = await firebaseSurveyService.fetchUsersByCompanyId(
-      companyId,
-    );
-
-    if (!mounted) return;
-    setState(() {
-      userList = querySnapshot.docs
-          .map((doc) => UserModel.fromFirestore(doc))
-          .toList();
-      isLoading = false;
-    });
   }
 
-  String capitalize(String input) {
-    if (input.isEmpty) return "";
-    return input[0].toUpperCase() + input.substring(1);
+  static int _rank(String role) => switch (role) {
+    'superadmin' => 0,
+    'admin' => 1,
+    'moderator' => 2,
+    _ => 3,
+  };
+
+  List<UserModel> get _visible {
+    final needle = _searchController.text.trim().toLowerCase();
+    if (needle.isEmpty) return _users;
+    return _users
+        .where((user) => user.name.toLowerCase().contains(needle))
+        .toList();
+  }
+
+  Future<void> _changeRole(UserModel user, String role) async {
+    final previous = user.role;
+
+    setState(() => user.role = role);
+
+    try {
+      await _service.updateUserRole(user.id, role);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => user.role = previous);
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
+  }
+
+  Future<void> _ban(UserModel user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('ban_user'.tr()),
+        content: Text('ban_user_confirm'.tr(namedArgs: {'name': user.name})),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('ban_user'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => user.banned = true);
+
+    try {
+      await CompanyAdminService().ban(
+        companyId: user.companyId,
+        userId: user.id,
+        name: user.name,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => user.banned = false);
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
+  }
+
+  Future<void> _approve(UserModel user) async {
+    setState(() => user.membership = 'active');
+
+    try {
+      await CompanyAdminService().approve(user.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => user.membership = 'pending');
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
+  }
+
+  Future<void> _remove(UserModel user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('remove_from_company'.tr()),
+        content: Text(
+          'remove_from_company_confirm'.tr(namedArgs: {'name': user.name}),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('remove'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await _service.removeUserFromCompany(user.id);
+      if (!mounted) return;
+
+      setState(() => _users.removeWhere((entry) => entry.id == user.id));
+    } catch (_) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    List<UserModel> filteredUsers = filterUsers(
-      userList,
-      searchQuery,
-      currentPage,
-      itemsPerPage,
-    );
-    if (isLoading) {
-      return const Scaffold(body: Center(child: CustomLoadingWidget()));
-    }
+    final users = _visible;
 
     return Scaffold(
-      appBar: AppBar(
-        title: isSearching
-            ? ActionField(
-                isSearching: isSearching,
-                searchController: searchController,
-                onSearchTextChanged: _onSearchTextChanged,
-              )
-            : Text(
-                'user_management'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5),
+      appBar: AppBar(title: Text('user_management'.tr())),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 640,
+          scrollable: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.sm),
+              SearchPill(
+                controller: _searchController,
+                hint: 'search_hint'.tr(),
               ),
-        backgroundColor: getAppbarColor(context),
-        actions: [buildSearchBar(getButtonColor(context))],
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: buildUserList(filteredUsers),
+              const SizedBox(height: Spacing.md),
+              Expanded(child: _buildBody(users)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget buildSearchBar(Color buttonColor) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return isSearching
-        ? IconButton(
-            icon: Icon(
-              Icons.close,
-              size: timeFontSize * 1.8,
-              color: buttonColor,
-            ),
-            onPressed: () {
-              setState(() {
-                isSearching = !isSearching;
-                searchController.clear();
-              });
-            },
-          )
-        : IconButton(
-            icon: Icon(
-              Icons.search,
-              size: timeFontSize * 1.8,
-              color: buttonColor,
-            ),
-            onPressed: () {
-              setState(() {
-                isSearching = !isSearching;
-              });
-            },
-          );
-  }
+  Widget _buildBody(List<UserModel> users) {
+    if (_loading) {
+      return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
+    }
 
-  Widget buildUserList(List<UserModel> users) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    if (_error case final error?) {
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'error_occurred'.tr(),
+        body: error,
+        action: TextButton(onPressed: _load, child: Text('retry'.tr())),
+      );
+    }
 
     if (users.isEmpty) {
-      return Center(
-        child: Text(
-          'user_list_empty'.tr(),
-          style: TextStyle(fontSize: fontSize),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              '${'total_users'.tr()} ${users.length}',
-              style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(
-            child: ListView.separated(
-              itemCount: users.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) => Card(
-                elevation: 5,
-                shadowColor: getButtonColor(context),
-                child: buildUserItem(users[index], fontSize),
+      return EmptyState(
+        icon: Icons.person_search_rounded,
+        title: _searchController.text.isEmpty
+            ? 'user_list_empty'.tr()
+            : 'no_search_results'.tr(),
+        action: _searchController.text.isEmpty
+            ? null
+            : TextButton(
+                onPressed: _searchController.clear,
+                child: Text('clear_search'.tr()),
               ),
-            ),
-          ),
-          buildPaginationControls(),
-        ],
-      ),
-    );
-  }
-
-  ListTile buildUserItem(UserModel user, double fontSize) {
-    return ListTile(
-      leading: GestureDetector(
-        onTap: () {
-          // userProfile(context, user.id);
-        },
-        child: CircleAvatar(
-          backgroundImage: user.profileImage.isNotEmpty
-              ? NetworkImage(user.profileImage)
-              : null,
-          backgroundColor: getIconColor(context),
-          child: user.profileImage.isEmpty
-              ? Text(user.name[0], style: TextStyle(fontSize: fontSize))
-              : null,
-        ),
-      ),
-      title: Text(user.name),
-      trailing: buildUserRoleSelection(user),
-    );
-  }
-
-  Widget buildUserRoleSelection(UserModel user) {
-    if (user.id == widget.userId) {
-      return Text(
-        capitalize(user.role),
-        style: TextStyle(color: getListTileColor(context), fontSize: 16),
-        textAlign: TextAlign.center,
       );
     }
 
-    String currentRoleLabel = roleLabelsToValues.entries
-        .firstWhere(
-          (entry) => entry.value == user.role,
-          orElse: () => roleLabelsToValues.entries.first,
-        )
-        .key;
+    return ListView.separated(
+      padding: const EdgeInsets.only(bottom: Spacing.xxl),
+      itemCount: users.length + 1,
+      separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return SectionLabel(label: 'total_users'.tr(), count: _users.length);
+        }
 
-    return GestureDetector(
-      onTap: () => _showRoleSelectionModal(context, user),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Text(
-          currentRoleLabel,
-          style: const TextStyle(fontSize: 16),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  void _showRoleSelectionModal(BuildContext context, UserModel user) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Wrap(
-            children: roleLabelsToValues.entries.map((entry) {
-              return ListTile(
-                title: Text(entry.key, textAlign: TextAlign.center),
-                onTap: () {
-                  setState(() {
-                    updateUserRole(user.id, entry.value);
-                  });
-                  Navigator.of(context).pop();
-                },
-              );
-            }).toList(),
-          ),
+        final user = users[index - 1];
+        return _UserRow(
+          user: user,
+          isSelf: user.id == widget.userId,
+          canManagePeople: _canManagePeople,
+          onRoleChanged: (role) => _changeRole(user, role),
+          onBan: () => _ban(user),
+          onApprove: () => _approve(user),
+          onRemove: () => _remove(user),
         );
       },
     );
   }
+}
 
-  void updateUserRole(String userId, String newRole) {
-    firebaseSurveyService.updateUserRole(userId, newRole).then((_) {
-      int userIndex = userList.indexWhere((user) => user.id == userId);
-      if (userIndex != -1) {
-        setState(() {
-          userList[userIndex].role = newRole;
-        });
-      }
-    });
-  }
+class _UserRow extends StatelessWidget {
+  const _UserRow({
+    required this.user,
+    required this.isSelf,
+    required this.canManagePeople,
+    required this.onRoleChanged,
+    required this.onBan,
+    required this.onApprove,
+    required this.onRemove,
+  });
 
-  Widget buildPaginationControls() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: currentPage > 1
-              ? () => setState(() => currentPage--)
-              : null,
-        ),
-        Text('${'page'.tr()} $currentPage'),
-        IconButton(
-          icon: const Icon(Icons.arrow_forward),
-          onPressed: userList.length == itemsPerPage
-              ? () => setState(() => currentPage++)
-              : null,
-        ),
-      ],
+  final UserModel user;
+  final bool isSelf;
+  final bool canManagePeople;
+  final ValueChanged<String> onRoleChanged;
+  final VoidCallback onBan;
+  final VoidCallback onApprove;
+  final VoidCallback onRemove;
+
+  bool get _locked => isSelf || user.role == 'superadmin' || !canManagePeople;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ContentCard(
+      child: Row(
+        children: [
+          _Avatar(user: user),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.name.isEmpty ? user.id : user.name,
+                  style: theme.textTheme.bodyLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (isSelf)
+                  Text(
+                    'you'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+
+                if (user.banned) ...[
+                  const SizedBox(height: Spacing.xs),
+                  StatusPill(
+                    label: 'banned'.tr(),
+                    tone: StatusTone.danger,
+                    icon: Icons.block_rounded,
+                  ),
+                ] else if (user.isPending) ...[
+                  const SizedBox(height: Spacing.xs),
+                  StatusPill(
+                    label: 'approval_pending'.tr(),
+                    tone: StatusTone.caution,
+                    icon: Icons.hourglass_top_rounded,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+
+          if (user.isPending && canManagePeople && !user.banned) ...[
+            FilledButton.tonal(
+              onPressed: onApprove,
+              child: Text('approve'.tr()),
+            ),
+            const SizedBox(width: Spacing.xs),
+          ] else if (_locked)
+            StatusPillFor(role: user.role)
+          else
+            _RoleMenu(role: user.role, onSelected: onRoleChanged),
+          if (!_locked) ...[
+            const SizedBox(width: Spacing.xs),
+            PopupMenuButton<VoidCallback>(
+              tooltip: 'more'.tr(),
+              onSelected: (action) => action(),
+              icon: Icon(
+                Icons.more_vert_rounded,
+                size: 20,
+                color: scheme.onSurfaceVariant,
+              ),
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: onBan,
+                  child: Row(
+                    children: [
+                      Icon(
+                        user.banned
+                            ? Icons.lock_open_rounded
+                            : Icons.block_rounded,
+                        size: 18,
+                        color: scheme.error,
+                      ),
+                      const SizedBox(width: Spacing.md),
+                      Text('ban_user'.tr()),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: onRemove,
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_remove_outlined,
+                        size: 18,
+                        color: scheme.error,
+                      ),
+                      const SizedBox(width: Spacing.md),
+                      Text(
+                        'remove_from_company'.tr(),
+                        style: TextStyle(color: scheme.error),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
+}
 
-  List<UserModel> filterUsers(
-    List<UserModel> users,
-    String query,
-    int page,
-    int itemsCount,
-  ) {
-    return users
-        .where((user) => user.name.toLowerCase().contains(query.toLowerCase()))
-        .skip((page - 1) * itemsCount)
-        .take(itemsCount)
-        .toList();
+class StatusPillFor extends StatelessWidget {
+  const StatusPillFor({super.key, required this.role});
+
+  final String role;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(999),
+        color: scheme.surfaceContainerHighest,
+      ),
+      child: Text(
+        'role_$role'.tr(),
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleMenu extends StatelessWidget {
+  const _RoleMenu({required this.role, required this.onSelected});
+
+  final String role;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return PopupMenuButton<String>(
+      initialValue: role,
+      tooltip: 'role'.tr(),
+      onSelected: onSelected,
+      itemBuilder: (context) => [
+        for (final value in _assignableRoles)
+          PopupMenuItem(
+            value: value,
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  child: value == role
+                      ? Icon(
+                          Icons.check_rounded,
+                          size: 16,
+                          color: scheme.primary,
+                        )
+                      : null,
+                ),
+                Text('role_$value'.tr()),
+              ],
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 6, 6, 6),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          color: scheme.primary.withValues(alpha: 0.12),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'role_$role'.tr(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: scheme.primary,
+              ),
+            ),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 18,
+              color: scheme.primary,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.user});
+
+  final UserModel user;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final source = user.name.trim();
+    final initial = source.isEmpty ? '?' : source[0].toUpperCase();
+
+    return Container(
+      height: 38,
+      width: 38,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: scheme.primaryContainer,
+        image: user.profileImage.isEmpty
+            ? null
+            : DecorationImage(
+                image: NetworkImage(user.profileImage),
+                fit: BoxFit.cover,
+              ),
+      ),
+      alignment: Alignment.center,
+      child: user.profileImage.isEmpty
+          ? Text(
+              initial,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: scheme.onPrimaryContainer,
+              ),
+            )
+          : null,
+    );
   }
 }

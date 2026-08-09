@@ -4,10 +4,6 @@ import 'package:echomeet/settings/account_deletion_service.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
 
-/// Permanently deletes the signed-in user's account.
-///
-/// Disabled for superadmins: a company's owner cannot delete themselves and
-/// leave the company without one.
 class DeleteAccountButton extends StatefulWidget {
   const DeleteAccountButton({super.key, required this.isSuperadmin});
 
@@ -69,10 +65,6 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
     }
   }
 
-  /// Confirms intent and collects the password Firebase needs to re-authenticate
-  /// before it will delete an account.
-  ///
-  /// Returns null if the user backs out.
   Future<String?> _promptForPassword() {
     final controller = TextEditingController();
 

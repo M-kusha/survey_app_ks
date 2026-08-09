@@ -5,16 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class UIUtils {
-  /// Shows a transient message.
-  ///
-  /// Styling comes from the theme's `snackBarTheme` rather than being rebuilt
-  /// here. The old version painted *every* message in the error colour, so
-  /// "Password updated successfully" arrived in red, and hardcoded a width of
-  /// half the screen with padding computed from the other 20% — which wrapped
-  /// badly on anything wider than a phone.
-  ///
-  /// Pass [isError] for genuine failures; they get the error colour, and only
-  /// they do.
   static void showSnackBar(
     BuildContext context,
     String message, {
@@ -23,8 +13,6 @@ class UIUtils {
     final scheme = Theme.of(context).colorScheme;
 
     ScaffoldMessenger.of(context)
-      // Queued snackbars used to stack up behind each other; a new message
-      // should replace whatever is on screen.
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(

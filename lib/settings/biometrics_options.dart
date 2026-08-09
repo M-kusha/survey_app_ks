@@ -1,91 +1,66 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/login/biometrics.dart';
 import 'package:echomeet/login/user_preferences.dart';
-import 'package:echomeet/utilities/text_style.dart';
-import 'package:flutter/cupertino.dart';
+import 'package:echomeet/settings/settings_kit.dart';
 import 'package:flutter/material.dart';
 
 class BiometricOptions extends StatefulWidget {
+  const BiometricOptions({super.key, required this.icon, required this.title});
+
   final IconData icon;
   final String title;
-
-  const BiometricOptions({super.key, required this.icon, required this.title});
 
   @override
   State<BiometricOptions> createState() => _BiometricOptionsState();
 }
 
 class _BiometricOptionsState extends State<BiometricOptions> {
-  bool _biometricEnabled = false;
-  final AuthService _authService = AuthService();
+  final _auth = AuthService();
+
+  bool _enabled = UserPreferences.getBiometricAuthEnabled();
+  bool _available = false;
+  bool _checking = true;
 
   @override
   void initState() {
     super.initState();
-    _loadBiometricSetting();
+    _checkAvailability();
   }
 
-  Future<void> _loadBiometricSetting() async {
-    _biometricEnabled = UserPreferences.getBiometricAuthEnabled();
-    setState(() {});
-  }
+  Future<void> _checkAvailability() async {
+    final available =
+        await _auth.canCheckBiometrics() && await _auth.isDeviceSupported();
+    if (!mounted) return;
 
-  Future<void> _updateBiometricSetting(bool value) async {
-    if (value) {
-      final canAuthenticate =
-          await _authService.canCheckBiometrics() &&
-          await _authService.isDeviceSupported();
-      if (canAuthenticate) {
-        final didAuthenticate = await _authService.authenticateUser();
-        if (didAuthenticate) {
-          await UserPreferences.setBiometricAuthEnabled(true);
-          _biometricEnabled = true;
-        } else {
-          _biometricEnabled = false;
-          await UserPreferences.setBiometricAuthEnabled(false);
-        }
-      } else {
-        _biometricEnabled = false;
-        await UserPreferences.setBiometricAuthEnabled(false);
+    setState(() {
+      _available = available;
+      _checking = false;
+
+      if (!available && _enabled) {
+        _enabled = false;
+        UserPreferences.setBiometricAuthEnabled(false);
       }
-    } else {
-      // Disable biometric
-      await UserPreferences.setBiometricAuthEnabled(false);
-      _biometricEnabled = false;
-    }
-    setState(() {});
+    });
+  }
+
+  Future<void> _set(bool value) async {
+    if (value && !await _auth.authenticateUser()) return;
+
+    await UserPreferences.setBiometricAuthEnabled(value);
+    if (!mounted) return;
+    setState(() => _enabled = value);
   }
 
   @override
   Widget build(BuildContext context) {
-    Color buttonColor = getButtonColor(context);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Icon(widget.icon, size: 24),
-              const SizedBox(width: 10),
-              Text(
-                widget.title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          Transform.scale(
-            scale: 0.7,
-            child: CupertinoSwitch(
-              activeTrackColor: buttonColor,
-              inactiveTrackColor: Colors.grey,
-              value: _biometricEnabled,
-              onChanged: (bool newValue) {
-                _updateBiometricSetting(newValue);
-              },
-            ),
-          ),
-        ],
-      ),
+    return SettingsSwitchTile(
+      icon: widget.icon,
+      title: widget.title,
+      subtitle: _checking
+          ? null
+          : (_available ? null : 'biometrics_unavailable'.tr()),
+      value: _enabled,
+      onChanged: _checking || !_available ? null : _set,
     );
   }
 }

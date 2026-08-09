@@ -5,13 +5,6 @@ const double fontMediumSize = 14;
 const double fontMinSize = 12;
 const double fontMaxSize = 22;
 
-/// The user's chosen base font size, restored on launch and saved on change.
-///
-/// Persistence belongs here rather than in the widget that draws the slider.
-/// Previously the slider wrote the value to preferences and read it back into
-/// its own local state, but nothing ever fed it into this provider at startup —
-/// so every launch rendered the whole app at the default size while the slider
-/// still displayed the saved number.
 class FontSizeProvider with ChangeNotifier {
   FontSizeProvider() {
     _restore();
@@ -21,6 +14,8 @@ class FontSizeProvider with ChangeNotifier {
 
   double _fontSize = fontMediumSize;
   double get fontSize => _fontSize;
+
+  double get textScale => _fontSize / fontMediumSize;
 
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();

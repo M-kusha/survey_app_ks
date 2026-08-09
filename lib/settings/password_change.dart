@@ -1,323 +1,189 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/delete_account.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
+import 'package:echomeet/core/widgets/glass_panel.dart';
+import 'package:echomeet/core/widgets/password_strength_meter.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class PasswordChanger extends StatefulWidget {
+  const PasswordChanger({super.key, required this.isSuperAdmin});
+
   final bool isSuperAdmin;
-  const PasswordChanger({super.key, d, required this.isSuperAdmin});
 
   @override
-  PasswordChangertate createState() => PasswordChangertate();
+  State<PasswordChanger> createState() => _PasswordChangerState();
 }
 
-class PasswordChangertate extends State<PasswordChanger> {
-  final _oldPasswordController = TextEditingController();
-  final _newPasswordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
-  double _strength = 0;
-  bool _isPasswordVisible = false;
-  bool _isSaving = false;
+class _PasswordChangerState extends State<PasswordChanger> {
+  final _formKey = GlobalKey<FormState>();
+  final _current = TextEditingController();
+  final _next = TextEditingController();
+  final _confirm = TextEditingController();
+
+  bool _visible = false;
+  bool _saving = false;
 
   @override
-  void initState() {
-    super.initState();
-
-    _newPasswordController.addListener(() {
-      _updateStrength(_newPasswordController.text);
-    });
-
-    _confirmPasswordController.addListener(() {
-      setState(() {});
-    });
+  void dispose() {
+    _current.dispose();
+    _next.dispose();
+    _confirm.dispose();
+    super.dispose();
   }
 
-  void _updateStrength(String password) {
-    bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
-    bool hasLowercase = password.contains(RegExp(r'[a-z]'));
-    bool hasDigitsOrSpecialCharacters = password.contains(
-      RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'),
-    );
-    final length = password.length;
+  Future<void> _submit() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-    double strength = 0.0;
-    if (length >= 3) strength = 0.2;
-    if (length > 6) strength = 0.4;
-    if (hasUppercase && hasLowercase && length > 6) {
-      strength = 0.6;
-    }
-    if (hasUppercase &&
-        hasLowercase &&
-        hasDigitsOrSpecialCharacters &&
-        length > 6) {
-      strength = 1.0;
-    }
-
-    setState(() {
-      _strength = strength;
-    });
-  }
-
-  Color _getBorderColorBasedOnStrength(double strength) {
-    if (strength <= 0.2) {
-      return _newPasswordController.text.isEmpty ? Colors.grey : Colors.red;
-    } else if (strength <= 0.4) {
-      return Colors.yellow;
-    } else if (strength <= 0.6) {
-      return Colors.orange;
-    } else {
-      return Colors.green;
-    }
-  }
-
-  Color _getConfirmPasswordBorderColor() {
-    bool passwordsMatch =
-        _newPasswordController.text == _confirmPasswordController.text &&
-        _newPasswordController.text.isNotEmpty;
-
-    return passwordsMatch ? Colors.green : Colors.grey;
-  }
-
-  Future<bool> _validateCurrentPassword(String password) async {
-    User? user = FirebaseAuth.instance.currentUser;
-    String? email = user?.email;
+    setState(() => _saving = true);
 
     try {
-      var credential = EmailAuthProvider.credential(
-        email: email!,
-        password: password,
-      );
-      var authResult = await user!.reauthenticateWithCredential(credential);
-      return authResult.user != null;
-    } catch (e) {
-      return false;
-    }
-  }
+      final user = FirebaseAuth.instance.currentUser;
+      final email = user?.email;
+      if (user == null || email == null) {
+        throw FirebaseAuthException(code: 'no-current-user');
+      }
 
-  void _changePassword() async {
-    if (_oldPasswordController.text.isNotEmpty &&
-        _newPasswordController.text.isNotEmpty &&
-        _confirmPasswordController.text.isNotEmpty &&
-        _newPasswordController.text == _confirmPasswordController.text) {
-      setState(() {
-        _isSaving = true;
+      await user.reauthenticateWithCredential(
+        EmailAuthProvider.credential(email: email, password: _current.text),
+      );
+      await user.updatePassword(_next.text);
+
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'password_updated_success'.tr());
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      UIUtils.showSnackBar(context, switch (e.code) {
+        'wrong-password' || 'invalid-credential' => 'invalid_old_password'.tr(),
+        'weak-password' => 'validate_password_strong'.tr(),
+        'requires-recent-login' => 'invalid_old_password'.tr(),
+        _ => 'error_occurred'.tr(),
       });
-
-      bool isValidOldPassword = await _validateCurrentPassword(
-        _oldPasswordController.text,
-      );
-      if (!isValidOldPassword) {
-        if (!mounted) return;
-        UIUtils.showSnackBar(context, 'invalid_old_password'.tr());
-        setState(() {
-          _isSaving = false;
-        });
-        return;
-      }
-
-      try {
-        User? user = FirebaseAuth.instance.currentUser;
-        await user!.updatePassword(_newPasswordController.text);
-        if (!mounted) return;
-
-        UIUtils.showSnackBar(context, 'password_updated_success'.tr());
-        await Future.delayed(const Duration(seconds: 2));
-        if (!mounted) return;
-        Navigator.pop(context);
-      } catch (e) {
-        if (!mounted) return;
-        UIUtils.showSnackBar(context, 'An error occurred. Please try again.');
-      } finally {
-        if (context.mounted) {
-          setState(() {
-            _isSaving = false;
-          });
-        }
-      }
-    } else {
-      UIUtils.showSnackBar(context, 'check_your_input'.tr());
+    } catch (_) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('set_new_password'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: _isSaving
-          ? const Center(
-              child: CustomLoadingWidget(loadingText: 'saving_password'),
-            )
-          : SingleChildScrollView(
-              child: Center(
-                child: Column(
-                  children: [
-                    Card(
-                      shadowColor: getButtonColor(
-                        context,
-                      ), // Card with shadow (elevation
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 50.0,
-                        horizontal: 25.0,
-                      ),
-                      elevation: 5,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const SizedBox(height: 20),
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 8.0,
-                                bottom: 8.0,
-                              ),
-                              child: Text(
-                                'change_password_title'.tr(),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 50),
-                            TextFormField(
-                              controller: _oldPasswordController,
-                              obscureText: !_isPasswordVisible,
-                              decoration: InputDecoration(
-                                labelText: 'old_password'.tr(),
-                                border: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                                focusedBorder: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _isPasswordVisible
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _isPasswordVisible = !_isPasswordVisible;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            TextFormField(
-                              controller: _newPasswordController,
-                              onChanged: (value) {
-                                _updateStrength(value);
-                                _newPasswordController.text = value;
-                              },
-                              obscureText: !_isPasswordVisible,
-                              decoration: InputDecoration(
-                                labelText: 'set_your_password'.tr(),
-                                hintStyle: const TextStyle(fontSize: 10),
-                                border: const OutlineInputBorder(
-                                  borderRadius: BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: const BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                  borderSide: BorderSide(
-                                    color: _getBorderColorBasedOnStrength(
-                                      _strength,
-                                    ),
-                                    width: 2.0,
-                                  ),
-                                ),
-                                prefixIcon: const Icon(Icons.lock),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _isPasswordVisible
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _isPasswordVisible = !_isPasswordVisible;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            const SizedBox(height: 10),
-                            TextFormField(
-                              controller: _confirmPasswordController,
-                              obscureText: !_isPasswordVisible,
-                              onChanged: (value) {
-                                setState(() {});
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'confirm_password'.tr(),
-                                border: OutlineInputBorder(
-                                  borderRadius: const BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                  borderSide: BorderSide(
-                                    color: _getConfirmPasswordBorderColor(),
-                                    width: 1.0,
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: const BorderRadius.all(
-                                    Radius.circular(12),
-                                  ),
-                                  borderSide: BorderSide(
-                                    color: _getConfirmPasswordBorderColor(),
-                                    width: 2.0,
-                                  ),
-                                ),
-                                prefixIcon: const Icon(Icons.lock_outline),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    _isPasswordVisible
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                  ),
-                                  onPressed: () {
-                                    setState(() {
-                                      _isPasswordVisible = !_isPasswordVisible;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 50),
-                          ],
-                        ),
-                      ),
-                    ),
-                    DeleteAccountButton(isSuperadmin: widget.isSuperAdmin),
-                  ],
+      appBar: AppBar(title: Text('change_password'.tr())),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 460,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.md),
+              Text(
+                'change_password_hint'.tr(),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            ),
-      bottomNavigationBar: !_isSaving
-          ? buildBottomElevatedButton(
-              context: context,
-              onPressed: _changePassword,
-              buttonText: 'change_password',
-            )
-          : null,
+              const SizedBox(height: Spacing.lg),
+              GlassPanel(
+                padding: const EdgeInsets.all(Spacing.xl),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      AppTextField(
+                        label: 'current_password'.tr(),
+                        controller: _current,
+                        icon: Icons.lock_outline_rounded,
+                        obscure: !_visible,
+                        autofillHints: const [AutofillHints.password],
+                        textInputAction: TextInputAction.next,
+                        validator: (value) => (value == null || value.isEmpty)
+                            ? 'password_empty'.tr()
+                            : null,
+                        trailing: _VisibilityToggle(
+                          visible: _visible,
+                          onChanged: (v) => setState(() => _visible = v),
+                        ),
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      AppTextField(
+                        label: 'set_new_password'.tr(),
+                        controller: _next,
+                        icon: Icons.lock_reset_rounded,
+                        obscure: !_visible,
+                        autofillHints: const [AutofillHints.newPassword],
+                        textInputAction: TextInputAction.next,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'password_empty'.tr();
+                          }
+                          if (value == _current.text) {
+                            return 'password_same_as_old'.tr();
+                          }
+                          return PasswordStrengthMeter.isStrongEnough(value)
+                              ? null
+                              : 'validate_password_strong'.tr();
+                        },
+                      ),
+
+                      ValueListenableBuilder(
+                        valueListenable: _next,
+                        builder: (context, value, _) =>
+                            PasswordStrengthMeter(password: value.text),
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      AppTextField(
+                        label: 'confirm_password'.tr(),
+                        controller: _confirm,
+                        icon: Icons.check_circle_outline_rounded,
+                        obscure: !_visible,
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _submit(),
+                        validator: (value) => value == _next.text
+                            ? null
+                            : 'passwords_dont_match'.tr(),
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      GlowButton(
+                        onPressed: _saving ? null : _submit,
+                        busy: _saving,
+                        label: 'change_password'.tr(),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: Spacing.xxl),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VisibilityToggle extends StatelessWidget {
+  const _VisibilityToggle({required this.visible, required this.onChanged});
+
+  final bool visible;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(
+        visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        size: 19,
+      ),
+      onPressed: () => onChanged(!visible),
     );
   }
 }

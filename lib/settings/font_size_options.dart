@@ -18,8 +18,6 @@ class SizeOptionsState extends State<SizeOptions> {
 
   @override
   Widget build(BuildContext context) {
-    // Read straight from the provider so the slider and the rest of the app can
-    // never show different sizes.
     final fontSizeProvider = context.watch<FontSizeProvider>();
     final fontSize = fontSizeProvider.fontSize;
     Color buttonColor = getButtonColor(context);

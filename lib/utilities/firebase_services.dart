@@ -1,18 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Reads of the signed-in user's profile, plus lookups of other users.
-///
-/// The signed-in user's document is fetched once and cached. Role, company and
-/// display name all live in that single document, and the app asks for one or
-/// another of them on nearly every screen — previously as a separate Firestore
-/// read each time, which is the main driver of read volume in the app.
-///
-/// The cache is static because callers construct `FirebaseServices()` ad hoc
-/// rather than sharing one instance; a per-instance cache would never be hit.
-/// It is keyed by uid so a different user can never read a stale profile, and
-/// [invalidateCache] must still be called on sign-out so a signed-out user's
-/// details do not linger in memory.
 class FirebaseServices {
   FirebaseServices({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _db = firestore ?? FirebaseFirestore.instance,
@@ -24,7 +12,6 @@ class FirebaseServices {
   static String? _cachedUid;
   static Map<String, dynamic>? _cachedProfile;
 
-  /// Drops the cached profile. Call on sign-out and on account deletion.
   static void invalidateCache() {
     _cachedUid = null;
     _cachedProfile = null;
@@ -45,10 +32,6 @@ class FirebaseServices {
     return data;
   }
 
-  /// Whether the signed-in user may administer surveys and appointments.
-  ///
-  /// This is a convenience for hiding UI only. It is not a security boundary —
-  /// Firestore rules are what actually keep a non-admin from writing.
   Future<bool> fetchAdminStatus() async {
     final role = (await _currentProfile())?['role'] as String?;
     return role == 'admin' || role == 'moderator' || role == 'superadmin';
@@ -57,11 +40,11 @@ class FirebaseServices {
   Future<bool> isSuperAdminUser() async =>
       ((await _currentProfile())?['role'] as String?) == 'superadmin';
 
-  /// The company the signed-in user belongs to, or `null` if unknown.
-  ///
-  /// This is the single source of truth. Earlier builds also kept a copy in
-  /// `SharedPreferences` that nothing ever wrote, so every read came back null
-  /// and appointment creation failed on it.
+  Future<bool> canManagePeople() async {
+    final role = (await _currentProfile())?['role'] as String?;
+    return role == 'admin' || role == 'superadmin';
+  }
+
   Future<String?> currentCompanyId() async {
     final companyId = (await _currentProfile())?['companyId'] as String?;
     return (companyId == null || companyId.isEmpty) ? null : companyId;
