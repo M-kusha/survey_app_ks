@@ -128,20 +128,14 @@ class MyApp extends StatelessWidget {
         theme: theme,
         darkTheme: darkTheme,
 
-        builder: (context, child) {
-          final media = MediaQuery.of(context);
-          final systemScale = media.textScaler.scale(1);
-          final preferredScale = context.watch<FontSizeProvider>().textScale;
-
-          return MediaQuery(
-            data: media.copyWith(
-              textScaler: TextScaler.linear(
-                (systemScale * preferredScale).clamp(0.8, 3.0),
-              ),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(
+              context.watch<FontSizeProvider>().textScale,
             ),
-            child: child!,
-          );
-        },
+          ),
+          child: child!,
+        ),
         home: const _SessionLanding(),
       ),
     );
