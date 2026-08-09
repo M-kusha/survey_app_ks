@@ -133,7 +133,7 @@
   "deadline_tomorrow": "Endet morgen",
   "delete": "Löschen",
   "delete_account": "Konto löschen",
-  "delete_account_blocked": "Eine Inhaberin oder ein Inhaber kann das eigene Konto nicht loeschen",
+  "delete_account_blocked": "Inhaberinnen und Inhaber können ihr Konto nicht löschen. Schließen Sie zuerst das Unternehmen — danach ist Ihr Konto ein gewöhnliches und die Option erscheint.",
   "delete_account_hint": "Entfernt dein Konto und deine Daten dauerhaft",
   "delete_account_warning": "Das laesst sich nicht rueckgaengig machen. Profil, Notizen und Antworten werden endgueltig entfernt.",
   "delete_appointment": "Löschen",

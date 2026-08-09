@@ -419,6 +419,9 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
     return SettingsGroup(
       title: 'danger_zone'.tr(),
+      // Says what to do instead, rather than leaving the owner wondering why
+      // everyone else has a control they do not.
+      footnote: _isSuperAdmin ? 'delete_account_blocked'.tr() : null,
       children: [
         SettingsTile(
           icon: Icons.logout_rounded,
@@ -428,15 +431,25 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
           onTap: _signOut,
         ),
 
-        SettingsTile(
-          icon: Icons.delete_outline_rounded,
-          title: 'delete_account'.tr(),
-          subtitle: _isSuperAdmin
-              ? 'delete_account_blocked'.tr()
-              : 'delete_account_hint'.tr(),
-          tint: scheme.error,
-          onTap: _confirmDelete,
-        ),
+        // Not shown to the company's owner.
+        //
+        // An admin or a moderator is a role inside a company and nothing more:
+        // deleting their account takes nothing else with it. The owner is the
+        // company - their account is what `createdCompany` is checked against,
+        // and removing it would leave a company nobody can administer, close or
+        // join. They close the company first, which resets them to an ordinary
+        // account, and then this appears.
+        //
+        // It used to be shown to them and then refuse in the sheet, which is a
+        // dead end dressed up as an action.
+        if (!_isSuperAdmin)
+          SettingsTile(
+            icon: Icons.delete_outline_rounded,
+            title: 'delete_account'.tr(),
+            subtitle: 'delete_account_hint'.tr(),
+            tint: scheme.error,
+            onTap: _confirmDelete,
+          ),
       ],
     );
   }
@@ -461,10 +474,10 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: Spacing.sm),
+            // No owner branch here any more: the row that opens this sheet is
+            // not shown to them at all.
             Text(
-              _isSuperAdmin
-                  ? 'delete_account_blocked'.tr()
-                  : 'delete_account_warning'.tr(),
+              'delete_account_warning'.tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

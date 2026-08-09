@@ -156,14 +156,28 @@ class _ProgressRule extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final radius = BorderRadius.circular(2);
+
     return LayoutBuilder(
-      builder: (context, constraints) => Align(
-        alignment: Alignment.centerLeft,
-        child: Container(
-          width: constraints.maxWidth * value.clamp(0.0, 1.0),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withValues(alpha: 0.25), color],
+      builder: (context, constraints) => DecoratedBox(
+        // The track. Without it only the filled part was drawn, so a card 10%
+        // of the way through its window showed a short coloured stub floating
+        // at the bottom left with nothing behind it to say what it measured -
+        // which reads as a rendering artefact, not as progress.
+        decoration: BoxDecoration(
+          color: scheme.outlineVariant.withValues(alpha: 0.45),
+          borderRadius: radius,
+        ),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: constraints.maxWidth * value.clamp(0.0, 1.0),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color.withValues(alpha: 0.25), color],
+              ),
+              borderRadius: radius,
             ),
           ),
         ),

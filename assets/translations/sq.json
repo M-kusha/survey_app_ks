@@ -133,7 +133,7 @@
   "deadline_tomorrow": "Mbyllet neser",
   "delete": "Fshij",
   "delete_account": "Fshij Llogarinë",
-  "delete_account_blocked": "Pronari i kompanise nuk mund te fshije llogarine e vet",
+  "delete_account_blocked": "Pronari i kompanisë nuk mund ta fshijë llogarinë e vet. Mbyllni fillimisht kompaninë — pas kësaj llogaria bëhet e zakonshme dhe opsioni shfaqet.",
   "delete_account_hint": "Heq perfundimisht llogarine dhe te dhenat tuaja",
   "delete_account_warning": "Kjo nuk mund te zhbehet. Profili, shenimet dhe pergjigjet hiqen perfundimisht.",
   "delete_appointment": "Fshij",

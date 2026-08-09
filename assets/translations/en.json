@@ -133,7 +133,7 @@
   "deadline_tomorrow": "Closes tomorrow",
   "delete": "Delete",
   "delete_account": "Delete Account",
-  "delete_account_blocked": "A company owner cannot delete their own account",
+  "delete_account_blocked": "A company owner cannot delete their account. Close the company first — once that completes you become an ordinary account and this appears.",
   "delete_account_hint": "Permanently removes your account and data",
   "delete_account_warning": "This cannot be undone. Your profile, notes and answers are removed for good.",
   "delete_appointment": "Delete",
