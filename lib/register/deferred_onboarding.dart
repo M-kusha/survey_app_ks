@@ -10,9 +10,12 @@ import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/core/widgets/aurora_background.dart';
 import 'package:echomeet/core/widgets/glass_panel.dart';
 import 'package:echomeet/login/login_logics.dart';
+import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 enum DeferredOnboardingType { createCompany, joinCompany }
 
@@ -233,8 +236,21 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
       _loading = false;
       _failure = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => NotificationNavigation.appReady(),
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationNavigation.appReady();
+      unawaited(_uploadPendingProfileImage());
+    });
+  }
+
+  Future<void> _uploadPendingProfileImage() async {
+    final registration = context.read<RegisterLogic>();
+    if (!registration.hasPendingProfileImage) return;
+    final uploaded = await registration.uploadPendingProfileImage();
+    if (uploaded || !mounted) return;
+    UIUtils.showSnackBar(
+      context,
+      'error_updating_profile_image'.tr(),
+      isError: true,
     );
   }
 

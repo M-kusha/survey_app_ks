@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:flutter/material.dart';
 
@@ -38,6 +43,54 @@ class RegisterLogic {
   final TextEditingController companyNameController = TextEditingController();
 
   String? selectedCompanyName;
+  Uint8List? _pendingProfileImage;
+  Future<bool>? _profileImageUpload;
+
+  Uint8List? get pendingProfileImage => _pendingProfileImage;
+  bool get hasPendingProfileImage => _pendingProfileImage != null;
+
+  void setProfileImage(Uint8List image) {
+    _pendingProfileImage = image;
+  }
+
+  void resetForRegistration() {
+    emailController.clear();
+    passwordController.clear();
+    fullnameController.clear();
+    birthdateController.clear();
+    companyNameController.clear();
+    selectedCompanyName = null;
+    _pendingProfileImage = null;
+  }
+
+  Future<bool> uploadPendingProfileImage() {
+    if (_pendingProfileImage == null) return Future.value(true);
+    return _profileImageUpload ??= _uploadPendingProfileImage().whenComplete(
+      () => _profileImageUpload = null,
+    );
+  }
+
+  Future<bool> _uploadPendingProfileImage() async {
+    final user = _auth.currentUser;
+    final image = _pendingProfileImage;
+    if (user == null || user.emailVerified != true || image == null) {
+      return false;
+    }
+
+    try {
+      final result = await FirebaseFunctions.instanceFor(region: 'europe-west4')
+          .httpsCallable('uploadProfileImage')
+          .call<Map<String, dynamic>>({'jpegBase64': base64Encode(image)});
+      if (result.data['path'] != profileImagePathFor(user.uid)) return false;
+      final revision = result.data['revision'];
+      if (revision is! int || revision < 1) return false;
+      _pendingProfileImage = null;
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> registerUser({
     required ProfileType profileType,
     String? existingCompanyId,

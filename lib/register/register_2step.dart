@@ -1,10 +1,15 @@
+import 'dart:typed_data';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/profile/profile_image_sanitizer.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/register/register_3step.dart';
 import 'package:echomeet/register/register_logics.dart';
 import 'package:echomeet/register/register_shell.dart';
+import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 class Register2step extends StatefulWidget {
   final RegisterLogic registerLogic;
@@ -42,6 +47,24 @@ class _Register2stepState extends State<Register2step> {
     );
   }
 
+  Future<void> _pickImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null || !mounted) return;
+
+    try {
+      final image = await sanitizeProfileImage(picked);
+      if (!mounted) return;
+      setState(() => _logic.setProfileImage(image));
+    } catch (_) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(
+        context,
+        'error_updating_profile_image'.tr(),
+        isError: true,
+      );
+    }
+  }
+
   Future<void> _pickBirthdate() async {
     final now = DateTime.now();
 
@@ -74,6 +97,8 @@ class _Register2stepState extends State<Register2step> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            _AvatarPicker(image: _logic.pendingProfileImage, onTap: _pickImage),
+            const SizedBox(height: Spacing.xl),
             AppTextField(
               label: 'fullname'.tr(),
               controller: _logic.fullnameController,
@@ -123,6 +148,61 @@ class _Register2stepState extends State<Register2step> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _AvatarPicker extends StatelessWidget {
+  const _AvatarPicker({required this.image, required this.onTap});
+
+  final Uint8List? image;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hasImage = image != null;
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            height: 84,
+            width: 84,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.primary.withValues(alpha: 0.10),
+              border: Border.all(
+                color: scheme.primary.withValues(alpha: hasImage ? 0.9 : 0.35),
+                width: 2,
+              ),
+              image: hasImage
+                  ? DecorationImage(
+                      image: MemoryImage(image!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: hasImage
+                ? null
+                : Icon(
+                    Icons.add_a_photo_outlined,
+                    color: scheme.primary,
+                    size: 26,
+                  ),
+          ),
+        ),
+        const SizedBox(height: Spacing.sm),
+        Text(
+          hasImage
+              ? 'change_photo'.tr()
+              : '${'add_photo'.tr()} · ${'optional'.tr()}',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
     );
   }
 }

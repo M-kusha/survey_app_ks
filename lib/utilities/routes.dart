@@ -22,7 +22,10 @@ class AppRoutes {
     return {
       '/settings': (context) => _protected(context, const SettingsPageUI()),
       '/login': (BuildContext context) => const LoginPage(),
-      '/register': (context) => Register1step(registerLogic: RegisterLogic()),
+      '/register': (context) {
+        final logic = context.read<RegisterLogic>()..resetForRegistration();
+        return Register1step(registerLogic: logic);
+      },
       '/reset_password': (context) => const ResetPasswordPage(),
       '/account-deletion': (context) => const AccountDeletionInfoPage(),
       '/home': (context) => _protected(context, const BottomNavigation()),
