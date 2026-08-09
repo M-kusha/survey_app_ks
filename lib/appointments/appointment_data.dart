@@ -86,6 +86,7 @@ class TimeSlot {
 
 class Appointment {
   String? companyId;
+  String? createdBy;
   String appointmentId;
   String title;
   String description;
@@ -104,6 +105,7 @@ class Appointment {
 
   Appointment({
     this.companyId,
+    this.createdBy,
     required this.appointmentId,
     required this.title,
     required this.description,
@@ -119,6 +121,7 @@ class Appointment {
   static Appointment fromFirestore(Map<String, dynamic> map) {
     return Appointment(
       companyId: map['companyId'],
+      createdBy: map['createdBy'] as String?,
       title: map['title'],
       description: map['description'],
       availableDates: List<DateTime>.from(
@@ -167,6 +170,10 @@ class Appointment {
           .toList(),
       'appointmentId': appointmentId,
       'expirationDate': expirationDate.toIso8601String(),
+      // A Timestamp lives beside the legacy ISO string so security rules and
+      // scheduled functions can compare the deadline without breaking reads
+      // of existing appointments.
+      'expirationAt': Timestamp.fromDate(expirationDate),
       'confirmedTimeSlots': confirmedTimeSlots
           .map((ts) => ts.toFirestore())
           .toList(),
@@ -175,6 +182,7 @@ class Appointment {
     };
 
     if (companyId != null) data['companyId'] = companyId;
+    if (createdBy != null) data['createdBy'] = createdBy;
 
     return data;
   }

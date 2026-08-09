@@ -1,12 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/edit/appointment_edit_conflict.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AppointmentService {
-  AppointmentService({FirebaseServices? userServices})
-    : _userServices = userServices ?? FirebaseServices();
+  AppointmentService({
+    FirebaseServices? userServices,
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+  }) : _userServices = userServices ?? FirebaseServices(),
+       _db = firestore ?? FirebaseFirestore.instance,
+       _auth = auth ?? FirebaseAuth.instance;
 
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
+  final FirebaseAuth _auth;
   final FirebaseServices _userServices;
 
   Future<String> createAppointment(Appointment appointment) async {
@@ -16,11 +24,16 @@ class AppointmentService {
         'Cannot create an appointment: the signed-in user has no companyId.',
       );
     }
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) {
+      throw StateError('Cannot create an appointment while signed out.');
+    }
 
     final document = _db.collection('appointments').doc();
 
     appointment.appointmentId = document.id;
     appointment.companyId = companyId;
+    appointment.createdBy = userId;
 
     await document.set(appointment.toFirestore());
 
@@ -56,55 +69,82 @@ class AppointmentService {
     return false;
   }
 
-  Future<void> updateParticipantStatus(
-    String userId,
-    String appointmentId,
-    String userName,
-    DateTime date,
-    TimeSlot timeSlot,
-    String status,
-  ) async {
-    final appointmentRef = FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(appointmentId);
+  Future<void> saveVotes({
+    required String userId,
+    required String appointmentId,
+    required String userName,
+    required List<({TimeSlot slot, String status})> votes,
+  }) async {
+    if (votes.isEmpty) return;
 
-    final participantId = '$userId-${timeSlot.start}-${timeSlot.end}';
+    final appointmentRef = _db.collection('appointments').doc(appointmentId);
+    final batch = _db.batch();
 
-    final participantData = {
-      'userName': userName,
-      'date': date.toIso8601String(),
-      'timeSlot': {
-        'start': timeSlot.start.toIso8601String(),
-        'end': timeSlot.end.toIso8601String(),
-      },
-      'status': status,
-      'userId': userId,
-      'participated': true,
-    };
+    for (final vote in votes) {
+      final slot = vote.slot;
+      final participantId =
+          '$userId-${slot.start.toIso8601String()}-${slot.end.toIso8601String()}';
+      batch.set(appointmentRef.collection('participants').doc(participantId), {
+        'userName': userName,
+        'date': slot.start.toIso8601String(),
+        // Store the complete offered slot. Security rules can then require an
+        // exact match with availableTimeSlots instead of trusting arbitrary
+        // start/end values supplied by the client.
+        'timeSlot': slot.toFirestore(),
+        'status': vote.status,
+        'userId': userId,
+        'participated': true,
+      });
+    }
 
-    await appointmentRef
-        .collection('participants')
-        .doc(participantId)
-        .set(participantData);
+    // The trusted vote-create trigger derives participantUserIds on the parent.
+    // Keeping the client out of that field closes the parent-only forgery path.
+    await batch.commit();
   }
 
-  Future<void> registerParticipation(
-    String appointmentId,
-    String userId,
-  ) async {
-    await _db.collection('appointments').doc(appointmentId).update({
-      'participantUserIds': FieldValue.arrayUnion([userId]),
+  Future<void> updateAppointment({
+    required String appointmentId,
+    required AppointmentEditBaseline baseline,
+    required String title,
+    required String description,
+    required List<TimeSlot> availableTimeSlots,
+    required DateTime expirationDate,
+    required bool reopenVoting,
+  }) async {
+    final docRef = _db.collection('appointments').doc(appointmentId);
+
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      final current = snapshot.data();
+      if (!snapshot.exists || current == null) {
+        throw const AppointmentEditMissing();
+      }
+      if (!baseline.matchesFirestore(current)) {
+        throw const AppointmentEditConflict();
+      }
+
+      final currentConfirmed =
+          ((current['confirmedTimeSlots'] as List<dynamic>?) ?? const []).map(
+            (slot) => Map<String, dynamic>.from(slot as Map),
+          );
+      final confirmation = mergeAppointmentConfirmation(
+        editedSlots: availableTimeSlots.map((slot) => slot.toFirestore()),
+        currentConfirmedSlots: currentConfirmed,
+        reopenVoting: reopenVoting,
+      );
+
+      transaction.update(docRef, {
+        'title': title,
+        'description': description,
+        'availableDates': availableTimeSlots
+            .map((slot) => slot.start.toIso8601String())
+            .toList(),
+        'availableTimeSlots': confirmation.availableSlots,
+        'expirationDate': expirationDate.toIso8601String(),
+        'expirationAt': Timestamp.fromDate(expirationDate),
+        'confirmedTimeSlots': confirmation.confirmedSlots,
+      });
     });
-  }
-
-  Future<void> updateAppointment(Appointment updatedAppointment) async {
-    final docRef = FirebaseFirestore.instance
-        .collection('appointments')
-        .doc(updatedAppointment.appointmentId);
-
-    Map<String, dynamic> updatedData = updatedAppointment.toFirestore();
-
-    await docRef.update(updatedData);
   }
 
   Stream<List<TimeSlot>> streamConfirmedTimeSlots(String appointmentId) {
@@ -123,9 +163,37 @@ class AppointmentService {
     });
   }
 
+  Stream<Appointment?> watchAppointment(String appointmentId) {
+    return _db.collection('appointments').doc(appointmentId).snapshots().map((
+      snapshot,
+    ) {
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) return null;
+      return Appointment.fromFirestore(data);
+    });
+  }
+
+  Stream<List<AppointmentParticipants>> watchParticipants(
+    String appointmentId,
+  ) {
+    return _db
+        .collection('appointments')
+        .doc(appointmentId)
+        .collection('participants')
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (document) =>
+                    AppointmentParticipants.fromFirestore(document.data()),
+              )
+              .toList(growable: false),
+        );
+  }
+
   Future<String> fetchUserNameById(String userId) async {
     var userDoc = await FirebaseFirestore.instance
-        .collection('users')
+        .collection('memberDirectory')
         .doc(userId)
         .get();
     if (userDoc.exists) {
@@ -138,7 +206,7 @@ class AppointmentService {
   Future<String> fetchProfileImage(String userId) async {
     if (userId.isNotEmpty) {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
+          .collection('memberDirectory')
           .doc(userId)
           .get();
       return (userDoc.data() as Map<String, dynamic>)['profileImage'] ?? '';
@@ -150,46 +218,47 @@ class AppointmentService {
     String appointmentId,
     TimeSlot timeSlotToConfirm,
   ) async {
-    final DocumentReference docRef = _db
-        .collection('appointments')
-        .doc(appointmentId);
+    final docRef = _db.collection('appointments').doc(appointmentId);
+    final start = timeSlotToConfirm.start.toIso8601String();
+    final end = timeSlotToConfirm.end.toIso8601String();
 
-    final DocumentSnapshot docSnapshot = await docRef.get();
-    if (!docSnapshot.exists) throw Exception("Appointment not found");
-
-    List<dynamic> availableTimeSlots =
-        (docSnapshot.data() as Map<String, dynamic>)['availableTimeSlots'] ??
-        [];
-    List<dynamic> confirmedTimeSlots =
-        (docSnapshot.data() as Map<String, dynamic>)['confirmedTimeSlots'] ??
-        [];
-
-    bool found = false;
-    for (int i = 0; i < availableTimeSlots.length; i++) {
-      if (availableTimeSlots[i]['start'] ==
-          timeSlotToConfirm.start.toIso8601String()) {
-        availableTimeSlots[i]['isConfirmed'] = true;
-        found = true;
-        break;
+    await _db.runTransaction((transaction) async {
+      final snapshot = await transaction.get(docRef);
+      final data = snapshot.data();
+      if (!snapshot.exists || data == null) {
+        throw StateError('Appointment not found.');
       }
-    }
 
-    if (!found) throw Exception("Time slot not found in appointment");
+      final available = ((data['availableTimeSlots'] as List<dynamic>?) ?? [])
+          .map((slot) => Map<String, dynamic>.from(slot as Map))
+          .toList();
+      final confirmed = ((data['confirmedTimeSlots'] as List<dynamic>?) ?? [])
+          .map((slot) => Map<String, dynamic>.from(slot as Map))
+          .toList();
 
-    if (!confirmedTimeSlots.any(
-      (ts) => ts['start'] == timeSlotToConfirm.start.toIso8601String(),
-    )) {
-      confirmedTimeSlots.add({
-        'start': timeSlotToConfirm.start.toIso8601String(),
-        'end': timeSlotToConfirm.end.toIso8601String(),
-        'expirationDate': timeSlotToConfirm.expirationDate.toIso8601String(),
-        'isConfirmed': true,
+      if (confirmed.isNotEmpty) {
+        final alreadySelected =
+            confirmed.length == 1 &&
+            confirmed.single['start'] == start &&
+            confirmed.single['end'] == end;
+        if (alreadySelected) return;
+        throw StateError('Another time slot is already confirmed.');
+      }
+
+      Map<String, dynamic>? selected;
+      for (final slot in available) {
+        final isSelected = slot['start'] == start && slot['end'] == end;
+        slot['isConfirmed'] = isSelected;
+        if (isSelected) selected = slot;
+      }
+      if (selected == null) {
+        throw StateError('Time slot not found in appointment.');
+      }
+
+      transaction.update(docRef, {
+        'availableTimeSlots': available,
+        'confirmedTimeSlots': [Map<String, dynamic>.from(selected)],
       });
-    }
-
-    await docRef.update({
-      'availableTimeSlots': availableTimeSlots,
-      'confirmedTimeSlots': confirmedTimeSlots,
     });
   }
 

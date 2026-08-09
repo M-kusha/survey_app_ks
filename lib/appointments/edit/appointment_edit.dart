@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/create/time_slot_editor.dart';
+import 'package:echomeet/appointments/edit/appointment_edit_conflict.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
@@ -33,15 +34,31 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
   final _service = AppointmentService();
   final _formKey = GlobalKey<FormState>();
 
-  late final _title = TextEditingController(text: widget.appointment.title);
-  late final _description = TextEditingController(
-    text: widget.appointment.description,
-  );
-
-  late List<TimeSlot> _slots = [...widget.appointment.availableTimeSlots];
-  late DateTime _deadline = widget.appointment.expirationDate;
+  late final TextEditingController _title;
+  late final TextEditingController _description;
+  late final AppointmentEditBaseline _baseline;
+  late List<TimeSlot> _slots;
+  late DateTime _deadline;
 
   bool _saving = false;
+  bool _reopenVoting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseline = AppointmentEditBaseline.fromAppointment(widget.appointment);
+    _title = TextEditingController(text: widget.appointment.title);
+    _description = TextEditingController(text: widget.appointment.description);
+    _slots = widget.appointment.availableTimeSlots.map(_copySlot).toList();
+    _deadline = widget.appointment.expirationDate;
+  }
+
+  TimeSlot _copySlot(TimeSlot slot) => TimeSlot(
+    start: slot.start,
+    end: slot.end,
+    expirationDate: slot.expirationDate,
+    isConfirmed: slot.isConfirmed,
+  );
 
   @override
   void dispose() {
@@ -90,6 +107,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
 
     if (confirmed != true) return;
     setState(() {
+      _reopenVoting = true;
       _slots = [
         for (final slot in _slots)
           TimeSlot(
@@ -110,19 +128,25 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
 
     setState(() => _saving = true);
 
-    final appointment = widget.appointment
-      ..title = _title.text.trim()
-      ..description = _description.text.trim()
-      ..availableTimeSlots = _slots
-      ..availableDates = _slots.map((slot) => slot.start).toList()
-      ..confirmedTimeSlots = _slots.where((slot) => slot.isConfirmed).toList()
-      ..expirationDate = _deadline;
-
     try {
-      await _service.updateAppointment(appointment);
+      await _service.updateAppointment(
+        appointmentId: widget.appointment.appointmentId,
+        baseline: _baseline,
+        title: _title.text.trim(),
+        description: _description.text.trim(),
+        availableTimeSlots: _slots,
+        expirationDate: _deadline,
+        reopenVoting: _reopenVoting,
+      );
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'appointment_updated'.tr());
       Navigator.pop(context, true);
+    } on AppointmentEditConflict {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'appointment_edit_conflict'.tr());
+    } on AppointmentEditMissing {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'appointment_deleted'.tr());
     } catch (_) {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());

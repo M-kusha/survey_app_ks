@@ -91,4 +91,26 @@ void main() {
       expect(deadline.progress, lessThanOrEqualTo(1));
     });
   });
+
+  group('nearest refresh boundary', () {
+    test('selects the nearest future deadline regardless of input order', () {
+      final nearest = nearestFutureDeadline([
+        now.add(const Duration(hours: 5)),
+        now.subtract(const Duration(minutes: 1)),
+        now.add(const Duration(minutes: 20)),
+      ], now: now);
+
+      expect(nearest, now.add(const Duration(minutes: 20)));
+    });
+
+    test('ignores boundaries that have already crossed', () {
+      expect(
+        nearestFutureDeadline([
+          now,
+          now.subtract(const Duration(seconds: 1)),
+        ], now: now),
+        isNull,
+      );
+    });
+  });
 }

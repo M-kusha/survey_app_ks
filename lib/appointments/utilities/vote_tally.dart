@@ -27,15 +27,21 @@ enum VoteStatus {
   };
 }
 
+typedef SlotKey = ({DateTime start, DateTime end});
+
+SlotKey slotKeyOf(TimeSlot slot) => (start: slot.start, end: slot.end);
+
 class SlotTally {
   const SlotTally({
     required this.start,
+    this.end,
     required this.yes,
     required this.maybe,
     required this.no,
   });
 
   final DateTime start;
+  final DateTime? end;
   final int yes;
   final int maybe;
   final int no;
@@ -43,6 +49,9 @@ class SlotTally {
   int get responses => yes + maybe + no;
 
   int get score => yes * VoteStatus.yes.weight + maybe;
+
+  bool matches(TimeSlot slot) =>
+      start == slot.start && (end == null || end == slot.end);
 }
 
 class AppointmentTally {
@@ -53,7 +62,7 @@ class AppointmentTally {
   final SlotTally? leader;
 
   SlotTally? forSlot(TimeSlot slot) =>
-      slots.where((tally) => tally.start == slot.start).firstOrNull;
+      slots.where((tally) => tally.matches(slot)).firstOrNull;
 
   bool get isTied {
     final best = leader?.score;
@@ -66,13 +75,13 @@ AppointmentTally tallyVotes(
   List<TimeSlot> slots,
   List<AppointmentParticipants> votes,
 ) {
-  final byUser = <String, Map<DateTime, VoteStatus>>{};
+  final byUser = <String, Map<SlotKey, VoteStatus>>{};
 
   for (final vote in votes) {
     final status = VoteStatus.fromWire(vote.status);
     if (status == null) continue;
 
-    (byUser[vote.userId] ??= {})[vote.timeSlot.start] = status;
+    (byUser[vote.userId] ??= {})[slotKeyOf(vote.timeSlot)] = status;
   }
 
   final tallies = [
@@ -83,7 +92,7 @@ AppointmentTally tallyVotes(
         var no = 0;
 
         for (final perSlot in byUser.values) {
-          switch (perSlot[slot.start]) {
+          switch (perSlot[slotKeyOf(slot)]) {
             case VoteStatus.yes:
               yes++;
             case VoteStatus.maybe:
@@ -95,7 +104,13 @@ AppointmentTally tallyVotes(
           }
         }
 
-        return SlotTally(start: slot.start, yes: yes, maybe: maybe, no: no);
+        return SlotTally(
+          start: slot.start,
+          end: slot.end,
+          yes: yes,
+          maybe: maybe,
+          no: no,
+        );
       }(),
   ];
 
@@ -109,7 +124,12 @@ SlotTally? _leaderOf(List<SlotTally> tallies) {
     if (tally.score == 0) continue;
     if (best == null ||
         tally.score > best.score ||
-        (tally.score == best.score && tally.start.isBefore(best.start))) {
+        (tally.score == best.score &&
+            (tally.start.isBefore(best.start) ||
+                (tally.start == best.start &&
+                    tally.end != null &&
+                    best.end != null &&
+                    tally.end!.isBefore(best.end!))))) {
       best = tally;
     }
   }
@@ -117,13 +137,13 @@ SlotTally? _leaderOf(List<SlotTally> tallies) {
   return best;
 }
 
-Map<DateTime, VoteStatus> votesOf(
+Map<SlotKey, VoteStatus> votesOf(
   String userId,
   List<AppointmentParticipants> votes,
 ) {
   return {
     for (final vote in votes)
       if (vote.userId == userId && VoteStatus.fromWire(vote.status) != null)
-        vote.timeSlot.start: VoteStatus.fromWire(vote.status)!,
+        slotKeyOf(vote.timeSlot): VoteStatus.fromWire(vote.status)!,
   };
 }

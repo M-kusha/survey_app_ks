@@ -61,7 +61,7 @@ void main() {
       expect(tally.forSlot(tuesday)!.yes, 1);
     });
 
-    test('matches a vote to its slot by start, not by object identity', () {
+    test('matches a vote to its full slot, not by object identity', () {
       // The screens compared TimeSlot instances with `==`, which the class does
       // not implement — so it was reference equality and only ever worked while
       // the same objects stayed in the widget tree.
@@ -73,6 +73,23 @@ void main() {
 
       final tally = tallyVotes([monday], [vote('a', rebuilt, VoteStatus.yes)]);
       expect(tally.forSlot(monday)!.yes, 1);
+    });
+
+    test('keeps slots with the same start and different ends distinct', () {
+      final shorter = TimeSlot(
+        start: monday.start,
+        end: monday.start.add(const Duration(minutes: 30)),
+        expirationDate: monday.expirationDate,
+      );
+      final tally = tallyVotes(
+        [shorter, monday],
+        [vote('a', shorter, VoteStatus.yes), vote('b', monday, VoteStatus.no)],
+      );
+
+      expect(tally.forSlot(shorter)!.yes, 1);
+      expect(tally.forSlot(shorter)!.no, 0);
+      expect(tally.forSlot(monday)!.yes, 0);
+      expect(tally.forSlot(monday)!.no, 1);
     });
 
     test('two people with the same name are two votes', () {
@@ -199,8 +216,8 @@ void main() {
       ]);
 
       expect(mine, {
-        monday.start: VoteStatus.yes,
-        tuesday.start: VoteStatus.no,
+        slotKeyOf(monday): VoteStatus.yes,
+        slotKeyOf(tuesday): VoteStatus.no,
       });
     });
 

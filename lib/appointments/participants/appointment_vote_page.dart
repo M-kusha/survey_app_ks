@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/edit/appointment_edit.dart';
@@ -35,42 +37,156 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
 
   List<AppointmentParticipants> _votes = [];
 
-  final Map<DateTime, VoteStatus> _pending = {};
+  final Map<SlotKey, VoteStatus> _pending = {};
 
   bool _loading = true;
   bool _saving = false;
   String? _error;
+  Timer? _deadlineTimer;
+  StreamSubscription<Appointment?>? _appointmentSubscription;
+  StreamSubscription<List<AppointmentParticipants>>? _votesSubscription;
+  var _streamGeneration = 0;
+  var _appointmentSeen = false;
+  var _votesSeen = false;
+  var _appointmentDeleted = false;
+  String? _appointmentError;
+  String? _votesError;
 
-  Appointment get _appointment => widget.appointment;
+  late Appointment _appointment;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _appointment = widget.appointment;
+    unawaited(_load());
+  }
+
+  @override
+  void dispose() {
+    _streamGeneration++;
+    _deadlineTimer?.cancel();
+    final appointmentSubscription = _appointmentSubscription;
+    final votesSubscription = _votesSubscription;
+    if (appointmentSubscription != null) {
+      unawaited(appointmentSubscription.cancel());
+    }
+    if (votesSubscription != null) {
+      unawaited(votesSubscription.cancel());
+    }
+    super.dispose();
+  }
+
+  void _scheduleDeadlineRefresh() {
+    _deadlineTimer?.cancel();
+    final remaining = _appointment.expirationDate.difference(DateTime.now());
+    if (remaining.isNegative) return;
+
+    // deadlineFor treats an exact zero duration as still open. Rebuild just
+    // after the boundary so controls cannot remain enabled on an idle page.
+    _deadlineTimer = Timer(remaining + const Duration(milliseconds: 10), () {
+      if (!mounted) return;
+      setState(_pending.clear);
+    });
   }
 
   Future<void> _load() async {
+    final generation = ++_streamGeneration;
+    final previousAppointmentSubscription = _appointmentSubscription;
+    final previousVotesSubscription = _votesSubscription;
+    _appointmentSubscription = null;
+    _votesSubscription = null;
+    await Future.wait<void>([
+      if (previousAppointmentSubscription != null)
+        previousAppointmentSubscription.cancel(),
+      if (previousVotesSubscription != null) previousVotesSubscription.cancel(),
+    ]);
+    if (!mounted || generation != _streamGeneration) return;
+
+    _scheduleDeadlineRefresh();
     setState(() {
       _loading = true;
       _error = null;
+      _appointmentSeen = false;
+      _votesSeen = false;
+      _appointmentError = null;
+      _votesError = null;
     });
 
-    try {
-      final votes = await _service.fetchAllParticipants(
-        _appointment.appointmentId,
-      );
-      if (!mounted) return;
-      setState(() {
-        _votes = votes;
-        _loading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _error = '$e';
-        _loading = false;
-      });
-    }
+    final appointmentId = _appointment.appointmentId;
+    _appointmentSubscription = _service
+        .watchAppointment(appointmentId)
+        .listen(
+          (appointment) {
+            if (!mounted || generation != _streamGeneration) return;
+            if (appointment == null) {
+              _deadlineTimer?.cancel();
+              setState(() {
+                _appointmentSeen = true;
+                _appointmentDeleted = true;
+                _appointmentError = 'appointment_deleted'.tr();
+                _pending.clear();
+                _applyLiveState();
+              });
+              return;
+            }
+
+            setState(() {
+              _appointment = appointment;
+              _appointmentSeen = true;
+              _appointmentDeleted = false;
+              _appointmentError = null;
+              final availableSlots = appointment.availableTimeSlots
+                  .map(slotKeyOf)
+                  .toSet();
+              _pending.removeWhere((slot, _) => !availableSlots.contains(slot));
+              final confirmed =
+                  appointment.confirmedTimeSlots.isNotEmpty ||
+                  appointment.availableTimeSlots.any(
+                    (slot) => slot.isConfirmed,
+                  );
+              if (confirmed ||
+                  !appointment.expirationDate.isAfter(DateTime.now())) {
+                _pending.clear();
+              }
+              _applyLiveState();
+            });
+            _scheduleDeadlineRefresh();
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!mounted || generation != _streamGeneration) return;
+            setState(() {
+              _appointmentSeen = true;
+              _appointmentError = '$error';
+              _applyLiveState();
+            });
+          },
+        );
+    _votesSubscription = _service
+        .watchParticipants(appointmentId)
+        .listen(
+          (votes) {
+            if (!mounted || generation != _streamGeneration) return;
+            setState(() {
+              _votes = votes;
+              _votesSeen = true;
+              _votesError = null;
+              _applyLiveState();
+            });
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            if (!mounted || generation != _streamGeneration) return;
+            setState(() {
+              _votesSeen = true;
+              _votesError = '$error';
+              _applyLiveState();
+            });
+          },
+        );
+  }
+
+  void _applyLiveState() {
+    _loading = !_appointmentSeen || !_votesSeen;
+    _error = _appointmentError ?? _votesError;
   }
 
   Deadline get _deadline => deadlineFor(
@@ -80,24 +196,31 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
   );
 
   TimeSlot? get _confirmedSlot =>
+      _appointment.confirmedTimeSlots.firstOrNull ??
       _appointment.availableTimeSlots.where((s) => s.isConfirmed).firstOrNull;
 
   bool get _canVote => !_deadline.isPassed && _confirmedSlot == null;
 
   VoteStatus? _statusFor(TimeSlot slot) =>
-      _pending[slot.start] ?? votesOf(_userId, _votes)[slot.start];
+      _pending[slotKeyOf(slot)] ?? votesOf(_userId, _votes)[slotKeyOf(slot)];
 
   void _choose(TimeSlot slot, VoteStatus status) {
+    if (!_canVote) return;
     setState(() {
       if (_statusFor(slot) == status) {
-        _pending[slot.start] = VoteStatus.maybe;
+        _pending[slotKeyOf(slot)] = VoteStatus.maybe;
       } else {
-        _pending[slot.start] = status;
+        _pending[slotKeyOf(slot)] = status;
       }
     });
   }
 
   Future<void> _submit() async {
+    if (!_canVote) {
+      if (_pending.isNotEmpty) setState(_pending.clear);
+      UIUtils.showSnackBar(context, 'voting_has_closed'.tr());
+      return;
+    }
     if (_pending.isEmpty) {
       Navigator.pop(context);
       return;
@@ -107,28 +230,41 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
 
     try {
       final name = await _service.fetchUserNameById(_userId);
-
-      for (final entry in _pending.entries) {
-        final slot = _appointment.availableTimeSlots.firstWhere(
-          (s) => s.start == entry.key,
-        );
-        await _service.updateParticipantStatus(
-          _userId,
-          _appointment.appointmentId,
-          name,
-          slot.start,
-          slot,
-          entry.value.wireName,
-        );
+      if (!_canVote) {
+        if (mounted) {
+          setState(_pending.clear);
+          UIUtils.showSnackBar(context, 'voting_has_closed'.tr());
+        }
+        return;
       }
-
-      await _service.registerParticipation(_appointment.appointmentId, _userId);
+      final votes = <({TimeSlot slot, String status})>[];
+      for (final entry in _pending.entries) {
+        final matching = _appointment.availableTimeSlots
+            .where((slot) => slotKeyOf(slot) == entry.key)
+            .firstOrNull;
+        if (matching != null) {
+          votes.add((slot: matching, status: entry.value.wireName));
+        }
+      }
+      if (votes.isEmpty) {
+        if (mounted) setState(_pending.clear);
+        return;
+      }
+      await _service.saveVotes(
+        userId: _userId,
+        appointmentId: _appointment.appointmentId,
+        userName: name,
+        votes: votes,
+      );
 
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (_) {
       if (!mounted) return;
-      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+      UIUtils.showSnackBar(
+        context,
+        (_canVote ? 'error_occurred' : 'voting_has_closed').tr(),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -168,7 +304,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       if (!mounted) return;
       setState(() {
         for (final s in _appointment.availableTimeSlots) {
-          s.isConfirmed = s.start == slot.start;
+          s.isConfirmed = slotKeyOf(s) == slotKeyOf(slot);
         }
       });
     } catch (_) {
@@ -186,7 +322,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       appBar: AppBar(
         title: Text(_appointment.title, overflow: TextOverflow.ellipsis),
         actions: [
-          if (widget.isAdmin)
+          if (widget.isAdmin && !_appointmentDeleted)
             IconButton(
               tooltip: 'appointment_edit'.tr(),
               icon: const Icon(Icons.edit_outlined),
@@ -201,7 +337,6 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
                     ),
                   ),
                 );
-                if (mounted) _load();
               },
             ),
         ],
@@ -235,12 +370,14 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
     }
 
-    if (_error case final error?) {
+    if (_error != null) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
-        action: TextButton(onPressed: _load, child: Text('retry'.tr())),
+        body: _appointmentDeleted ? 'appointment_deleted'.tr() : 'retry'.tr(),
+        action: _appointmentDeleted
+            ? null
+            : TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }
 
@@ -273,7 +410,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
                 myStatus: _statusFor(slot),
                 isLeader:
                     tally.leader != null &&
-                    tally.leader!.start == slot.start &&
+                    tally.leader!.matches(slot) &&
                     confirmed == null,
                 isTied: tally.isTied,
                 enabled: _canVote,
@@ -292,7 +429,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
 
   void _showVoters(TimeSlot slot) {
     final forSlot = _votes
-        .where((vote) => vote.timeSlot.start == slot.start)
+        .where((vote) => slotKeyOf(vote.timeSlot) == slotKeyOf(slot))
         .toList();
 
     showModalBottomSheet<void>(
