@@ -8,6 +8,7 @@ import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/notes/add_item_widget.dart';
 import 'package:echomeet/notes/detailed_notes.dart';
+import 'package:echomeet/notes/note_draft_store.dart';
 import 'package:echomeet/notes/note_query.dart';
 import 'package:echomeet/notes/notes_logics.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,7 @@ class TodoList extends StatefulWidget {
 
 class TodoListState extends State<TodoList> {
   final _backend = TodoListBackend();
+  late final _localStore = NoteDraftStore();
   final _searchController = TextEditingController();
 
   StreamSubscription<QuerySnapshot>? _subscription;
@@ -30,16 +32,50 @@ class TodoListState extends State<TodoList> {
   NoteSort _sort = NoteSort.newest;
   bool _loading = true;
   String? _error;
+  final Set<String> _activeUndoWindows = {};
+  final Set<String> _cleanupInFlight = {};
+  final Map<String, Timer> _cleanupTimers = {};
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
+    _listen();
+    unawaited(_resumeDeletionJournal());
+  }
+
+  void _listen({bool showLoading = false}) {
+    if (showLoading) {
+      setState(() {
+        _error = null;
+        _loading = true;
+      });
+    }
+    unawaited(_subscription?.cancel());
     _subscription = _backend.userNotesCollection.snapshots().listen(
       (snapshot) {
         if (!mounted) return;
+        final notes = <NoteItem>[];
+        for (final document in snapshot.docs) {
+          final data = document.data() as Map<String, dynamic>;
+          if (data['deletionPendingAt'] != null) {
+            final finalizeAfter =
+                (data['deletionFinalizeAfter'] as Timestamp?)?.toDate() ??
+                DateTime.now();
+            if (!_activeUndoWindows.contains(document.id)) {
+              _scheduleCleanup(
+                PendingNoteDeletion(
+                  noteId: document.id,
+                  finalizeAfterMillis: finalizeAfter.millisecondsSinceEpoch,
+                ),
+              );
+            }
+          } else {
+            notes.add(_toNote(document));
+          }
+        }
         setState(() {
-          _notes = snapshot.docs.map(_toNote).toList();
+          _notes = notes;
           _error = null;
           _loading = false;
         });
@@ -58,6 +94,9 @@ class TodoListState extends State<TodoList> {
   @override
   void dispose() {
     _subscription?.cancel();
+    for (final timer in _cleanupTimers.values) {
+      timer.cancel();
+    }
     _searchController.dispose();
     super.dispose();
   }
@@ -111,25 +150,161 @@ class TodoListState extends State<TodoList> {
   }
 
   Future<void> _delete(NoteItem note) async {
-    await _backend.deleteNote(note.id);
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text('note_deleted'.tr()),
-
-          showCloseIcon: true,
-          action: SnackBarAction(
-            label: 'undo'.tr(),
-            onPressed: () => _backend.restoreNote(
-              title: note.title,
-              completed: note.completed,
-            ),
-          ),
+    final deletion = PendingNoteDeletion(
+      noteId: note.id,
+      // Other devices wait long enough for an offline undo to synchronize.
+      // This device finalizes immediately when the Snackbar times out.
+      finalizeAfterMillis: DateTime.now()
+          .add(const Duration(minutes: 5))
+          .millisecondsSinceEpoch,
+    );
+    _activeUndoWindows.add(note.id);
+    try {
+      await _localStore.saveDeletion(deletion);
+      await _backend.stageNoteDeletion(
+        note.id,
+        finalizeAfter: DateTime.fromMillisecondsSinceEpoch(
+          deletion.finalizeAfterMillis,
         ),
       );
+    } catch (_) {
+      _activeUndoWindows.remove(note.id);
+      await _localStore.removeDeletion(note.id).catchError((_) {});
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context)..hideCurrentSnackBar();
+    Future<void>? undo;
+    final controller = messenger.showSnackBar(
+      SnackBar(
+        content: Text('note_deleted'.tr()),
+
+        showCloseIcon: true,
+        duration: const Duration(seconds: 6),
+        action: SnackBarAction(
+          label: 'undo'.tr(),
+          onPressed: () {
+            undo = _undoDeletion(deletion);
+          },
+        ),
+      ),
+    );
+
+    final reason = await controller.closed;
+    _activeUndoWindows.remove(note.id);
+    try {
+      if (reason == SnackBarClosedReason.action) {
+        await undo;
+      } else {
+        final confirmed = deletion.confirmDelete();
+        await _localStore.saveDeletion(confirmed);
+        await _finalizeDeletion(confirmed, force: true);
+      }
+    } catch (_) {
+      unawaited(_resumeDeletionJournal());
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+      }
+    }
+  }
+
+  Future<void> _undoDeletion(PendingNoteDeletion deletion) async {
+    final undo = deletion.requestUndo();
+    await _localStore.saveDeletion(undo);
+    await _backend.undoNoteDeletion(deletion.noteId);
+    await _localStore.removeDeletion(deletion.noteId);
+  }
+
+  Future<void> _resumeDeletionJournal() async {
+    List<PendingNoteDeletion> deletions;
+    try {
+      deletions = await _localStore.loadDeletions();
+    } catch (_) {
+      return;
+    }
+    for (final deletion in deletions) {
+      if (deletion.undoRequested) {
+        try {
+          await _backend.undoNoteDeletion(deletion.noteId);
+          await _localStore.removeDeletion(deletion.noteId);
+        } catch (_) {
+          _scheduleJournalRetry();
+        }
+      } else if (deletion.deleteConfirmed) {
+        unawaited(_finalizeDeletion(deletion, force: true));
+      } else {
+        _scheduleCleanup(deletion);
+      }
+    }
+  }
+
+  void _scheduleJournalRetry() {
+    _cleanupTimers['journal']?.cancel();
+    _cleanupTimers['journal'] = Timer(
+      const Duration(seconds: 10),
+      () => unawaited(_resumeDeletionJournal()),
+    );
+  }
+
+  void _scheduleCleanup(PendingNoteDeletion deletion) {
+    if (_activeUndoWindows.contains(deletion.noteId)) return;
+    final due = DateTime.fromMillisecondsSinceEpoch(
+      deletion.finalizeAfterMillis,
+    );
+    final delay = due.difference(DateTime.now());
+    _cleanupTimers[deletion.noteId]?.cancel();
+    _cleanupTimers[deletion.noteId] = Timer(
+      delay.isNegative ? Duration.zero : delay,
+      () => unawaited(_finalizeDeletion(deletion)),
+    );
+  }
+
+  Future<void> _finalizeDeletion(
+    PendingNoteDeletion deletion, {
+    bool force = false,
+  }) async {
+    if (!_cleanupInFlight.add(deletion.noteId)) return;
+    try {
+      if (!force) {
+        final local = await _localStore.loadDeletions();
+        final matching = local.where((item) => item.noteId == deletion.noteId);
+        if (matching.isNotEmpty && matching.first.undoRequested) {
+          await _backend.undoNoteDeletion(deletion.noteId);
+          await _localStore.removeDeletion(deletion.noteId);
+          _cleanupTimers.remove(deletion.noteId)?.cancel();
+          return;
+        }
+      }
+      final result = await _backend.finalizeNoteDeletion(
+        deletion.noteId,
+        ignoreGracePeriod: force,
+      );
+      switch (result) {
+        case NoteDeletionFinalization.deleted:
+          await _localStore.remove(deletion.noteId).catchError((_) {});
+          await _localStore.removeDeletion(deletion.noteId).catchError((_) {});
+          _cleanupTimers.remove(deletion.noteId)?.cancel();
+        case NoteDeletionFinalization.cancelled:
+          await _localStore.removeDeletion(deletion.noteId).catchError((_) {});
+          _cleanupTimers.remove(deletion.noteId)?.cancel();
+        case NoteDeletionFinalization.notReady:
+          _scheduleCleanup(deletion);
+      }
+    } catch (_) {
+      _cleanupTimers[deletion.noteId]?.cancel();
+      _cleanupTimers[deletion.noteId] = Timer(
+        const Duration(seconds: 10),
+        () => unawaited(_finalizeDeletion(deletion, force: force)),
+      );
+    } finally {
+      _cleanupInFlight.remove(deletion.noteId);
+    }
   }
 
   @override
@@ -240,11 +415,14 @@ class TodoListState extends State<TodoList> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_error case final error?) {
+    if (_error != null) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
+        action: TextButton(
+          onPressed: () => _listen(showLoading: true),
+          child: Text('retry'.tr()),
+        ),
       );
     }
 
