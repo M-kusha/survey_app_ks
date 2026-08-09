@@ -8,6 +8,23 @@ plugins {
     id "dev.flutter.flutter-gradle-plugin"
 }
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def requiredSigningProperties = [
+    "storeFile",
+    "storePassword",
+    "keyAlias",
+    "keyPassword",
+]
+def missingSigningProperties = requiredSigningProperties.findAll {
+    !keystoreProperties[it]?.trim()
+}
+def releaseSigningReady = keystorePropertiesFile.exists() && missingSigningProperties.isEmpty()
+
 android {
     namespace = "com.echomeet.app"
     compileSdk = flutter.compileSdkVersion
@@ -31,13 +48,45 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            release {
+                storeFile = file(keystoreProperties["storeFile"])
+                storePassword = keystoreProperties["storePassword"]
+                keyAlias = keystoreProperties["keyAlias"]
+                keyPassword = keystoreProperties["keyPassword"]
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Replace with a real signing config before publishing.
-            // Release builds are currently signed with the debug key, which
-            // Play will not accept.
-            signingConfig = signingConfigs.getByName("debug")
+            // Never produce a store artifact with the shared debug key.
+            signingConfig = releaseSigningReady ? signingConfigs.release : null
         }
+    }
+}
+
+def validateReleaseSigning = tasks.register("validateReleaseSigning") {
+    doLast {
+        if (!releaseSigningReady) {
+            def detail = keystorePropertiesFile.exists()
+                ? "Missing values: ${missingSigningProperties.join(', ')}"
+                : "Missing android/key.properties."
+            throw new GradleException(
+                "Release signing is not configured. ${detail} " +
+                "Copy android/key.properties.example, use the upload keystore, and keep both private."
+            )
+        }
+        if (!file(keystoreProperties["storeFile"]).exists()) {
+            throw new GradleException("Release signing storeFile does not exist.")
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == "preReleaseBuild") {
+        task.dependsOn(validateReleaseSigning)
     }
 }
 

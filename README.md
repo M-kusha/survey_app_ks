@@ -5,8 +5,8 @@ scheduling** by availability poll, and **surveys and graded tests** with
 scoring, review and PDF export.
 
 Built solo in 2023–24 and rebuilt from the ground up in 2026: a hardened
-security model with 78 rules tests, a company membership system, server-side
-notifications, and a complete Material 3 redesign.
+security model with an emulator-backed rules suite, a company membership
+system, server-side notifications, and a complete Material 3 redesign.
 
 ---
 
@@ -86,7 +86,7 @@ holds up in real use, along three lines.
 The database previously had **no server-side protection at all** — every rule
 that mattered lived in the UI, and the UI is a suggestion. Now:
 
-- Firestore and Storage rules, with **78 tests** against the emulator
+- Firestore and Storage rules, with more than 100 cases against the emulators
 - Company isolation: one company's data is unreachable from another
 - Two levels of privilege enforced in rules, not just hidden in the interface
 - `superadmin` grantable only at company creation, never afterwards, by anyone
@@ -102,8 +102,9 @@ that mattered lived in the UI, and the UI is a suggestion. Now:
 - **Membership as a real model** — join, approval queues, bans, removal, and a
   route back for anyone who loses a company
 - **Scheduled company closure** with a week's grace and a banner for every member
-- **Push notifications** — six Cloud Functions covering new surveys, new
-  meetings, confirmed times, join requests and deadline reminders
+- **Push notifications** — six notification handlers within fifteen deployed
+  backend functions, covering new surveys, meetings, confirmed times, join
+  requests and deadline reminders
 - **Notes** gained autosave, body previews, pinning and editable titles
 - **PDF export** for individuals, filtered groups and survey analytics
 - **Proportional scoring** for multiple choice — right options earn, wrong ones
@@ -201,14 +202,16 @@ exactly this reason. A moderator who can promote is an admin with extra steps.
   rule guarding a child reads its parent's `companyId` — so removing the parent
   first denies every child delete and strands the subcollection. Children first,
   batched, parent last.
-- The owner cannot delete their own account while they own a company, and an
-  admin cannot ban themselves. Both would leave a company nobody can administer.
+- Account deletion runs at a trusted server boundary with recent-authentication
+  enforcement. An owner must explicitly accept that deleting their account also
+  destroys every company they own; other members keep their accounts and notes.
+  An admin still cannot ban themselves.
 
-The one deliberate hole: `companies` is readable unauthenticated, because the
-"join an existing company" step lists them before the account exists. Company
-names are not secrets and nothing else is stored on the document. The proper fix
-is to create the auth account at the start of registration rather than the end;
-it is noted in the rules where it applies.
+Unauthenticated registration reads only `companyDirectory`, a public projection
+containing a company name and join policy. Ownership, deletion metadata and
+other tenant state remain private. Company and profile creation are deferred
+until the Auth account has verified its email, and a trusted callable completes
+the public/private documents atomically.
 
 ---
 
@@ -260,7 +263,7 @@ where there is no `BuildContext` left to read one from.
 
 | Suite | Count | What it covers |
 | --- | --- | --- |
-| `rules-tests/` | 78 | Firestore rules, against the emulator |
+| `rules-tests/` | 100+ cases | Firestore and Storage rules, against the emulators |
 | `test/unit/` | 8 files | Pure logic — scoring, tallies, queries, deadlines |
 | `test/widget/` | 6 files | Layout geometry and interaction |
 | `test/golden/` | 8 files | Design system and signed-out screens |
@@ -302,7 +305,7 @@ surfaces as an empty viewer in front of whoever needed the results.
 
 ## Notifications
 
-Six Cloud Functions, in `functions/`:
+Notifications are one part of the 15 Functions exported from `functions/`:
 
 | Trigger | Who hears |
 | --- | --- |
@@ -312,15 +315,20 @@ Six Cloud Functions, in `functions/`:
 | Someone asks to join | admins and the owner, never moderators |
 | Daily 09:00 | anyone who has **not yet answered** something closing within 24h |
 | Daily 03:30 | carries out company closures whose week has run out |
+| Hourly at minute 15 | removes expired account-deletion write locks; sends no message |
 
 Messages are addressed by device token rather than topic: a topic subscription
 outlives removal, bans and leaving, so somebody who lost access to a company
 would keep hearing from it.
 
-Full detail, including the free-tier maths and the region constraint, is in
+The full 15-export inventory, current schedule, and region constraint are in
 [docs/notifications.md](docs/notifications.md). Auth email wording is in
 [docs/email-templates.md](docs/email-templates.md) — those live in the Firebase
 console, not in this repository.
+
+The operator-owned privacy, contact, retention and store-listing inputs that
+cannot be derived from code are tracked in
+[docs/legal-release-inputs.md](docs/legal-release-inputs.md).
 
 ---
 
@@ -341,22 +349,25 @@ To point at your own project:
 
 ```bash
 flutterfire configure
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes,storage --project echomeet-app
 ```
 
 ---
 
 ## Deploying
 
-```bash
-flutter build web --release
-firebase deploy --only hosting
+Production rollout is ordered because the privacy projections, private survey
+keys, appointment timestamps/caches, and canonical avatars require guarded
+migrations between specific backend and client releases. Follow
+[docs/release-runbook.md](docs/release-runbook.md) from Gate 0; do not deploy
+individual rules, Functions, or clients out of sequence.
 
-firebase deploy --only firestore:rules,firestore:indexes,storage
-firebase deploy --only functions          # requires the Blaze plan
-```
+Android release builds fail closed until `android/key.properties` points to a
+real upload keystore. See [docs/release-signing.md](docs/release-signing.md).
 
-Android release signing still uses the debug key — see below.
+The public account-deletion instructions are available at
+`https://echomeet-app.web.app/#/account-deletion`. The route is part of the app;
+publishing it still requires the hosting deployment above.
 
 ---
 
@@ -364,12 +375,13 @@ Android release signing still uses the debug key — see below.
 
 What comes next, in rough priority order:
 
-- **Release signing.** `applicationId` is `com.echomeet.app`; release builds
-  still use the debug key. A proper keystore is the last step before store
-  submission, and must never enter this repository.
-- **Firebase App Check.** Rules control which *users* may do what; App Check
-  controls which *clients* may talk to the backend at all. The natural next
-  layer.
+- **Release credentials.** Android signing now fails closed when an upload key
+  is missing. The private Android keystore, Apple team/provisioning, APNs key,
+  web VAPID key and App Check provider keys remain release-environment inputs
+  and must never enter this repository.
+- **Firebase App Check enforcement rollout.** Client integration is complete and
+  the safe rollout is documented in `docs/app-check.md`. Provider registration,
+  metrics review and gradual console enforcement remain release-console tasks.
 - **Roles as custom claims** rather than Firestore fields. Every rule that
   checks a role currently costs a document read; claims are cheaper and cannot
   be reached by a client at all. Needs a function to set them.

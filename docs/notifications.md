@@ -7,20 +7,13 @@ switching the project to **Blaze**, which requires a payment method on the
 account. That is a change only the project owner can make, in the Firebase
 console, and nothing here does it automatically.
 
-The plan is pay-as-you-go with a permanent free allowance, and this app is not
-close to it:
-
-| | Free each month | What this app uses |
-| --- | --- | --- |
-| Function invocations | 2,000,000 | one per survey, meeting, confirmation and join request, plus 2 scheduled runs a day |
-| Compute time | 400,000 GB-seconds | a few seconds a day |
-| Cloud Messaging | unlimited, always free | all of it |
-| Scheduler jobs | 3 free | 2 |
-
-A company creating a survey a day and a couple of meetings a week lands in the
-low hundreds of invocations a month against an allowance of two million. Expect
-a bill of nothing. Set a budget alert anyway — the console will offer one when
-you upgrade, and it costs nothing to say yes.
+Pricing and free allowances can change, so the release owner must review the
+current Firebase and Google Cloud pricing pages rather than treating this file
+as a quote. The current source deploys three Scheduler jobs. They produce 26
+scheduled invocations on an ordinary day: one reminder sweep, one company-purge
+sweep, and an hourly account-deletion-lock sweep. Firestore event triggers and
+the three callables add usage when users act. Configure a budget alert before
+production deployment.
 
 ## Deploying
 
@@ -28,8 +21,24 @@ you upgrade, and it costs nothing to say yes.
 firebase deploy --only functions,firestore:indexes --project echomeet-app
 ```
 
-The indexes matter: two of the queries the functions run are composite and will
-fail without them.
+The indexes matter: the current manifest contains three composite indexes and a
+collection-group field override used by trusted account deletion. A successful
+submission is not enough; wait until every index reports enabled.
+
+### Deployed inventory
+
+The current `functions/src/index.ts` exports exactly 15 Functions:
+
+| Kind | Exports |
+| --- | --- |
+| App Check callables | `completeOnboarding`, `uploadProfileImage`, `deleteMyAccount` |
+| Survey triggers | `onSurveyCreated`, `onSurveyResponseCreated`, `onSurveyResponseUpdated` |
+| Appointment triggers | `onAppointmentCreated`, `onAppointmentVoteCreated`, `onAppointmentVoteDeleted`, `onTimeSlotConfirmed` |
+| Membership triggers | `onJoinRequested`, `onJoinRequestedAtRegistration` |
+| Scheduler jobs | `remindExpiring`, `purgeScheduledCompanies`, `purgeAccountDeletionLocks` |
+
+Treat an unexpected deletion prompt, region duplicate, or a different export
+count as a failed deployment review.
 
 ### The region is not a preference
 
@@ -80,6 +89,7 @@ nothing.
 | Somebody asks to join | the company's admins and owner — never moderators |
 | Daily at 09:00 | anyone who has *not yet answered* a survey or meeting closing within 24 hours |
 | Daily at 03:30 | scheduled company closures whose week has run out are carried out |
+| Hourly at minute 15 | expired account-deletion write locks are removed; this sends no message |
 
 Two decisions worth keeping:
 
@@ -98,6 +108,10 @@ being removed, banned, or leaving — so somebody who lost access to a company
 would keep hearing from it. Tokens live in `users/{uid}.fcmTokens`, the same
 document the rest of the app already reasons about.
 
+That private document also stores `notificationLocale` (`en`, `de`, or `sq`).
+The sender groups tokens by the user's chosen app language; an older profile
+without the field safely falls back to English.
+
 Tokens rot: apps are uninstalled, browsers are cleared. The sender prunes any
 token that comes back permanently invalid, and only those two error codes —
 a transient failure must never cost somebody their registration.
@@ -109,26 +123,44 @@ not a bug; a foreground message is delivered to the app and it is the app's job
 to decide what to do with it. `PushService` shows it through
 `flutter_local_notifications`, which is why both packages are needed.
 
-On **web**, foreground notifications are left to the browser and the local
-plugin is skipped — `flutter_local_notifications` has no meaningful web
-implementation, and drawing our own would be worse than the browser's.
+On **web**, FCM delivers foreground messages through `onMessage` but does not
+draw a system notification. EchoMeet therefore shows a localized in-app banner
+with an Open action. The native local-notifications plugin remains skipped
+because it has no web implementation.
+
+Every message carries a non-sensitive type and document ID. Tapping a survey,
+meeting, or approval opens the corresponding app tab on Android, iOS, and web
+after the verified-session and optional biometric gate. A cold start retains
+the pending destination until the gate is unlocked; it never bypasses access
+checks.
 
 ## Before the first send
 
 1. **Android** — nothing. `google-services.json` is already in place.
-2. **iOS** — upload an APNs authentication key under *Project settings → Cloud
-   Messaging*. Without it, iOS devices register and then silently never receive
-   anything, which looks exactly like a broken function.
-3. **Web** — generate a VAPID key pair in the same place and pass it to
-   `getToken(vapidKey: …)`. Until then web registration fails, which
-   `PushService` swallows deliberately: it must never break sign-in.
+2. **iOS** — the repository declares the Remote notifications background mode.
+   In Xcode, enable the Push Notifications signing capability and verify the
+   background mode, then upload an APNs authentication key under *Project
+   settings → Cloud Messaging*. The signing entitlement and key remain external
+   release configuration.
+3. **Web** — generate a Web Push VAPID key pair in the same place. The required
+   `firebase-messaging-sw.js` worker is in `web/`; pass the public key at build
+   time so it is not duplicated in source configuration:
+
+   ```bash
+   flutter build web --dart-define=FCM_WEB_VAPID_KEY=YOUR_PUBLIC_VAPID_KEY
+   ```
+
+   If registration or token persistence fails, EchoMeet leaves the preference
+   disabled instead of claiming that notifications are active.
 
 ## Email
 
-Password reset and verification mail is sent by Firebase Auth itself, from
-templates stored in the console rather than in this repository. The wording is
-in [email-templates.md](email-templates.md) and has to be pasted in by hand
-under *Authentication → Templates*.
+Password-reset and verification mail is sent by Firebase Auth itself, from
+templates stored in the console rather than in this repository. EchoMeet sends
+verification mail during registration and rejects unverified sign-ins. The
+proposed wording is in
+[email-templates.md](email-templates.md) and has to be pasted in by hand under
+*Authentication → Templates*.
 
 Change the sender name and reply-to address at the same time. The default
 no-reply on a `firebaseapp.com` domain is the single biggest reason

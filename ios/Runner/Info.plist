@@ -45,6 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<!-- iOS terminates the app immediately if a capability is used without a
 	     usage description. Unlike Android, there is no manifest merging, so
 	     these cannot come from the plugins and must live here. -->

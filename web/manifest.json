@@ -1,12 +1,11 @@
 {
-    "name": "Echomeet",
-    "short_name": "Echomeet",
+    "name": "EchoMeet",
+    "short_name": "EchoMeet",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#00306B",
     "theme_color": "#004B96",
     "description": "Shared notes, meeting scheduling and surveys for small companies.",
-    "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
         {
