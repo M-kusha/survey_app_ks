@@ -33,9 +33,25 @@ List<QuestionProblem> validateQuestions(
       continue;
     }
 
+    if (type == QuestionType.unknown) {
+      problems.add(QuestionProblem(i, 'unsupported_question_type'));
+      continue;
+    }
+
     if (type == QuestionType.single || type == QuestionType.multiple) {
-      if (options.where((option) => option.isNotEmpty).length < 2) {
+      if (options.length < 2) {
         problems.add(QuestionProblem(i, 'needs_two_options'));
+        continue;
+      }
+
+      if (options.any((option) => option.isEmpty)) {
+        problems.add(QuestionProblem(i, 'blank_option'));
+        continue;
+      }
+
+      final normalized = options.map((option) => option.toLowerCase()).toSet();
+      if (normalized.length != options.length) {
+        problems.add(QuestionProblem(i, 'duplicate_options'));
         continue;
       }
     }
@@ -44,19 +60,24 @@ List<QuestionProblem> validateQuestions(
 
     switch (type) {
       case QuestionType.single:
-        if (question['correctAnswer'] == null) {
+        final correct = question['correctAnswer'];
+        if (correct is! int || correct < 0 || correct >= options.length) {
           problems.add(QuestionProblem(i, 'single_choice_validation_warning'));
         }
       case QuestionType.multiple:
         final correct = (question['correctAnswers'] as List<dynamic>?) ?? [];
-        if (correct.length < 2) {
+        final validIndexes = correct.whereType<int>().toSet();
+        if (validIndexes.length < 2 ||
+            validIndexes.length != correct.length ||
+            validIndexes.any((index) => index < 0 || index >= options.length)) {
           problems.add(
             QuestionProblem(i, 'multiple_choice_validation_warning'),
           );
         }
       case QuestionType.text:
-      case QuestionType.unknown:
         break;
+      case QuestionType.unknown:
+        throw StateError('Unknown question types are rejected above.');
     }
   }
 

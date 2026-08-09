@@ -71,7 +71,29 @@ void main() {
             single(options: ['A', '  ']),
           ], isTest: false),
         ),
-        ['needs_two_options'],
+        ['blank_option'],
+      );
+    });
+
+    test('a blank third option is rejected rather than silently displayed', () {
+      expect(
+        keys(
+          validateQuestions([
+            single(options: ['A', 'B', '   ']),
+          ], isTest: false),
+        ),
+        ['blank_option'],
+      );
+    });
+
+    test('duplicate options are rejected after trimming and case folding', () {
+      expect(
+        keys(
+          validateQuestions([
+            single(options: ['Yes', ' yes ']),
+          ], isTest: false),
+        ),
+        ['duplicate_options'],
       );
     });
   });
@@ -82,6 +104,12 @@ void main() {
         'single_choice_validation_warning',
       ]);
       expect(validateQuestions([single(correct: 0)], isTest: true), isEmpty);
+    });
+
+    test('single choice rejects an out-of-range answer index', () {
+      expect(keys(validateQuestions([single(correct: 2)], isTest: true)), [
+        'single_choice_validation_warning',
+      ]);
     });
 
     test('multiple choice needs at least two marked', () {
@@ -100,6 +128,21 @@ void main() {
           multiple(correct: const [0, 2]),
         ], isTest: true),
         isEmpty,
+      );
+    });
+
+    test('multiple choice rejects duplicate and out-of-range indexes', () {
+      expect(
+        keys(
+          validateQuestions([
+            multiple(correct: const [0, 0]),
+            multiple(correct: const [0, 3]),
+          ], isTest: true),
+        ),
+        [
+          'multiple_choice_validation_warning',
+          'multiple_choice_validation_warning',
+        ],
       );
     });
 
@@ -138,11 +181,11 @@ void main() {
       expect(validateQuestions([], isTest: true), isEmpty);
     });
 
-    test('a question of an unrecognised type does not throw', () {
+    test('a question of an unrecognised type is rejected without throwing', () {
       final problems = validateQuestions([
         {'type': 'Ranking', 'question': 'From the future'},
       ], isTest: true);
-      expect(problems, isEmpty);
+      expect(keys(problems), ['unsupported_question_type']);
     });
   });
 }

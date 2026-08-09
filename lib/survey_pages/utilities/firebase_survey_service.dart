@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/membership/member_directory.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
+import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:echomeet/survey_pages/utilities/survey_answer_keys.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 
 class FirebaseSurveyService {
@@ -8,12 +12,16 @@ class FirebaseSurveyService {
   Future<String> createSurvey(Survey survey) async {
     final document = _firestore.collection('surveys').doc();
     final uniqueId = document.id;
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) throw StateError('A signed-in author is required.');
+
+    final questions = splitSurveyQuestions(survey.questions);
 
     Map<String, dynamic> surveyData = {
       'surveyName': survey.surveyName,
       'surveyDescription': survey.surveyDescription,
       'timeCreated': Timestamp.fromDate(survey.timeCreated),
-      'questions': survey.questions,
+      'questions': questions.publicQuestions,
       'id': uniqueId,
       'participants': survey.participants
           .map((e) => e.toFirestoreMap())
@@ -23,10 +31,19 @@ class FirebaseSurveyService {
       'surveyType': survey.surveyType.index,
       'companyId': survey.companyId,
 
-      'createdBy': FirebaseAuth.instance.currentUser?.uid,
+      'createdBy': userId,
     };
 
-    await document.set(surveyData);
+    final answerKey = _firestore.collection('surveyAnswerKeys').doc(uniqueId);
+    final batch = _firestore.batch();
+    batch.set(document, surveyData);
+    batch.set(answerKey, {
+      'schemaVersion': 1,
+      'surveyId': uniqueId,
+      'companyId': survey.companyId,
+      'questionKeys': questions.privateAnswerKeys,
+    });
+    await batch.commit();
     return uniqueId;
   }
 
@@ -44,14 +61,14 @@ class FirebaseSurveyService {
       await batch.commit();
     }
 
-    await survey.delete();
+    final batch = _firestore.batch();
+    batch.delete(_firestore.collection('surveyAnswerKeys').doc(surveyId));
+    batch.delete(survey);
+    await batch.commit();
   }
 
   Future<void> removeUserFromCompany(String userId) async {
-    await _firestore.collection('users').doc(userId).update({
-      'companyId': '',
-      'role': 'user',
-    });
+    await MemberDirectory.removeMember(firestore: _firestore, userId: userId);
   }
 
   Future<void> updateTextAnswersReviewed(
@@ -67,42 +84,48 @@ class FirebaseSurveyService {
         .update({'textAnswersReviewed': textAnswersReviewed});
   }
 
-  Future<void> updateCorrectAnswersCount(
+  Stream<Participant?> watchParticipant(
     String surveyId,
     String participantId,
-    int correctAnswersCount,
-  ) async {
-    await _firestore
-        .collection('surveys')
-        .doc(surveyId)
-        .collection('participants')
-        .doc(participantId)
-        .update({'totalCorrectAnswers': correctAnswersCount});
-  }
-
-  Future<void> updateScore(
-    String surveyId,
-    String participantId,
-    double newScore,
-  ) async {
-    await _firestore
-        .collection('surveys')
-        .doc(surveyId)
-        .collection('participants')
-        .doc(participantId)
-        .update({'score': newScore});
-  }
+  ) => _firestore
+      .collection('surveys')
+      .doc(surveyId)
+      .collection('participants')
+      .doc(participantId)
+      .snapshots()
+      .map((snapshot) {
+        final data = snapshot.data();
+        return snapshot.exists && data != null
+            ? Participant.fromFirestore(data)
+            : null;
+      });
 
   Future<void> submitSurveyAnswers({
     required String surveyId,
     required Participant participant,
     required Map<String, List<dynamic>> answers,
-    required double score,
     required String imageProfile,
-    required Map<String, bool> textAnswersReviewed,
-    required int totalCorrectAnswers,
   }) async {
     try {
+      final directory = await _firestore
+          .collection('memberDirectory')
+          .doc(participant.userId)
+          .get();
+      final member = directory.data();
+      final currentStoredImage = member?['profileImage'] as String?;
+      final resolvedImage = profileImageReference(
+        currentStoredImage ?? imageProfile,
+      );
+      final imagePath =
+          resolvedImage?.fullPath == profileImagePathFor(participant.userId)
+          ? resolvedImage!.fullPath
+          : '';
+      final currentRevision = readProfileImageRevision(
+        member?['profileImageRevision'],
+      );
+      final imageRevision = member == null
+          ? participant.profileImageRevision
+          : currentRevision;
       await _firestore
           .collection('surveys')
           .doc(surveyId)
@@ -112,12 +135,17 @@ class FirebaseSurveyService {
             'userId': participant.userId,
             'name': participant.name,
             'answers': answers,
-            'score': score,
+            // Security rules only accept sentinels on the untrusted first
+            // write. A Firestore trigger computes the authoritative grade.
+            'score': 0.0,
             'submittedAt': FieldValue.serverTimestamp(),
             'participantSubmitted': true,
-            'imageProfile': imageProfile,
-            'textAnswersReviewed': textAnswersReviewed,
-            'totalCorrectAnswers': totalCorrectAnswers,
+            'imageProfile': imagePath,
+            'profileImageRevision': imageRevision,
+            'textAnswersReviewed': <String, bool>{},
+            'totalCorrectAnswers': 0,
+            'gradedQuestionCount': 0,
+            'gradingStatus': 'processing',
           });
     } catch (e) {
       throw Exception('Error saving answers: $e');
@@ -126,14 +154,16 @@ class FirebaseSurveyService {
 
   Future<QuerySnapshot> fetchUsersByCompanyId(String companyId) {
     return FirebaseFirestore.instance
-        .collection('users')
+        .collection('memberDirectory')
         .where('companyId', isEqualTo: companyId)
         .get();
   }
 
   Future<void> updateUserRole(String userId, String newRole) async {
-    await FirebaseFirestore.instance.collection('users').doc(userId).update({
-      'role': newRole,
-    });
+    await MemberDirectory.updateMember(
+      firestore: FirebaseFirestore.instance,
+      userId: userId,
+      fields: {'role': newRole},
+    );
   }
 }

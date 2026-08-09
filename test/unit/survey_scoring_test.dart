@@ -169,6 +169,11 @@ void main() {
         reason: '100% must be reachable while review is outstanding',
       );
       expect(grade.hasPendingReview, isTrue);
+      expect(
+        grade.passed,
+        isFalse,
+        reason: 'a provisional score must not be presented as a final pass',
+      );
     });
 
     test('a reviewer marking it correct counts it', () {

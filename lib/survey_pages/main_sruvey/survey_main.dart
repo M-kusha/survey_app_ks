@@ -1,15 +1,17 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/membership/company_gate.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/time/deadline.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_create_button.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_list.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -29,69 +31,121 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
   final _searchController = TextEditingController();
 
   SurveySort _sort = SurveySort.newest;
-  bool _isAdmin = false;
   bool _isLoading = true;
   String? _error;
-  Membership? _membership;
+  String? _sessionKey;
+  bool _loadScheduled = false;
+  int _loadGeneration = 0;
+  Timer? _deadlineTimer;
+  DateTime? _scheduledDeadline;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(() => setState(() {}));
-    _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final membershipState = context.watch<MembershipProvider>();
+    final user = context.watch<UserDataProvider>().currentUser;
+    final membership = membershipState.membership;
+    final sessionKey = [
+      membershipState.loading,
+      membership?.state,
+      membership?.companyId,
+      membership?.deletionAt,
+      user?.id,
+      user?.role,
+      user?.membership,
+    ].join('|');
+
+    if (_sessionKey == sessionKey || _loadScheduled) return;
+    _sessionKey = sessionKey;
+    _loadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadScheduled = false;
+      if (mounted) _load();
+    });
   }
 
   @override
   void dispose() {
+    _deadlineTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _scheduleDeadlineRefresh(Iterable<DateTime> deadlines) {
+    final now = DateTime.now();
+    final nearest = nearestFutureDeadline(deadlines, now: now);
+    if (_deadlineTimer?.isActive == true &&
+        nearest != null &&
+        _scheduledDeadline?.isAtSameMomentAs(nearest) == true) {
+      return;
+    }
+
+    _deadlineTimer?.cancel();
+    _deadlineTimer = null;
+    _scheduledDeadline = nearest;
+    if (nearest == null) return;
+
+    _deadlineTimer = Timer(
+      nearest.difference(now) + const Duration(milliseconds: 10),
+      () {
+        _deadlineTimer = null;
+        _scheduledDeadline = null;
+        if (mounted) setState(() {});
+      },
+    );
   }
 
   Future<void> _refresh() => _load(silent: true);
 
   Future<void> _load({bool silent = false}) async {
+    final generation = ++_loadGeneration;
     final surveys = Provider.of<SurveyDataProvider>(context, listen: false);
-    final users = Provider.of<UserDataProvider>(context, listen: false);
-    final services = Provider.of<FirebaseServices>(context, listen: false);
+    final users = context.read<UserDataProvider>();
+    final membershipState = context.read<MembershipProvider>();
 
     setState(() {
-      _isLoading = true;
+      _isLoading = !silent;
       _error = null;
     });
 
     try {
       await users.loadCurrentUser();
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
+      if (users.error case final error?) throw error;
 
-      final membership = await MembershipService().resolve();
-      if (!mounted) return;
+      if (membershipState.loading && membershipState.membership == null) return;
+      final membership = membershipState.membership;
 
-      if (!membership.isActive) {
+      if (membership?.isActive != true) {
+        await surveys.clear();
+        if (!mounted || generation != _loadGeneration) return;
         setState(() {
-          _membership = membership;
           _isLoading = false;
         });
         return;
       }
 
-      _membership = membership;
-      final companyId = membership.companyId;
+      final companyId = membership!.companyId;
 
       await surveys.loadSurveys(companyId);
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       await surveys.checkParticipationForCurrentUser(
         FirebaseAuth.instance.currentUser?.uid ?? '',
       );
 
-      final isAdmin = await services.fetchAdminStatus();
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
       setState(() {
-        _isAdmin = isAdmin;
         _isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
       setState(() {
         _error = '$e';
         _isLoading = false;
@@ -144,11 +198,21 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<SurveyDataProvider>(context);
+    _scheduleDeadlineRefresh(provider.surveys.map((survey) => survey.deadline));
+    final membershipState = context.watch<MembershipProvider>();
+    final membership = membershipState.membership;
+    final user = context.watch<UserDataProvider>().currentUser;
+    final isAdmin = switch (user?.role) {
+      'admin' || 'moderator' || 'superadmin' => true,
+      _ => false,
+    };
     final surveys = _visible(provider.surveys);
 
-    if (!_isLoading && _membership?.isActive != true) {
+    if (!_isLoading &&
+        !membershipState.loading &&
+        membership?.isActive != true) {
       return CompanyGate(
-        membership: _membership,
+        membership: membership,
         onChanged: _load,
         child: const SizedBox.shrink(),
       );
@@ -187,12 +251,12 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
                   _buildSortMenu(),
                 ],
               ),
-              Expanded(child: _buildBody(provider, surveys)),
+              Expanded(child: _buildBody(provider, surveys, isAdmin)),
             ],
           ),
         ),
       ),
-      floatingActionButton: _isAdmin
+      floatingActionButton: isAdmin
           ? buildCreateQuestionarySurveyButton(context)
           : null,
     );
@@ -230,16 +294,22 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     );
   }
 
-  Widget _buildBody(SurveyDataProvider provider, List<Survey> surveys) {
-    if (_isLoading) {
+  Widget _buildBody(
+    SurveyDataProvider provider,
+    List<Survey> surveys,
+    bool isAdmin,
+  ) {
+    if (_isLoading || provider.isLoading) {
       return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
     }
 
-    if (_error case final error?) {
+    if ((_error ??
+            provider.error ??
+            context.read<MembershipProvider>().error) !=
+        null) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
         action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }
@@ -281,7 +351,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
                   padding: const EdgeInsets.only(bottom: Spacing.md),
                   child: SurveyListItem(
                     survey: survey,
-                    isAdmin: _isAdmin,
+                    isAdmin: isAdmin,
 
                     hasParticipated:
                         provider.userParticipationStatus[survey.id] ?? false,

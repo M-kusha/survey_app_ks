@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
@@ -29,49 +31,65 @@ class ParticipantAnswersPage extends StatefulWidget {
 
 class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   final _service = FirebaseSurveyService();
+  StreamSubscription<Participant?>? _participantSubscription;
+  late Participant _participant;
 
   bool _saving = false;
 
   bool get _isTest => widget.survey.surveyType != SurveyType.survey;
 
-  SurveyGrade get _grade => SurveyScorer.grade(
+  SurveyGrade get _grade => SurveyScorer.authoritativeGrade(
     surveyId: widget.survey.id,
     questions: widget.survey.questions,
-    answers: widget.participant.surveyAnswers,
-    textReviews: widget.participant.textAnswersReviewed,
+    answers: _participant.surveyAnswers,
+    score: _participant.score,
+    correctCount: _participant.totalCorrectAnswers,
+    gradedCount: _participant.gradedQuestionCount,
+    gradingStatus: _participant.gradingStatus,
+    textReviews: _participant.textAnswersReviewed,
   );
+
+  @override
+  void initState() {
+    super.initState();
+    _participant = widget.participant;
+    _participantSubscription = _service
+        .watchParticipant(widget.survey.id, widget.participant.userId)
+        .listen((participant) {
+          if (participant != null && mounted) {
+            setState(() => _participant = participant);
+          }
+        });
+  }
+
+  @override
+  void dispose() {
+    _participantSubscription?.cancel();
+    super.dispose();
+  }
 
   Future<void> _review(int questionIndex, bool? verdict) async {
     if (_saving) return;
 
     final key = '${widget.survey.id}-${SurveyScorer.answerKey(questionIndex)}';
-    final reviews = Map<String, bool>.from(
-      widget.participant.textAnswersReviewed,
-    );
+    final reviews = Map<String, bool>.from(_participant.textAnswersReviewed);
     if (verdict == null) {
       reviews.remove(key);
     } else {
       reviews[key] = verdict;
     }
 
-    final grade = SurveyScorer.grade(
-      surveyId: widget.survey.id,
-      questions: widget.survey.questions,
-      answers: widget.participant.surveyAnswers,
-      textReviews: reviews,
-    );
-
     final previous = (
-      reviews: widget.participant.textAnswersReviewed,
-      score: widget.participant.score,
-      correct: widget.participant.totalCorrectAnswers,
+      reviews: _participant.textAnswersReviewed,
+      status: _participant.gradingStatus,
     );
 
     setState(() {
       _saving = true;
-      widget.participant.textAnswersReviewed = reviews;
-      widget.participant.score = grade.percentage;
-      widget.participant.totalCorrectAnswers = grade.correctCount;
+      _participant.textAnswersReviewed = reviews;
+      // The old score belongs to the previous review map. Never present it as
+      // final while the trusted Function is recomputing the result.
+      _participant.gradingStatus = 'processing';
     });
 
     try {
@@ -80,24 +98,13 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
         widget.participant.userId,
         reviews,
       );
-      await _service.updateScore(
-        widget.survey.id,
-        widget.participant.userId,
-        grade.percentage,
-      );
-      await _service.updateCorrectAnswersCount(
-        widget.survey.id,
-        widget.participant.userId,
-        grade.correctCount,
-      );
       if (mounted) setState(() => _saving = false);
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        widget.participant.textAnswersReviewed = previous.reviews;
-        widget.participant.score = previous.score;
-        widget.participant.totalCorrectAnswers = previous.correct;
+        _participant.textAnswersReviewed = previous.reviews;
+        _participant.gradingStatus = previous.status;
       });
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     }
@@ -107,9 +114,9 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => PDFResults(
-          participant: widget.participant,
+          participant: _participant,
           survey: widget.survey,
-          textQuestionCorrect: widget.participant.textAnswersReviewed,
+          textQuestionCorrect: _participant.textAnswersReviewed,
         ),
       ),
     );
@@ -121,7 +128,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.participant.name),
+        title: Text(_participant.name),
         actions: [
           IconButton(
             tooltip: 'download_results'.tr(),
@@ -149,13 +156,10 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                     index: i,
                     question: widget.survey.questions[i],
                     answer:
-                        widget.participant.surveyAnswers[SurveyScorer.answerKey(
-                          i,
-                        )] ??
+                        _participant.surveyAnswers[SurveyScorer.answerKey(i)] ??
                         const [],
                     isTest: _isTest,
-                    verdict: widget
-                        .participant
+                    verdict: _participant
                         .textAnswersReviewed['${widget.survey.id}-${SurveyScorer.answerKey(i)}'],
                     busy: _saving,
                     onReview: (verdict) => _review(i, verdict),
@@ -178,7 +182,33 @@ class _Summary extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final app = context.appColors;
-    final tone = grade.passed ? app.success : theme.colorScheme.error;
+    final tone = grade.isProcessing
+        ? app.info
+        : grade.hasPendingReview
+        ? app.warning
+        : grade.hasGradingError
+        ? theme.colorScheme.error
+        : grade.passed
+        ? app.success
+        : theme.colorScheme.error;
+    final statusLabel = grade.isProcessing
+        ? 'grading_processing'.tr()
+        : grade.hasPendingReview
+        ? 'awaiting_review'.tr()
+        : grade.hasGradingError
+        ? 'grading_error'.tr()
+        : grade.passed
+        ? 'passed'.tr()
+        : 'not_passed'.tr();
+    final statusTone = grade.isProcessing
+        ? StatusTone.info
+        : grade.hasPendingReview
+        ? StatusTone.caution
+        : grade.hasGradingError
+        ? StatusTone.danger
+        : grade.passed
+        ? StatusTone.positive
+        : StatusTone.danger;
 
     return ContentCard(
       accent: tone,
@@ -186,7 +216,7 @@ class _Summary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
-            '${grade.percentage.round()}%',
+            grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
             style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w700,
               color: tone,
@@ -198,33 +228,29 @@ class _Summary extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'correct_of_total'.tr(
-                    namedArgs: {
-                      'correct': '${grade.correctCount}',
-                      'total': '${grade.gradedCount}',
-                    },
+                if (grade.scoreAvailable)
+                  Text(
+                    'correct_of_total'.tr(
+                      namedArgs: {
+                        'correct': '${grade.correctCount}',
+                        'total': '${grade.gradedCount}',
+                      },
+                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                if (grade.hasPendingReview) ...[
+                if (!grade.resultIsFinal) ...[
                   const SizedBox(height: 2),
                   Text(
-                    'awaiting_review'.tr(),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: app.warning,
-                    ),
+                    statusLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(color: tone),
                   ),
                 ],
               ],
             ),
           ),
-          StatusPill(
-            label: grade.passed ? 'passed'.tr() : 'not_passed'.tr(),
-            tone: grade.passed ? StatusTone.positive : StatusTone.danger,
-          ),
+          StatusPill(label: statusLabel, tone: statusTone),
         ],
       ),
     );
@@ -292,7 +318,7 @@ class _QuestionCard extends StatelessWidget {
                     busy: busy,
                     onReview: onReview,
                   )
-                : _Options(question: question, answer: answer, isTest: isTest),
+                : _Options(question: question, answer: answer),
           ),
         ],
       ),
@@ -301,36 +327,19 @@ class _QuestionCard extends StatelessWidget {
 }
 
 class _Options extends StatelessWidget {
-  const _Options({
-    required this.question,
-    required this.answer,
-    required this.isTest,
-  });
+  const _Options({required this.question, required this.answer});
 
   final Map<String, dynamic> question;
   final List<dynamic> answer;
-  final bool isTest;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final app = context.appColors;
-    final type = QuestionType.parse(question['type']);
 
     final options = (question['options'] as List<dynamic>? ?? const [])
         .map((option) => '$option')
         .toList();
-
-    final correct = <int>{
-      if (type == QuestionType.single && question['correctAnswer'] is int)
-        question['correctAnswer'] as int,
-      if (type == QuestionType.multiple)
-        ...(question['correctAnswers'] as List<dynamic>? ?? const [])
-            .whereType<int>(),
-    };
-
-    final graded = isTest && correct.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -338,52 +347,11 @@ class _Options extends StatelessWidget {
         for (var i = 0; i < options.length; i++)
           () {
             final picked = answer.contains(i);
-            final isRight = correct.contains(i);
-
-            final (color, icon, label, tone, lostMark) = switch ((
-              graded,
-              picked,
-              isRight,
-            )) {
-              (true, true, true) => (
-                app.success,
-                Icons.check_circle_rounded,
-                'chosen_correct',
-                StatusTone.positive,
-                false,
-              ),
-              (true, true, false) => (
-                scheme.error,
-                Icons.cancel_rounded,
-                'chosen_wrong',
-                StatusTone.danger,
-                true,
-              ),
-
-              (true, false, true) => (
-                app.success,
-                Icons.check_circle_outline_rounded,
-                'missed',
-                StatusTone.danger,
-                true,
-              ),
-              (false, true, _) => (
-                scheme.primary,
-                Icons.radio_button_checked_rounded,
-                'chosen',
-                StatusTone.info,
-                false,
-              ),
-              _ => (
-                scheme.outline,
-                Icons.radio_button_unchecked_rounded,
-                null,
-                StatusTone.neutral,
-                false,
-              ),
-            };
-
-            final border = lostMark ? scheme.error : color;
+            final color = picked ? scheme.primary : scheme.outline;
+            final icon = picked
+                ? Icons.radio_button_checked_rounded
+                : Icons.radio_button_unchecked_rounded;
+            final label = picked ? 'chosen' : null;
 
             return Container(
               margin: const EdgeInsets.only(bottom: Spacing.sm),
@@ -394,10 +362,8 @@ class _Options extends StatelessWidget {
                     ? color.withValues(alpha: 0.12)
                     : Colors.transparent,
                 border: Border.all(
-                  color: border.withValues(
-                    alpha: picked || lostMark ? 0.65 : 0.18,
-                  ),
-                  width: picked || lostMark ? 1.5 : 1,
+                  color: color.withValues(alpha: picked ? 0.65 : 0.18),
+                  width: picked ? 1.5 : 1,
                 ),
               ),
               child: IntrinsicHeight(
@@ -430,7 +396,10 @@ class _Options extends StatelessWidget {
                             ),
                             if (label != null) ...[
                               const SizedBox(width: Spacing.sm),
-                              StatusPill(label: label.tr(), tone: tone),
+                              StatusPill(
+                                label: label.tr(),
+                                tone: StatusTone.info,
+                              ),
                             ],
                           ],
                         ),

@@ -37,12 +37,15 @@ class QuestionGrade {
 
 const double kPassingPercentage = 50;
 
+enum SurveyGradingStatus { processing, pendingReview, finalResult, error }
+
 class SurveyGrade {
   const SurveyGrade({
     required this.questions,
     required this.gradedCount,
     required this.correctCount,
     required this.percentage,
+    this.authoritativeStatus,
   });
 
   final List<QuestionGrade> questions;
@@ -53,9 +56,29 @@ class SurveyGrade {
 
   final double percentage;
 
-  bool get hasPendingReview => questions.any((q) => q.awaitsReview);
+  /// Present when score/totals came from the trusted backend. A null value is
+  /// reserved for the pure scorer used by isolated unit tests.
+  final SurveyGradingStatus? authoritativeStatus;
 
-  bool get passed => percentage >= kPassingPercentage;
+  bool get isProcessing =>
+      authoritativeStatus == SurveyGradingStatus.processing;
+
+  bool get hasPendingReview => authoritativeStatus != null
+      ? authoritativeStatus == SurveyGradingStatus.pendingReview
+      : questions.any((q) => q.awaitsReview);
+
+  bool get hasGradingError => authoritativeStatus == SurveyGradingStatus.error;
+
+  bool get resultIsFinal => authoritativeStatus != null
+      ? authoritativeStatus == SurveyGradingStatus.finalResult
+      : !hasPendingReview;
+
+  bool get scoreAvailable =>
+      authoritativeStatus == null ||
+      authoritativeStatus == SurveyGradingStatus.pendingReview ||
+      authoritativeStatus == SurveyGradingStatus.finalResult;
+
+  bool get passed => resultIsFinal && percentage >= kPassingPercentage;
 }
 
 abstract final class SurveyScorer {
@@ -64,6 +87,97 @@ abstract final class SurveyScorer {
   static String reviewKey(String surveyId, int questionIndex) =>
       '$surveyId-${answerKey(questionIndex)}';
 
+  /// Builds UI state from fields authored by the trusted grading Function.
+  /// It never derives correctness from the member-readable survey document.
+  static SurveyGrade authoritativeGrade({
+    required String surveyId,
+    required List<Map<String, dynamic>> questions,
+    required Map<String, List<dynamic>> answers,
+    required double score,
+    required int correctCount,
+    required int? gradedCount,
+    required String? gradingStatus,
+    required Map<String, bool> textReviews,
+  }) {
+    final status = switch (gradingStatus) {
+      'processing' => SurveyGradingStatus.processing,
+      'pending_review' => SurveyGradingStatus.pendingReview,
+      'final' => SurveyGradingStatus.finalResult,
+      'error' => SurveyGradingStatus.error,
+      null => _legacyStatus(
+        surveyId: surveyId,
+        questions: questions,
+        answers: answers,
+        textReviews: textReviews,
+      ),
+      _ => SurveyGradingStatus.error,
+    };
+
+    final safeScore = score.isFinite ? score.clamp(0.0, 100.0) : 0.0;
+    final safeCorrect = correctCount < 0 ? 0 : correctCount;
+    final safeGraded = gradedCount == null || gradedCount < 0
+        ? _legacyGradedCount(
+            surveyId: surveyId,
+            questions: questions,
+            answers: answers,
+            textReviews: textReviews,
+          )
+        : gradedCount;
+
+    return SurveyGrade(
+      questions: const [],
+      gradedCount: safeGraded,
+      correctCount: safeCorrect.clamp(0, safeGraded),
+      percentage: safeScore,
+      authoritativeStatus: status,
+    );
+  }
+
+  static SurveyGradingStatus _legacyStatus({
+    required String surveyId,
+    required List<Map<String, dynamic>> questions,
+    required Map<String, List<dynamic>> answers,
+    required Map<String, bool> textReviews,
+  }) {
+    for (var index = 0; index < questions.length; index++) {
+      if (QuestionType.parse(questions[index]['type']) != QuestionType.text) {
+        continue;
+      }
+      final answer = answers[answerKey(index)] ?? const [];
+      if (answer.join().trim().isNotEmpty &&
+          !textReviews.containsKey(reviewKey(surveyId, index))) {
+        return SurveyGradingStatus.pendingReview;
+      }
+    }
+    return SurveyGradingStatus.finalResult;
+  }
+
+  static int _legacyGradedCount({
+    required String surveyId,
+    required List<Map<String, dynamic>> questions,
+    required Map<String, List<dynamic>> answers,
+    required Map<String, bool> textReviews,
+  }) {
+    var count = 0;
+    for (var index = 0; index < questions.length; index++) {
+      final type = QuestionType.parse(questions[index]['type']);
+      if (type == QuestionType.unknown) continue;
+      if (type != QuestionType.text) {
+        count += 1;
+        continue;
+      }
+
+      final answer = answers[answerKey(index)] ?? const [];
+      if (answer.join().trim().isEmpty ||
+          textReviews.containsKey(reviewKey(surveyId, index))) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  /// Pure answer-key scorer retained for isolated parity tests. Production UI
+  /// must use [authoritativeGrade]; deployed clients cannot read private keys.
   static SurveyGrade grade({
     required String surveyId,
     required List<Map<String, dynamic>> questions,

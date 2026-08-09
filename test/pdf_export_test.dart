@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:echomeet/survey_pages/admin/print_pages/group_results_pdf.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/pdf_binary.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/pdf_kit.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_analytics.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_results.dart';
@@ -27,7 +29,7 @@ void main() {
   /// branch of the option-marking switch is reachable from this one fixture.
   Survey surveyOf(SurveyType type) => Survey(
     id: 's1',
-    surveyName: 'Quarterly review',
+    surveyName: 'Quarterly review - Prüfung ë ç',
     surveyDescription: 'd',
     companyId: 'c1',
     timeCreated: DateTime(2026, 1, 1),
@@ -39,20 +41,17 @@ void main() {
         'type': 'Single',
         'question': 'Which is correct?',
         'options': ['A', 'B', 'C'],
-        'correctAnswer': 0,
       },
       {
         'type': 'Multiple',
         'question': 'Pick the right ones',
         'options': ['A', 'B', 'C'],
-        'correctAnswers': [0, 1],
       },
       {'type': 'Text', 'question': 'Explain your reasoning'},
       {
         'type': 'Single',
         'question': 'Nobody answered this one',
         'options': ['A', 'B'],
-        'correctAnswer': 1,
       },
     ],
   );
@@ -64,13 +63,15 @@ void main() {
     // silently ignored.
     name: 'Kushtrim Çabej-Ümlaut',
     surveyAnswers: {
-      'q0': [0],
-      'q1': [0, 2],
-      'q2': ['Because it seemed right'],
+      'Q0': [0],
+      'Q1': [0, 2],
+      'Q2': ['Because it seemed right'],
     },
     score: 50,
-    textAnswersReviewed: {'s1-q2': true},
+    textAnswersReviewed: {'s1-Q2': true},
     totalCorrectAnswers: 1,
+    gradedQuestionCount: 4,
+    gradingStatus: 'final',
   );
 
   test('theme embeds the app font', () async {
@@ -143,7 +144,7 @@ void main() {
     );
 
     final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await document.save(), 'participant');
+    expectValidPdf(await finalizePdfDocument(document), 'participant');
   });
 
   test('a survey sheet is a valid PDF', () async {
@@ -156,7 +157,7 @@ void main() {
     );
 
     final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await document.save(), 'survey');
+    expectValidPdf(await finalizePdfDocument(document), 'survey');
   });
 
   test('the analytics report is a valid PDF', () async {
@@ -174,7 +175,29 @@ void main() {
     );
 
     final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await document.save(), 'analytics');
+    expectValidPdf(await finalizePdfDocument(document), 'analytics');
+  });
+
+  test('the multi-page group report is a valid PDF', () async {
+    final participants = List.generate(
+      120,
+      (index) => Participant(
+        userId: 'u$index',
+        name: 'Teilnehmer $index - Kushtrim Çabej-Ümlaut ë ç',
+        surveyAnswers: const {},
+        score: (index % 101).toDouble(),
+        textAnswersReviewed: const {},
+        totalCorrectAnswers: index % 4,
+      ),
+    );
+    final widget = GroupResultsPdf(
+      survey: surveyOf(SurveyType.test),
+      participants: participants,
+      groupLabel: 'Alle Teilnehmenden - Të gjithë pjesëmarrësit',
+    );
+
+    final document = await widget.buildDocument(PdfPageFormat.a4);
+    expectValidPdf(await finalizePdfDocument(document), 'group');
   });
 
   test('fixtures cover both survey kinds', () {
@@ -182,6 +205,6 @@ void main() {
     // reminder that the exports have a third shape to handle.
     expect(SurveyType.values, hasLength(2));
     expect(surveyOf(SurveyType.test).questions, hasLength(4));
-    expect(participant.surveyAnswers.containsKey('q3'), isFalse);
+    expect(participant.surveyAnswers.containsKey('Q3'), isFalse);
   });
 }

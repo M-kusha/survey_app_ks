@@ -42,12 +42,34 @@ class PDFResults extends StatelessWidget {
   ) async {
     final pdf = pw.Document(theme: await PdfKit.theme());
 
-    final grade = SurveyScorer.grade(
+    final grade = SurveyScorer.authoritativeGrade(
       surveyId: survey.id,
       questions: survey.questions,
       answers: participant.surveyAnswers,
+      score: participant.score,
+      correctCount: participant.totalCorrectAnswers,
+      gradedCount: participant.gradedQuestionCount,
+      gradingStatus: participant.gradingStatus,
       textReviews: textQuestionCorrect,
     );
+    final statusLabel = grade.isProcessing
+        ? 'grading_processing'.tr()
+        : grade.hasPendingReview
+        ? 'awaiting_review'.tr()
+        : grade.hasGradingError
+        ? 'grading_error'.tr()
+        : grade.passed
+        ? 'passed'.tr()
+        : 'not_passed'.tr();
+    final statusTint = grade.isProcessing
+        ? PdfKit.chosen
+        : grade.hasPendingReview
+        ? PdfKit.pending
+        : grade.hasGradingError
+        ? PdfKit.wrong
+        : grade.passed
+        ? PdfKit.correct
+        : PdfKit.wrong;
 
     pdf.addPage(
       pw.MultiPage(
@@ -61,21 +83,19 @@ class PDFResults extends StatelessWidget {
             PdfKit.summary([
               PdfKit.stat(
                 'score'.tr(),
-                '${grade.percentage.round()}%',
-                tint: grade.passed ? PdfKit.correct : PdfKit.wrong,
+                grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
+                tint: statusTint,
               ),
               PdfKit.stat(
                 'correct_answers'.tr(),
-                '${grade.correctCount} / ${grade.gradedCount}',
+                grade.scoreAvailable
+                    ? '${grade.correctCount} / ${grade.gradedCount}'
+                    : '—',
               ),
-              PdfKit.stat(
-                'result'.tr(),
-                grade.passed ? 'passed'.tr() : 'not_passed'.tr(),
-                tint: grade.passed ? PdfKit.correct : PdfKit.wrong,
-              ),
+              PdfKit.stat('result'.tr(), statusLabel, tint: statusTint),
             ]),
 
-          for (var i = 0; i < survey.questions.length; i++) _question(i, grade),
+          for (var i = 0; i < survey.questions.length; i++) _question(i),
         ],
       ),
     );
@@ -83,7 +103,7 @@ class PDFResults extends StatelessWidget {
     return pdf;
   }
 
-  pw.Widget _question(int index, SurveyGrade grade) {
+  pw.Widget _question(int index) {
     final question = survey.questions[index];
     final key = SurveyScorer.answerKey(index);
     final answer = participant.surveyAnswers[key] ?? const [];
@@ -100,7 +120,7 @@ class PDFResults extends StatelessWidget {
             padding: const pw.EdgeInsets.only(left: 22),
             child: switch (type) {
               QuestionType.text => _textAnswer(index, answer),
-              _ => _options(question, answer, type),
+              _ => _options(question, answer),
             },
           ),
         ],
@@ -108,24 +128,10 @@ class PDFResults extends StatelessWidget {
     );
   }
 
-  pw.Widget _options(
-    Map<String, dynamic> question,
-    List<dynamic> answer,
-    QuestionType type,
-  ) {
+  pw.Widget _options(Map<String, dynamic> question, List<dynamic> answer) {
     final options = (question['options'] as List<dynamic>? ?? const [])
         .map((option) => '$option')
         .toList();
-
-    final correct = <int>{
-      if (type == QuestionType.single && question['correctAnswer'] is int)
-        question['correctAnswer'] as int,
-      if (type == QuestionType.multiple)
-        ...((question['correctAnswers'] as List<dynamic>? ?? const [])
-            .whereType<int>()),
-    };
-
-    final graded = _isTest && correct.isNotEmpty;
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -133,32 +139,14 @@ class PDFResults extends StatelessWidget {
         for (var i = 0; i < options.length; i++)
           () {
             final picked = answer.contains(i);
-            final isRight = correct.contains(i);
-
-            final (chip, fill, tag) = switch ((graded, picked, isRight)) {
-              (true, true, true) => (
-                PdfKit.correct,
-                PdfKit.correctFill,
-                'chosen_correct'.tr(),
-              ),
-              (true, true, false) => (
-                PdfKit.wrong,
-                PdfKit.wrongFill,
-                'chosen_wrong'.tr(),
-              ),
-
-              (true, false, true) => (PdfKit.correct, null, 'missed'.tr()),
-              (false, true, _) => (PdfKit.chosen, null, 'chosen'.tr()),
-              _ => (PdfKit.rule, null, null),
-            };
+            final chip = picked ? PdfKit.chosen : PdfKit.rule;
+            final tag = picked ? 'chosen'.tr() : null;
 
             return PdfKit.row(
               text: options[i],
               tag: tag,
               chipColor: chip,
-              fill: fill,
               picked: picked,
-              lostMark: graded && picked != isRight,
             );
           }(),
         if (answer.isEmpty)

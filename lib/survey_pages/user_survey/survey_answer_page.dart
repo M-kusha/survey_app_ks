@@ -46,6 +46,7 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
   int _remaining = 0;
   Timer? _timer;
   bool _submitting = false;
+  bool _advancing = false;
 
   bool get _isTimed => widget.survey.timeLimitPerQuestion > 0;
 
@@ -85,15 +86,22 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
     });
   }
 
-  void _advance() {
+  Future<void> _advance() async {
+    if (_advancing || _submitting) return;
+
     if (_current < widget.survey.questions.length - 1) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOut,
-      );
+      setState(() => _advancing = true);
+      try {
+        await _pageController.nextPage(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      } finally {
+        if (mounted) setState(() => _advancing = false);
+      }
       return;
     }
-    _submit();
+    await _submit();
   }
 
   void _setAnswer(int index, List<dynamic> answer) {
@@ -116,28 +124,20 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
         SurveyScorer.answerKey(i): _answers[i],
     };
 
-    final grade = SurveyScorer.grade(
-      surveyId: widget.survey.id,
-      questions: widget.survey.questions,
-      answers: answers,
-      textReviews: widget.participant.textAnswersReviewed,
-    );
-
     widget.participant
-      ..score = grade.percentage
+      ..score = 0
       ..surveyAnswers = answers
       ..participantSubmitted = true
-      ..totalCorrectAnswers = grade.correctCount;
+      ..totalCorrectAnswers = 0
+      ..gradedQuestionCount = 0
+      ..gradingStatus = 'processing';
 
     try {
       await FirebaseSurveyService().submitSurveyAnswers(
         surveyId: widget.survey.id,
         participant: widget.participant,
         answers: answers,
-        score: grade.percentage,
         imageProfile: widget.imageProfile,
-        textAnswersReviewed: widget.participant.textAnswersReviewed,
-        totalCorrectAnswers: grade.correctCount,
       );
       if (!mounted) return;
 
@@ -200,7 +200,9 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
         ),
         bottomNavigationBar: WizardActionBar(
           child: FilledButton(
-            onPressed: _submitting ? null : (_isTimed ? _advance : _submit),
+            onPressed: _submitting || _advancing
+                ? null
+                : (_isTimed ? _advance : _submit),
             child: _submitting
                 ? const SizedBox(
                     height: 18,

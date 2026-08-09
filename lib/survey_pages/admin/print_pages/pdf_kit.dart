@@ -9,6 +9,7 @@ abstract final class PdfKit {
   static const rule = PdfColors.blueGrey100;
   static const correct = PdfColors.green700;
   static const wrong = PdfColors.red700;
+  static const pending = PdfColors.orange700;
   static const chosen = PdfColors.blue700;
 
   static const correctFill = PdfColors.green50;

@@ -169,6 +169,7 @@ class SurveyListItem extends StatelessWidget {
             surveyAnswers: {},
             score: 0,
             textAnswersReviewed: {},
+            profileImageRevision: user?.profileImageRevision ?? 0,
           ),
           imageProfile: user?.profileImage ?? '',
         ),

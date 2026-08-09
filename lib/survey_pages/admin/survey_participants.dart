@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/survey_pages/admin/participant_results.dart';
@@ -26,7 +27,19 @@ enum ScoreBand {
   bool get isPass => this != ScoreBand.weak;
 }
 
-enum ParticipantFilter { all, passed, failed }
+enum ParticipantFilter { all, passed, failed, pending, processing, error }
+
+SurveyGrade _authoritativeGrade(Survey survey, Participant participant) =>
+    SurveyScorer.authoritativeGrade(
+      surveyId: survey.id,
+      questions: survey.questions,
+      answers: participant.surveyAnswers,
+      score: participant.score,
+      correctCount: participant.totalCorrectAnswers,
+      gradedCount: participant.gradedQuestionCount,
+      gradingStatus: participant.gradingStatus,
+      textReviews: participant.textAnswersReviewed,
+    );
 
 class SurveyParticipantsPage extends StatefulWidget {
   const SurveyParticipantsPage({
@@ -47,13 +60,34 @@ class SurveyParticipantsPage extends StatefulWidget {
 class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   ParticipantFilter _filter = ParticipantFilter.all;
 
+  SurveyGrade _gradeFor(Participant participant) =>
+      _authoritativeGrade(widget.survey, participant);
+
+  bool _isPending(Participant participant) =>
+      _gradeFor(participant).hasPendingReview;
+
+  bool _isProcessing(Participant participant) =>
+      _gradeFor(participant).isProcessing;
+
+  bool _hasGradingError(Participant participant) =>
+      _gradeFor(participant).hasGradingError;
+
+  bool _hasPassed(Participant participant) => _gradeFor(participant).passed;
+
+  bool _hasFailed(Participant participant) {
+    final grade = _gradeFor(participant);
+    return grade.resultIsFinal && !grade.passed;
+  }
+
   List<Participant> _visible(List<Participant> participants) {
     final result = switch (_filter) {
       ParticipantFilter.all => [...participants],
-      ParticipantFilter.passed =>
-        participants.where((p) => ScoreBand.of(p.score).isPass).toList(),
-      ParticipantFilter.failed =>
-        participants.where((p) => !ScoreBand.of(p.score).isPass).toList(),
+      ParticipantFilter.passed => participants.where(_hasPassed).toList(),
+      ParticipantFilter.failed => participants.where(_hasFailed).toList(),
+      ParticipantFilter.pending => participants.where(_isPending).toList(),
+      ParticipantFilter.processing =>
+        participants.where(_isProcessing).toList(),
+      ParticipantFilter.error => participants.where(_hasGradingError).toList(),
     };
 
     result.sort((a, b) => b.score.compareTo(a.score));
@@ -85,6 +119,9 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                       ParticipantFilter.all => 'filter_all'.tr(),
                       ParticipantFilter.passed => 'passed'.tr(),
                       ParticipantFilter.failed => 'not_passed'.tr(),
+                      ParticipantFilter.pending => 'awaiting_review'.tr(),
+                      ParticipantFilter.processing => 'grading_processing'.tr(),
+                      ParticipantFilter.error => 'grading_errors'.tr(),
                     },
                   ),
                 ),
@@ -107,17 +144,26 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                   ),
                 )
               else ...[
-                _Summary(participants: participants),
+                _Summary(survey: widget.survey, participants: participants),
                 const SizedBox(height: Spacing.md),
                 _Filters(
                   selected: _filter,
                   counts: {
                     ParticipantFilter.all: participants.length,
                     ParticipantFilter.passed: participants
-                        .where((p) => ScoreBand.of(p.score).isPass)
+                        .where(_hasPassed)
                         .length,
                     ParticipantFilter.failed: participants
-                        .where((p) => !ScoreBand.of(p.score).isPass)
+                        .where(_hasFailed)
+                        .length,
+                    ParticipantFilter.pending: participants
+                        .where(_isPending)
+                        .length,
+                    ParticipantFilter.processing: participants
+                        .where(_isProcessing)
+                        .length,
+                    ParticipantFilter.error: participants
+                        .where(_hasGradingError)
                         .length,
                   },
                   onChanged: (filter) => setState(() => _filter = filter),
@@ -154,6 +200,7 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
       itemCount: participants.length,
       separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
       itemBuilder: (context, index) => _ParticipantRow(
+        survey: widget.survey,
         participant: participants[index],
         rank: index + 1,
         onTap: () => Navigator.push(
@@ -173,8 +220,9 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
 }
 
 class _Summary extends StatelessWidget {
-  const _Summary({required this.participants});
+  const _Summary({required this.survey, required this.participants});
 
+  final Survey survey;
   final List<Participant> participants;
 
   @override
@@ -184,34 +232,70 @@ class _Summary extends StatelessWidget {
 
     if (participants.isEmpty) return const SizedBox.shrink();
 
-    final scores = participants.map((p) => p.score).toList();
-    final average = scores.reduce((a, b) => a + b) / scores.length;
-    final passed = participants
-        .where((p) => ScoreBand.of(p.score).isPass)
-        .length;
+    final grades = [
+      for (final participant in participants)
+        _authoritativeGrade(survey, participant),
+    ];
+    final finalGrades = grades.where((grade) => grade.resultIsFinal).toList();
+    final average = finalGrades.isEmpty
+        ? null
+        : finalGrades.map((grade) => grade.percentage).reduce((a, b) => a + b) /
+              finalGrades.length;
+    final passed = finalGrades.where((grade) => grade.passed).length;
+    final failed = finalGrades.length - passed;
+    final pending = grades.where((grade) => grade.hasPendingReview).length;
+    final processing = grades.where((grade) => grade.isProcessing).length;
+    final errors = grades.where((grade) => grade.hasGradingError).length;
 
     return ContentCard(
-      child: Row(
+      child: Column(
         children: [
-          _Figure(
-            label: 'average'.tr(),
-            value: '${average.round()}%',
-            color: _colourFor(context, ScoreBand.of(average)),
+          Row(
+            children: [
+              _Figure(
+                label: 'average'.tr(),
+                value: average == null ? '—' : '${average.round()}%',
+                color: average == null
+                    ? theme.colorScheme.onSurfaceVariant
+                    : _colourFor(context, ScoreBand.of(average)),
+              ),
+              _Divider(),
+              _Figure(
+                label: 'passed'.tr(),
+                value: '$passed',
+                color: app.success,
+              ),
+              _Divider(),
+              _Figure(
+                label: 'not_passed'.tr(),
+                value: '$failed',
+                color: theme.colorScheme.error,
+              ),
+            ],
           ),
-          _Divider(),
-          _Figure(label: 'passed'.tr(), value: '$passed', color: app.success),
-          _Divider(),
-
-          _Figure(
-            label: 'not_passed'.tr(),
-            value: '${participants.length - passed}',
-            color: theme.colorScheme.error,
-          ),
-          _Divider(),
-          _Figure(
-            label: 'participants'.tr(),
-            value: '${participants.length}',
-            color: theme.colorScheme.onSurfaceVariant,
+          const SizedBox(height: Spacing.md),
+          Divider(height: 1, color: theme.colorScheme.outlineVariant),
+          const SizedBox(height: Spacing.md),
+          Row(
+            children: [
+              _Figure(
+                label: 'awaiting_review'.tr(),
+                value: '$pending',
+                color: app.warning,
+              ),
+              _Divider(),
+              _Figure(
+                label: 'grading_processing'.tr(),
+                value: '$processing',
+                color: app.info,
+              ),
+              _Divider(),
+              _Figure(
+                label: 'grading_errors'.tr(),
+                value: '$errors',
+                color: theme.colorScheme.error,
+              ),
+            ],
           ),
         ],
       ),
@@ -288,20 +372,22 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.sm,
       children: [
         for (final (filter, labelKey) in const [
           (ParticipantFilter.all, 'filter_all'),
           (ParticipantFilter.passed, 'passed'),
           (ParticipantFilter.failed, 'failed'),
+          (ParticipantFilter.pending, 'awaiting_review'),
+          (ParticipantFilter.processing, 'grading_processing'),
+          (ParticipantFilter.error, 'grading_errors'),
         ])
-          Padding(
-            padding: const EdgeInsets.only(right: Spacing.sm),
-            child: ChoiceChip(
-              label: Text('${labelKey.tr()} ${counts[filter] ?? 0}'),
-              selected: selected == filter,
-              onSelected: (_) => onChanged(filter),
-            ),
+          ChoiceChip(
+            label: Text('${labelKey.tr()} ${counts[filter] ?? 0}'),
+            selected: selected == filter,
+            onSelected: (_) => onChanged(filter),
           ),
       ],
     );
@@ -310,11 +396,13 @@ class _Filters extends StatelessWidget {
 
 class _ParticipantRow extends StatelessWidget {
   const _ParticipantRow({
+    required this.survey,
     required this.participant,
     required this.rank,
     required this.onTap,
   });
 
+  final Survey survey;
   final Participant participant;
   final int rank;
   final VoidCallback onTap;
@@ -323,8 +411,22 @@ class _ParticipantRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final grade = _authoritativeGrade(survey, participant);
     final band = ScoreBand.of(participant.score);
-    final colour = _colourFor(context, band);
+    final colour = grade.isProcessing
+        ? context.appColors.info
+        : grade.hasPendingReview
+        ? context.appColors.warning
+        : grade.hasGradingError
+        ? scheme.error
+        : _colourFor(context, band);
+    final resultLabel = grade.isProcessing
+        ? 'grading_processing'.tr()
+        : grade.hasPendingReview
+        ? 'awaiting_review'.tr()
+        : grade.hasGradingError
+        ? 'grading_error'.tr()
+        : '${participant.score.round()}%';
 
     return ContentCard(
       onTap: onTap,
@@ -356,7 +458,9 @@ class _ParticipantRow extends StatelessWidget {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(2),
                   child: LinearProgressIndicator(
-                    value: (participant.score / 100).clamp(0.0, 1.0),
+                    value: grade.resultIsFinal
+                        ? (participant.score / 100).clamp(0.0, 1.0)
+                        : 0,
                     minHeight: 4,
                     backgroundColor: scheme.surfaceContainerHighest,
                     valueColor: AlwaysStoppedAnimation(colour),
@@ -367,7 +471,7 @@ class _ParticipantRow extends StatelessWidget {
           ),
           const SizedBox(width: Spacing.md),
           Text(
-            '${participant.score.round()}%',
+            resultLabel,
             style: theme.textTheme.titleSmall?.copyWith(color: colour),
           ),
           Icon(
@@ -392,28 +496,32 @@ class _Avatar extends StatelessWidget {
     final scheme = theme.colorScheme;
     final name = participant.name.trim();
 
-    return Container(
-      height: 34,
-      width: 34,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: scheme.primaryContainer,
-        image: participant.imageProfile.isEmpty
-            ? null
-            : DecorationImage(
-                image: NetworkImage(participant.imageProfile),
-                fit: BoxFit.cover,
+    return ClipOval(
+      child: SizedBox(
+        height: 34,
+        width: 34,
+        child: ColoredBox(
+          color: scheme.primaryContainer,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Text(
+                  name.isEmpty ? '?' : name[0].toUpperCase(),
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
               ),
+              AuthenticatedProfileImage(
+                storedReference: participant.imageProfile,
+                refreshKey: participant.profileImageRevision,
+                userId: participant.userId,
+              ),
+            ],
+          ),
+        ),
       ),
-      alignment: Alignment.center,
-      child: participant.imageProfile.isEmpty
-          ? Text(
-              name.isEmpty ? '?' : name[0].toUpperCase(),
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            )
-          : null,
     );
   }
 }

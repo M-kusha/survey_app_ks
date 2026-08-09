@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:uuid/uuid.dart';
+import 'package:echomeet/core/profile/profile_image_revision.dart';
 
 enum SurveyType { survey, test }
 
@@ -27,50 +27,6 @@ class Survey {
     this.surveyType = SurveyType.survey,
     required this.companyId,
   });
-
-  factory Survey.create({
-    required String title,
-    required String description,
-    required List<Map<String, dynamic>> questions,
-    required List<dynamic> correctAnswers,
-    required List<dynamic> participantsData,
-  }) {
-    final String uniqueId = const Uuid().v4();
-
-    List<Participant> participants = participantsData.map((participantData) {
-      int participantCorrectAnswers = 0;
-      Map<String, List<dynamic>> participantSurveyAnswers =
-          participantData['surveyAnswers'];
-
-      for (int i = 0; i < correctAnswers.length; i++) {
-        if (participantSurveyAnswers['question$i'].toString() ==
-            correctAnswers[i].toString()) {
-          participantCorrectAnswers++;
-        }
-      }
-
-      double participantScore =
-          participantCorrectAnswers / questions.length * 100;
-
-      return Participant(
-        userId: participantData['userId'],
-        name: participantData['name'],
-        surveyAnswers: participantSurveyAnswers,
-        score: participantScore,
-      );
-    }).toList();
-
-    return Survey(
-      surveyName: title,
-      surveyDescription: description,
-      timeCreated: DateTime.now(),
-      questions: questions,
-      id: uniqueId,
-      participants: participants,
-      deadline: DateTime.now().add(const Duration(days: 7)),
-      companyId: '',
-    );
-  }
 
   Map<String, dynamic> toFirestoreMap() {
     return {
@@ -137,8 +93,11 @@ class Participant {
   String textAnswer;
   bool participantSubmitted;
   String imageProfile;
+  int profileImageRevision;
   Map<String, bool> textAnswersReviewed;
   int totalCorrectAnswers;
+  int? gradedQuestionCount;
+  String? gradingStatus;
   List<Map<String, dynamic>> participations;
 
   Participant({
@@ -149,8 +108,11 @@ class Participant {
     this.textAnswer = '',
     this.participantSubmitted = false,
     this.imageProfile = '',
+    this.profileImageRevision = 0,
     this.textAnswersReviewed = const {},
     this.totalCorrectAnswers = 0,
+    this.gradedQuestionCount,
+    this.gradingStatus,
     this.participations = const [],
   });
 
@@ -163,8 +125,12 @@ class Participant {
       'textAnswer': textAnswer,
       'participantSubmitted': participantSubmitted,
       'imageProfile': imageProfile,
+      'profileImageRevision': profileImageRevision,
       'textAnswersReviewed': textAnswersReviewed,
       "totalCorrectAnswers": totalCorrectAnswers,
+      if (gradedQuestionCount != null)
+        'gradedQuestionCount': gradedQuestionCount,
+      if (gradingStatus != null) 'gradingStatus': gradingStatus,
       'participations': participations,
     };
   }
@@ -178,10 +144,15 @@ class Participant {
       textAnswer: data['textAnswer'] as String? ?? '',
       participantSubmitted: data['participantSubmitted'] as bool? ?? false,
       imageProfile: data['imageProfile'] as String? ?? '',
+      profileImageRevision: readProfileImageRevision(
+        data['profileImageRevision'],
+      ),
       textAnswersReviewed: Map<String, bool>.from(
         data['textAnswersReviewed'] ?? {},
       ),
       totalCorrectAnswers: data['totalCorrectAnswers'] ?? 0,
+      gradedQuestionCount: data['gradedQuestionCount'] as int?,
+      gradingStatus: data['gradingStatus'] as String?,
       participations: List<Map<String, dynamic>>.from(
         data['participations'] ?? [],
       ),
