@@ -2,12 +2,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/create/step4_create_appointment.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class Step3CreateAppointment extends StatefulWidget {
   const Step3CreateAppointment({super.key});
@@ -17,240 +17,256 @@ class Step3CreateAppointment extends StatefulWidget {
 }
 
 class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
-  late Appointment _newAppointment;
-  final AppointmentService _appointmentService = AppointmentService();
-  DateTime _expirationDate = DateTime.now().add(const Duration(days: 1));
+  final _service = AppointmentService();
 
-  bool _isSaving = false;
+  Appointment? _appointment;
+  bool _saving = false;
 
-  /// Creates the appointment and moves on.
-  ///
-  /// Both failure paths used to be silent: an invalid appointment hit an empty
-  /// `else {}`, and a failed write threw out of an un-caught `await`. Either
-  /// way the button appeared to do nothing at all, which is exactly what a user
-  /// with no companyId on their profile would have seen.
-  Future<void> _onNextPressed() async {
-    if (_isSaving) return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _appointment ??= ModalRoute.of(context)!.settings.arguments as Appointment;
+  }
 
-    if (!_newAppointment.isValid()) {
+  DateTime get _latestSensible {
+    final slots = _appointment!.availableTimeSlots;
+    if (slots.isEmpty) return DateTime.now().add(const Duration(days: 365));
+    return slots.map((s) => s.start).reduce((a, b) => a.isBefore(b) ? a : b);
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final latest = _latestSensible;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _appointment!.expirationDate.isAfter(latest)
+          ? latest
+          : _appointment!.expirationDate,
+      firstDate: now,
+      lastDate: latest.isAfter(now) ? latest : now,
+      helpText: 'select_voting_expiration_date'.tr(),
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _appointment!.expirationDate = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        23,
+        59,
+      );
+    });
+  }
+
+  void _setDaysFromNow(int days) {
+    final target = DateTime.now().add(Duration(days: days));
+    final latest = _latestSensible;
+
+    setState(() {
+      final chosen = target.isAfter(latest) ? latest : target;
+      _appointment!.expirationDate = DateTime(
+        chosen.year,
+        chosen.month,
+        chosen.day,
+        23,
+        59,
+      );
+    });
+  }
+
+  Future<void> _create() async {
+    if (_saving) return;
+
+    final appointment = _appointment!;
+    if (!appointment.isValid()) {
       UIUtils.showSnackBar(context, 'please_fill_all_fields'.tr());
       return;
     }
 
-    setState(() => _isSaving = true);
+    setState(() => _saving = true);
 
     try {
-      await _appointmentService.createAppointment(_newAppointment);
+      await _service.createAppointment(appointment);
       if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) =>
-              Step4CreateAppointment(appointment: _newAppointment),
+              Step4CreateAppointment(appointment: appointment),
         ),
       );
     } on StateError {
-      // Raised when the signed-in user has no company. Worth its own message:
-      // it is a broken profile rather than anything the user did wrong here.
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'no_company_error'.tr());
     } catch (_) {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _saving = false);
     }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _newAppointment =
-        ModalRoute.of(context)!.settings.arguments as Appointment? ??
-        Appointment(
-          title: '',
-          description: '',
-          availableDates: [],
-          availableTimeSlots: [],
-          appointmentId: '',
-          confirmedTimeSlots: [],
-          expirationDate: DateTime.now(),
-          participants: [],
-          creationDate: DateTime.now(),
-        );
-  }
-
-  // function to show date picker
-  Future<void> _selectExpirationDate(BuildContext context) async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _expirationDate,
-      firstDate: DateTime.now().add(const Duration(days: 1)),
-      lastDate: DateTime(2100),
-    );
-
-    if (pickedDate != null && pickedDate != _expirationDate) {
-      setState(() {
-        _expirationDate = pickedDate;
-        _newAppointment.expirationDate = pickedDate;
-      });
-    }
-  }
-
-  // Future<void> sendNotification(String surveyTitle) async {
-  //   final fcmToken = await FirebaseMessaging.instance.getToken();
-
-  //   // Assuming using a topic here. Adjust accordingly if using tokens.
-  //   const topic = 'surveys';
-
-  //   // Your server key from Firebase project settings
-  //   const serverKey = 'YOUR_SERVER_KEY';
-
-  //   final response = await http.post(
-  //     Uri.parse('https://fcm.googleapis.com/fcm/send'),
-  //     headers: <String, String>{
-  //       'Content-Type': 'application/json',
-  //       'Authorization': 'key=$serverKey',
-  //     },
-  //     body: jsonEncode(
-  //       <String, dynamic>{
-  //         'notification': <String, dynamic>{
-  //           'body': 'Check out this new survey: $surveyTitle',
-  //           'title': 'New Survey Available'
-  //         },
-  //         'priority': 'high',
-  //         'data': <String, dynamic>{
-  //           'click_action': 'FLUTTER_NOTIFICATION_CLICK',
-  //           'id': '1',
-  //           'status': 'done'
-  //         },
-  //         'to': '/topics/$topic',
-  //       },
-  //     ),
-  //   );
-
-  //   if (response.statusCode == 200) {
-  //     // Handle response and/or notify user
-  //     print("Notification sent");
-  //   } else {
-  //     // Handle failure
-  //     print("Failed to send notification");
-  //   }
-  // }
-
-  @override
-  void initState() {
-    super.initState();
-    // FirebaseMessaging.instance
-    //     .requestPermission(); // Request permissions for iOS
-    // FirebaseMessaging.instance.getToken().then((token) {
-    //   print("Firebase Messaging Token: $token");
-    // });
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+    final theme = Theme.of(context);
+    final appointment = _appointment!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'create_appointment'.tr(),
-          style: TextStyle(fontSize: timeFontSize * 1.5),
-        ),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return WizardScaffold(
+      step: 3,
+      totalSteps: 3,
+      appBarTitle: 'create_appointment'.tr(),
+      title: 'create_appointment_step3_title'.tr(),
+      subtitle: 'create_appointment_step3_subhead'.tr(),
+      primaryLabel: 'create_appointment'.tr(),
+      busy: _saving,
+      onPrimary: _create,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: EdgeInsets.all(timeFontSize * 1.5),
-            child: Column(
-              children: [
-                Text(
-                  'select_voting_expiration_date'.tr(),
-                  style: TextStyle(
-                    fontSize: timeFontSize,
-                    fontWeight: FontWeight.bold,
-                  ),
+          _DeadlineCard(date: appointment.expirationDate, onTap: _pickDate),
+          const SizedBox(height: Spacing.md),
+          Wrap(
+            spacing: Spacing.sm,
+            children: [
+              for (final days in [2, 3, 7])
+                ActionChip(
+                  label: Text('in_days'.tr(namedArgs: {'count': '$days'})),
+                  onPressed: () => _setDaysFromNow(days),
                 ),
-                const SizedBox(height: 20),
-              ],
-            ),
+            ],
           ),
-          Center(
-            child: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.8,
-              child: Card(
-                elevation: 5,
-                shadowColor: getButtonColor(context),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: InkWell(
-                  onTap: () => _selectExpirationDate(context),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.event,
-                          size: timeFontSize * 2.5,
-                          color: getButtonColor(context),
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          DateFormat("EEEE, d MMMM y").format(_expirationDate),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: timeFontSize * 1.1,
-                            fontWeight: FontWeight.bold,
-                            color: getListTileColor(context),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'tap_to_change'.tr(),
-                          style: TextStyle(
-                            fontSize: timeFontSize * 0.8,
-                            color: getListTileColor(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+          const SizedBox(height: Spacing.xxl),
+          Text('review'.tr(), style: theme.textTheme.titleMedium),
+          const SizedBox(height: Spacing.md),
+          _ReviewCard(appointment: appointment),
         ],
-      ),
-      bottomNavigationBar: buildBottomElevatedButton(
-        context: context,
-        onPressed: _onNextPressed,
-        buttonText: 'next',
       ),
     );
   }
+}
 
-  Widget buildAddDatesButton() {
-    final timeFontSize = getTimeFontSize(context, 13);
-    return OutlinedButton(
-      style: OutlinedButton.styleFrom(
-        foregroundColor: getButtonColor(context),
-        backgroundColor: getButtonColor(context),
-        shape: const CircleBorder(),
-        padding: const EdgeInsets.all(6),
+class _DeadlineCard extends StatelessWidget {
+  const _DeadlineCard({required this.date, required this.onTap});
+
+  final DateTime date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ContentCard(
+      onTap: onTap,
+      accent: scheme.primary,
+      child: Row(
+        children: [
+          Container(
+            height: 40,
+            width: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.md),
+              color: scheme.primary.withValues(alpha: 0.12),
+            ),
+            child: Icon(
+              Icons.how_to_vote_rounded,
+              size: 20,
+              color: scheme.primary,
+            ),
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'voting_closes'.tr(),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                Text(
+                  DateFormat.yMMMMEEEEd().format(date),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ],
+            ),
+          ),
+          Icon(
+            Icons.edit_calendar_rounded,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+        ],
       ),
-      onPressed: () {
-        setState(() {
-          _selectExpirationDate(context);
-        });
-      },
-      child: Icon(Icons.calendar_month_outlined, size: timeFontSize * 2.5),
+    );
+  }
+}
+
+class _ReviewCard extends StatelessWidget {
+  const _ReviewCard({required this.appointment});
+
+  final Appointment appointment;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return ContentCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(appointment.title, style: theme.textTheme.titleMedium),
+          if (appointment.description.isNotEmpty) ...[
+            const SizedBox(height: Spacing.xs),
+            Text(
+              appointment.description,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: Spacing.md),
+          Text(
+            'proposed_times'.tr(),
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            children: [
+              for (final slot in appointment.availableTimeSlots)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(Radii.sm),
+                    color: scheme.surfaceContainerHighest.withValues(
+                      alpha: 0.55,
+                    ),
+                  ),
+                  child: Text(
+                    '${DateFormat.MMMEd().format(slot.start)} · '
+                    '${DateFormat.jm().format(slot.start)}',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }

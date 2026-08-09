@@ -61,7 +61,7 @@ class ActionFieldState extends State<ActionField> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                    color: getButtonColor(context), // Adjust as needed
+                    color: getButtonColor(context),
                     width: 2,
                   ),
                   borderRadius: BorderRadius.circular(50),

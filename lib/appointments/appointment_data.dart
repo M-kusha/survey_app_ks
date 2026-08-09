@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AppointmentParticipants {
   String userId;
   String userName;
@@ -94,16 +96,8 @@ class Appointment {
   List<TimeSlot> confirmedTimeSlots = [];
   DateTime creationDate;
 
-  /// Everyone who has voted, by uid.
-  ///
-  /// A set rather than a counter, because one person may vote on several time
-  /// slots and may change their mind. `participationCount` used to be an
-  /// integer incremented on every press of the participate button, so it
-  /// counted button presses instead of people and grew every time somebody
-  /// revisited an appointment they had already answered.
   List<String> participantUserIds;
 
-  /// How many distinct people have voted. Derived, so it cannot drift.
   int get participationCount => participantUserIds.length;
 
   bool hasVoted(String userId) => participantUserIds.contains(userId);
@@ -148,9 +142,18 @@ class Appointment {
       participantUserIds: List<String>.from(
         (map['participantUserIds'] as List<dynamic>?) ?? const [],
       ),
-      creationDate: map['creationDate'].toDate(),
+
+      creationDate: _readDate(map['creationDate']),
     );
   }
+
+  static DateTime _readDate(Object? value) => switch (value) {
+    Timestamp() => value.toDate(),
+    DateTime() => value,
+    String() => DateTime.parse(value),
+
+    _ => DateTime.fromMillisecondsSinceEpoch(0),
+  };
 
   Map<String, dynamic> toFirestore() {
     Map<String, dynamic> data = {

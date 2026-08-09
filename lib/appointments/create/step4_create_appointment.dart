@@ -1,25 +1,18 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/theme/app_colors.dart';
+import 'package:echomeet/core/widgets/copyable_code.dart';
 import 'package:echomeet/utilities/bottom_navigation.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 
-class Step4CreateAppointment extends StatefulWidget {
-  final Appointment appointment;
-
+class Step4CreateAppointment extends StatelessWidget {
   const Step4CreateAppointment({super.key, required this.appointment});
 
-  @override
-  State<Step4CreateAppointment> createState() => Step4CreateAppointmentState();
-}
+  final Appointment appointment;
 
-class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
-  void _onNextPressed() async {
+  void _finish(BuildContext context) {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -31,139 +24,70 @@ class Step4CreateAppointmentState extends State<Step4CreateAppointment> {
 
   @override
   Widget build(BuildContext context) {
-    final fontSizeProvider = Provider.of<FontSizeProvider>(context);
-    final fontSize = fontSizeProvider.fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final app = context.appColors;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'create_appointment'.tr(),
-          style: TextStyle(fontSize: timeFontSize * 1.5),
-        ),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: Card(
-              elevation: 5,
-              shadowColor: getButtonColor(context),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: timeFontSize * 3,
-                      color: getButtonColor(context),
+      appBar: AppBar(automaticallyImplyLeading: false),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 520,
+          centerVertically: true,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  height: 64,
+                  width: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: app.success.withValues(alpha: 0.16),
+                    border: Border.all(
+                      color: app.success.withValues(alpha: 0.5),
+                      width: 2,
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'appointment_created_successfully'.tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: timeFontSize * 1.2,
-                        fontWeight: FontWeight.bold,
-                        color: getListTileColor(context),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'share_id_information'.tr(),
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: timeFontSize),
-                    ),
-                    const SizedBox(height: 30),
-                    InkWell(
-                      onTap: () => copyToClipboard(
-                        context,
-                        widget.appointment.appointmentId,
-                        timeFontSize,
-                      ),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: getAppbarColor(context),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 12,
-                          horizontal: 20,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.content_copy, size: timeFontSize * 1.2),
-                            const SizedBox(width: 10),
-                            Text(
-                              '${'appointment_id'.tr()} ${widget.appointment.appointmentId}',
-                              style: TextStyle(fontSize: timeFontSize - 1),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
+                  ),
+                  child: Icon(
+                    Icons.check_rounded,
+                    size: 32,
+                    color: app.success,
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: Spacing.xl),
+              Text(
+                'appointment_created_successfully'.tr(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall,
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                'share_id_information'.tr(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.xl),
+              CopyableCode(
+                label: 'appointment_id'.tr(),
+                code: appointment.appointmentId,
+              ),
+              const SizedBox(height: Spacing.xl),
+
+              Center(
+                child: FilledButton(
+                  onPressed: () => _finish(context),
+                  child: Text('finish'.tr()),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-      bottomNavigationBar: buildBottomElevatedButton(
-        context: context,
-        onPressed: _onNextPressed,
-        buttonText: 'finish',
-      ),
     );
-  }
-
-  Widget buildInformationCard(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-    required IconData iconData,
-    required double fontSize,
-  }) {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(iconData, size: fontSize * 1.5),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(subtitle, style: TextStyle(fontSize: fontSize)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void copyToClipboard(BuildContext context, String text, double fontSize) {
-    Clipboard.setData(ClipboardData(text: text));
-    UIUtils.showSnackBar(context, 'appointment_id_copied');
   }
 }

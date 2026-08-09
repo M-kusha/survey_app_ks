@@ -17,10 +17,6 @@ class AppointmentService {
       );
     }
 
-    // A Firestore auto-id, rather than a truncated UUID. The previous
-    // `Uuid().v1().substring(0, 6)` kept only 24 bits of a 100ns clock, which
-    // wraps roughly every seven minutes — and because the write below is a
-    // `set`, a collision silently overwrote an existing appointment.
     final document = _db.collection('appointments').doc();
 
     appointment.appointmentId = document.id;
@@ -29,6 +25,23 @@ class AppointmentService {
     await document.set(appointment.toFirestore());
 
     return document.id;
+  }
+
+  Future<void> deleteAppointment(String appointmentId) async {
+    final appointment = _db.collection('appointments').doc(appointmentId);
+    final votes = await appointment.collection('participants').get();
+
+    const chunkSize = 400;
+    for (var start = 0; start < votes.docs.length; start += chunkSize) {
+      final batch = _db.batch();
+      final end = (start + chunkSize).clamp(0, votes.docs.length);
+      for (final doc in votes.docs.sublist(start, end)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    await appointment.delete();
   }
 
   Future<bool> isAnyTimeSlotConfirmed(String appointmentId) async {
@@ -75,13 +88,6 @@ class AppointmentService {
         .set(participantData);
   }
 
-  /// Records that [userId] has voted on this appointment.
-  ///
-  /// `arrayUnion` is idempotent: voting again, changing your answer, or
-  /// double-tapping the button all leave the set unchanged. This replaced a
-  /// `FieldValue.increment(1)`, which counted button presses rather than
-  /// people — the total climbed every time somebody reopened an appointment
-  /// they had already answered.
   Future<void> registerParticipation(
     String appointmentId,
     String userId,
@@ -185,6 +191,20 @@ class AppointmentService {
       'availableTimeSlots': availableTimeSlots,
       'confirmedTimeSlots': confirmedTimeSlots,
     });
+  }
+
+  Future<List<AppointmentParticipants>> fetchAllParticipants(
+    String appointmentId,
+  ) async {
+    final snapshot = await _db
+        .collection('appointments')
+        .doc(appointmentId)
+        .collection('participants')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => AppointmentParticipants.fromFirestore(doc.data()))
+        .toList();
   }
 
   Future<List<AppointmentParticipants>> fetchParticipants(

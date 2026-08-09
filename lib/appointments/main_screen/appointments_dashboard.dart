@@ -2,121 +2,210 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/firebase/appointment_provider.dart';
 import 'package:echomeet/appointments/main_screen/appointment_list.dart';
-import 'package:echomeet/appointments/main_screen/appointment_search_field.dart';
 import 'package:echomeet/appointments/main_screen/create_appointment_button.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/membership/company_gate.dart';
+import 'package:echomeet/core/membership/membership.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:timeago/timeago.dart';
+
+enum AppointmentSort { newest, oldest, closingSoon, mostVotes }
 
 class AppointmentPageUI extends StatefulWidget {
   const AppointmentPageUI({super.key});
 
   @override
   State<AppointmentPageUI> createState() => AppointmentPageUIState();
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 80);
 }
 
 class AppointmentPageUIState extends State<AppointmentPageUI> {
-  int focusIndex = -1;
-  bool isSearching = false;
-  String searchQuery = '';
+  final _searchController = TextEditingController();
+
+  AppointmentSort _sort = AppointmentSort.newest;
   bool _isAdmin = false;
-  int _currentPage = 0;
-  final int _appointmentsPerPage = 4;
-  bool _isLoading = false;
-  late FirebaseServices _firebaseServices;
+  bool _isLoading = true;
+  String? _error;
+  Membership? _membership;
 
   @override
   void initState() {
     super.initState();
-    _firebaseServices = Provider.of<FirebaseServices>(context, listen: false);
-    _loadUserAndSurveys();
-  }
-
-  void _loadUserAndSurveys() async {
-    setState(() => _isLoading = true);
-
-    final provider = Provider.of<AppointmentDataProvider>(
-      context,
-      listen: false,
-    );
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    await Provider.of<UserDataProvider>(
-      context,
-      listen: false,
-    ).loadCurrentUser();
-    if (!mounted) return;
-    final companyId =
-        Provider.of<UserDataProvider>(
-          context,
-          listen: false,
-        ).currentUser?.companyId ??
-        '';
-    if (companyId.isNotEmpty) {
-      await provider.loadAppointments(companyId);
-      await provider.preloadUserParticipationStatus(userId);
-      await provider.preloadAppointmentsTimeSlotConfirmation();
-    }
-
-    final isAdmin = await _firebaseServices.fetchAdminStatus();
-
-    setState(() {
-      _isAdmin = isAdmin;
-      _isLoading = false;
-    });
+    _searchController.addListener(() => setState(() {}));
+    _load();
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     super.dispose();
-    searchController.dispose();
   }
 
-  void _onSearchTextChanged(String text) async {
+  Future<void> _refresh() => _load(silent: true);
+
+  Future<void> _load({bool silent = false}) async {
+    final appointments = Provider.of<AppointmentDataProvider>(
+      context,
+      listen: false,
+    );
+    final users = Provider.of<UserDataProvider>(context, listen: false);
+    final services = Provider.of<FirebaseServices>(context, listen: false);
+    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+
     setState(() {
-      searchQuery = text;
+      _isLoading = !silent;
+      _error = null;
     });
+
+    try {
+      await users.loadCurrentUser();
+      if (!mounted) return;
+
+      final membership = await MembershipService().resolve();
+      if (!mounted) return;
+
+      if (!membership.isActive) {
+        setState(() {
+          _membership = membership;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      _membership = membership;
+      final companyId = membership.companyId;
+
+      await appointments.loadAppointments(companyId);
+      await appointments.preloadUserParticipationStatus(userId);
+      await appointments.preloadAppointmentsTimeSlotConfirmation();
+
+      final isAdmin = await services.fetchAdminStatus();
+
+      if (!mounted) return;
+
+      setState(() {
+        _isAdmin = isAdmin;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _isLoading = false;
+      });
+    }
   }
 
-  int selectedSortOption = 0;
-  bool _isSearching = false;
-  TextEditingController searchController = TextEditingController();
+  ({
+    List<Appointment> waiting,
+    List<Appointment> done,
+    List<Appointment> closed,
+  })
+  _group(List<Appointment> appointments, AppointmentDataProvider provider) {
+    final now = DateTime.now();
+
+    bool voted(Appointment a) =>
+        provider.userParticipationStatus[a.appointmentId] ?? false;
+
+    bool settled(Appointment a) =>
+        a.availableTimeSlots.any((slot) => slot.isConfirmed);
+
+    bool live(Appointment a) => a.expirationDate.isAfter(now) && !settled(a);
+
+    return (
+      waiting: appointments.where((a) => live(a) && !voted(a)).toList(),
+      done: appointments.where((a) => live(a) && voted(a)).toList(),
+      closed: appointments.where((a) => !live(a)).toList(),
+    );
+  }
+
+  List<Appointment> _visible(List<Appointment> appointments) {
+    final needle = _searchController.text.trim().toLowerCase();
+
+    final result = appointments
+        .where(
+          (appointment) =>
+              needle.isEmpty ||
+              appointment.title.toLowerCase().contains(needle),
+        )
+        .toList();
+
+    result.sort(
+      (a, b) => switch (_sort) {
+        AppointmentSort.newest => b.creationDate.compareTo(a.creationDate),
+        AppointmentSort.oldest => a.creationDate.compareTo(b.creationDate),
+        AppointmentSort.closingSoon => a.expirationDate.compareTo(
+          b.expirationDate,
+        ),
+        AppointmentSort.mostVotes => b.participationCount.compareTo(
+          a.participationCount,
+        ),
+      },
+    );
+
+    return result;
+  }
+
+  String _waitingLabel(int count) => count == 0
+      ? 'all_caught_up'.tr()
+      : 'needs_you_count'.tr(namedArgs: {'count': '$count'});
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+    final provider = Provider.of<AppointmentDataProvider>(context);
+    final appointments = _visible(provider.appointments);
+
+    if (!_isLoading && _membership?.isActive != true) {
+      return CompanyGate(
+        membership: _membership,
+        onChanged: _load,
+        child: const SizedBox.shrink(),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        leading: buildPopupMenuButton(context),
-        title: _isSearching
-            ? ActionField(
-                isSearching: _isSearching,
-                searchController: searchController,
-                onSearchTextChanged: _onSearchTextChanged,
-              )
-            : Text(
-                'appointments'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 720,
+
+          scrollable: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.xl),
+              ScreenHeader(
+                title: 'appointments'.tr(),
+
+                subtitle: _isLoading
+                    ? null
+                    : _waitingLabel(
+                        _group(provider.appointments, provider).waiting.length,
+                      ),
+                actions: const [SignOutOnCompact()],
               ),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-        actions: [buildSearchBar()],
-        automaticallyImplyLeading: false,
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 22.0),
-          buildExpandedField(context, isSearching, searchQuery),
-        ],
+              const SizedBox(height: Spacing.lg),
+              Row(
+                children: [
+                  Expanded(
+                    child: SearchPill(
+                      controller: _searchController,
+                      hint: 'search_hint'.tr(),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  _buildSortMenu(),
+                ],
+              ),
+              Expanded(child: _buildBody(provider, appointments)),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: _isAdmin
           ? buildCreateAppointmentButton(context)
@@ -124,245 +213,112 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     );
   }
 
-  PopupMenuItem<int> buildPopupMenuItem(
-    BuildContext context,
-    String text,
-    int value,
-    IconData icon,
-  ) {
-    bool isSelected = selectedSortOption == value;
-
-    return PopupMenuItem(
-      value: value,
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: isSelected
-              ? getButtonColor(context)
-              : getListTileColor(context),
-        ),
-        title: Text(
-          text.tr(),
-          style: TextStyle(
-            color: isSelected
-                ? getButtonColor(context)
-                : getListTileColor(context),
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Widget _buildSortMenu() {
+    return PopupMenuButton<AppointmentSort>(
+      tooltip: 'sort'.tr(),
+      initialValue: _sort,
+      onSelected: (value) => setState(() => _sort = value),
+      itemBuilder: (context) => [
+        for (final (sort, labelKey, icon) in const [
+          (AppointmentSort.newest, 'newest', Icons.arrow_downward_rounded),
+          (AppointmentSort.oldest, 'oldest', Icons.arrow_upward_rounded),
+          (
+            AppointmentSort.closingSoon,
+            'exp_date_asc',
+            Icons.event_busy_rounded,
           ),
-        ),
-        trailing: isSelected
-            ? Icon(Icons.check, color: getButtonColor(context), size: 17.0)
-            : null,
-      ),
-    );
-  }
-
-  PopupMenuButton<int> buildPopupMenuButton(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return PopupMenuButton<int>(
-      icon: Icon(
-        Icons.sort_by_alpha_sharp,
-        color: getButtonColor(context),
-        size: timeFontSize * 1.8,
-      ),
-      offset: const Offset(0, 60),
-      onSelected: (int result) {
-        setState(() {
-          selectedSortOption = result;
-        });
-      },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<int>>[
-        buildPopupMenuItem(context, 'newest', 0, Icons.new_label),
-        buildPopupMenuItem(context, 'oldest', 1, Icons.history),
-        buildPopupMenuItem(context, 'most_participated', 2, Icons.groups_2),
-        buildPopupMenuItem(context, 'least_participated', 3, Icons.group),
-        buildPopupMenuItem(context, 'exp_date_asc', 4, Icons.date_range_sharp),
-        buildPopupMenuItem(context, 'exp_date_des', 5, Icons.date_range),
+          (AppointmentSort.mostVotes, 'participants', Icons.groups_rounded),
+        ])
+          PopupMenuItem(
+            value: sort,
+            child: Row(
+              children: [
+                Icon(icon, size: 18),
+                const SizedBox(width: Spacing.md),
+                Text(labelKey.tr()),
+              ],
+            ),
+          ),
       ],
+      child: CircleAction(
+        icon: Icons.sort_rounded,
+        tooltip: 'sort'.tr(),
+        active: _sort != AppointmentSort.newest,
+        onTap: null,
+      ),
     );
   }
 
-  Widget buildSearchBar() {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return _isSearching
-        ? IconButton(
-            icon: Icon(
-              Icons.close,
-              size: timeFontSize * 1.8,
-              color: getButtonColor(context),
-            ),
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-                searchController.clear();
-              });
-            },
-          )
-        : IconButton(
-            icon: Icon(
-              Icons.search,
-              size: timeFontSize * 1.8,
-              color: getButtonColor(context),
-            ),
-            onPressed: () {
-              setState(() {
-                _isSearching = !_isSearching;
-              });
-            },
-          );
-  }
-
-  Widget buildExpandedField(
-    BuildContext context,
-    bool isSearching,
-    String searchQuery,
+  Widget _buildBody(
+    AppointmentDataProvider provider,
+    List<Appointment> appointments,
   ) {
-    final appointmentListProvider = Provider.of<AppointmentDataProvider>(
-      context,
-    );
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
     if (_isLoading) {
-      return const Expanded(
-        child: Center(child: CustomLoadingWidget(loadingText: 'loading')),
+      return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
+    }
+
+    if (_error case final error?) {
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'error_occurred'.tr(),
+        body: error,
+        action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }
 
-    List<Appointment> filteredAppointments = appointmentListProvider
-        .appointments
-        .where((appoinments) {
-          final lowerCaseQuery = searchQuery.toLowerCase();
-          return appoinments.title.toLowerCase().contains(lowerCaseQuery) ||
-              appoinments.appointmentId.toLowerCase().contains(
-                lowerCaseQuery,
-              ) ||
-              format(
-                appoinments.creationDate,
-              ).toLowerCase().contains(lowerCaseQuery);
-        })
-        .toList();
-    switch (selectedSortOption) {
-      case 0:
-        filteredAppointments.sort(
-          (a, b) => b.creationDate.compareTo(a.creationDate),
-        );
-
-        break;
-      case 1:
-        filteredAppointments.sort(
-          (a, b) => a.creationDate.compareTo(b.creationDate),
-        );
-        break;
-      case 2:
-        filteredAppointments.sort(
-          (a, b) => b.participationCount.compareTo(a.participationCount),
-        );
-        break;
-      case 3:
-        filteredAppointments.sort(
-          (a, b) => a.participationCount.compareTo(b.participationCount),
-        );
-        break;
-      case 4:
-        filteredAppointments.sort(
-          (a, b) => a.expirationDate.compareTo(b.expirationDate),
-        );
-        break;
-      case 5:
-        filteredAppointments.sort(
-          (a, b) => b.expirationDate.compareTo(a.expirationDate),
-        );
-        break;
+    if (appointments.isEmpty) {
+      return _searchController.text.isEmpty
+          ? EmptyState(
+              icon: Icons.event_note_outlined,
+              title: 'no_appointments_added_yet'.tr(),
+              body: 'no_appointments_body'.tr(),
+            )
+          : EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'search_survey_or_test_not_found'.tr(),
+              action: TextButton(
+                onPressed: _searchController.clear,
+                child: Text('clear_search'.tr()),
+              ),
+            );
     }
 
-    final totalPages = (filteredAppointments.length / _appointmentsPerPage)
-        .ceil();
-    final startIndex = _currentPage * _appointmentsPerPage;
-    final endIndex =
-        startIndex + _appointmentsPerPage > filteredAppointments.length
-        ? filteredAppointments.length
-        : startIndex + _appointmentsPerPage;
-    final appointmentsForCurrentPage = filteredAppointments.sublist(
-      startIndex,
-      endIndex,
-    );
-    if (filteredAppointments.isEmpty) {
-      return Expanded(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              isSearching
-                  ? 'search_survey_or_test_not_found'.tr()
-                  : 'no_appointments_added_yet'.tr(),
-              style: TextStyle(fontSize: timeFontSize * 1.2),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    } else {
-      return Expanded(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.separated(
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 20.0),
-                itemCount: appointmentsForCurrentPage.length,
-                itemBuilder: (context, index) {
-                  final appointment = filteredAppointments[index];
-                  bool hasParticipated =
-                      appointmentListProvider
-                          .userParticipationStatus[appointment.appointmentId] ??
-                      false;
-                  bool isAnyTimeSlotConfirmed =
-                      appointmentListProvider.isAnyTimeSlotConfirmed[appointment
-                          .appointmentId] ??
-                      false;
+    final (:waiting, :done, :closed) = _group(appointments, provider);
 
-                  return AppointmentListItem(
-                    appointment: appointmentsForCurrentPage[index],
-                    hasUserParticipated: hasParticipated,
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 96),
+
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          for (final (labelKey, group) in [
+            ('section_needs_you', waiting),
+            ('section_done', done),
+            ('section_closed', closed),
+          ])
+            if (group.isNotEmpty) ...[
+              SectionLabel(label: labelKey.tr(), count: group.length),
+              for (final appointment in group)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.md),
+                  child: AppointmentListItem(
+                    appointment: appointment,
+                    hasUserParticipated:
+                        provider.userParticipationStatus[appointment
+                            .appointmentId] ??
+                        false,
                     isAdmin: _isAdmin,
-                    isAnyTimeSLotConfirmed: isAnyTimeSlotConfirmed,
-                  );
-                },
-              ),
-            ),
-            if (totalPages > 1)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_outlined),
-                    onPressed: _currentPage > 0
-                        ? () {
-                            setState(() {
-                              _currentPage--;
-                            });
-                          }
-                        : null,
+                    isAnyTimeSLotConfirmed:
+                        provider.isAnyTimeSlotConfirmed[appointment
+                            .appointmentId] ??
+                        false,
+                    onChanged: _refresh,
                   ),
-                  Text('${'page'.tr()} ${_currentPage + 1} of $totalPages'),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_outlined),
-                    onPressed: _currentPage < totalPages - 1
-                        ? () {
-                            setState(() {
-                              _currentPage++;
-                            });
-                          }
-                        : null,
-                  ),
-                ],
-              ),
-          ],
-        ),
-      );
-    }
+                ),
+            ],
+        ],
+      ),
+    );
   }
 }
