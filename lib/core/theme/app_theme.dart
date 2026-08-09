@@ -3,20 +3,7 @@ import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// The app's Material 3 themes.
-///
-/// Both themes are generated from one seed colour. That is the point of
-/// `ColorScheme.fromSeed`: it derives a tonally consistent palette — primary,
-/// container, on-colours, surfaces at every elevation — for both brightnesses,
-/// so light and dark stay in step by construction.
-///
-/// What this replaced was a hand-written `Map<String, Color>` per theme, which
-/// had drifted: the *light* map set `textColor: white` and `cardColor:
-/// grey[800]`, and the dark map used grey for both primary and secondary. That
-/// is why things looked inconsistent in ways that patching one widget at a time
-/// never fixed.
 abstract final class AppTheme {
-  /// Kept from the original design. Everything else is derived from it.
   static const seed = Color(0xFF004B96);
 
   static ThemeData get light => _build(Brightness.light);
@@ -30,16 +17,19 @@ abstract final class AppTheme {
     );
     final appColors = isDark ? AppColors.dark : AppColors.light;
 
-    final base = ThemeData(colorScheme: scheme, useMaterial3: true);
+    final base = ThemeData(
+      colorScheme: scheme,
+      useMaterial3: true,
+
+      fontFamily: fontFamily,
+    );
     final textTheme = _textTheme(base.textTheme, scheme);
 
     return base.copyWith(
       extensions: [appColors],
       textTheme: textTheme,
       scaffoldBackgroundColor: scheme.surface,
-      // Dark mode uses surfaceContainer rather than black. Pure black next to
-      // a mid-grey card reads as a hole rather than as depth, and Material 3
-      // expresses elevation through surface tint instead of shadow.
+
       canvasColor: scheme.surface,
       dividerTheme: DividerThemeData(
         color: scheme.outlineVariant,
@@ -65,16 +55,34 @@ abstract final class AppTheme {
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.lg),
-          // A hairline outline instead of a shadow. Shadows barely register on
-          // dark surfaces, so a card defined only by elevation disappears there.
+
           side: BorderSide(color: scheme.outlineVariant),
         ),
       ),
+
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 0,
+        focusElevation: 0,
+        hoverElevation: 2,
+        highlightElevation: 0,
+        extendedTextStyle: textTheme.labelMedium?.copyWith(
+          fontWeight: FontWeight.w600,
+        ),
+        extendedPadding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+        extendedIconLabelSpacing: Spacing.sm,
+        extendedSizeConstraints: const BoxConstraints.tightFor(height: 44),
+        shape: const StadiumBorder(),
+      ),
+
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
-          textStyle: textTheme.labelLarge,
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          textStyle: textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Radii.full),
           ),
@@ -98,9 +106,11 @@ abstract final class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: scheme.primary,
-          minimumSize: const Size(0, 48),
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.xl),
-          textStyle: textTheme.labelLarge,
+          minimumSize: const Size(0, 44),
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
+          textStyle: textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
           side: BorderSide(color: scheme.outline),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(Radii.full),
@@ -261,39 +271,73 @@ abstract final class AppTheme {
     );
   }
 
-  /// Weights and letter-spacing tuned for a UI rather than for prose.
-  ///
-  /// Sizes are left to Material's defaults so the user's font-size preference
-  /// and the platform text scale keep working — this adjusts hierarchy, not
-  /// absolute size.
-  static TextTheme _textTheme(TextTheme base, ColorScheme scheme) {
-    return base
-        .copyWith(
-          headlineSmall: base.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
-          titleLarge: base.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.1,
-          ),
-          titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          bodyMedium: base.bodyMedium?.copyWith(height: 1.45),
-          bodySmall: base.bodySmall?.copyWith(
-            height: 1.4,
-            color: scheme.onSurfaceVariant,
-          ),
-          labelLarge: base.labelLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.1,
-          ),
-        )
-        .apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
+  static const fontFamily = 'Inter';
+
+  static const displayFontFamily = 'Space Grotesk';
+
+  static TextTheme _textTheme(TextTheme rawBase, ColorScheme scheme) {
+    final base = rawBase.apply(
+      fontFamily: fontFamily,
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    );
+
+    return base.copyWith(
+      displayLarge: base.displayLarge?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -1.5,
+      ),
+      displayMedium: base.displayMedium?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -1.0,
+      ),
+      displaySmall: base.displaySmall?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.8,
+      ),
+      headlineLarge: base.headlineLarge?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.8,
+      ),
+      headlineMedium: base.headlineMedium?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.6,
+      ),
+      headlineSmall: base.headlineSmall?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.5,
+      ),
+      titleLarge: base.titleLarge?.copyWith(
+        fontFamily: displayFontFamily,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.3,
+      ),
+      titleMedium: base.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      bodyLarge: base.bodyLarge?.copyWith(height: 1.4),
+      bodyMedium: base.bodyMedium?.copyWith(height: 1.45),
+      bodySmall: base.bodySmall?.copyWith(
+        height: 1.4,
+        color: scheme.onSurfaceVariant,
+      ),
+      labelLarge: base.labelLarge?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.1,
+      ),
+
+      labelSmall: base.labelSmall?.copyWith(
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.1,
+      ),
+    );
   }
 }
 
-/// Corner radii, so rounding is consistent instead of every widget picking a
-/// number between 8 and 30 as it currently does.
 abstract final class Radii {
   static const double xs = 4;
   static const double sm = 8;

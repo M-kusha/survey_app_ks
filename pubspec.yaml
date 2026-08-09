@@ -34,6 +34,7 @@ dependencies:
   local_auth: ^3.0.2
   local_auth_android: ^2.0.9
   flutter_quill: ^11.5.1
+  intl: ^0.20.2
 
 
 dev_dependencies:
@@ -45,3 +46,27 @@ flutter:
   uses-material-design: true
   assets:
     - assets/translations/
+
+  # Bundled rather than fetched at runtime with google_fonts. Three reasons:
+  # the app works offline, the web build has no flash of unstyled text while a
+  # CDN font downloads, and golden tests render real glyphs instead of the
+  # placeholder boxes flutter_test substitutes when no font is available.
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    # Display face, headings only. Its wider apertures and flat terminals are
+    # what stop the app reading as stock Material.
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/SpaceGrotesk-Bold.ttf
+          weight: 700

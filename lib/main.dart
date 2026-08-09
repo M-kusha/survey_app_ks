@@ -1,5 +1,6 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/localization/app_locales.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/appointments/firebase/appointment_provider.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
@@ -13,6 +14,7 @@ import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/routes.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
@@ -22,8 +24,8 @@ Future<void> main() async {
 
   await EasyLocalization.ensureInitialized();
 
-  // Read the stored light/dark choice before the first frame, so the app does
-  // not paint in the wrong theme and then flip.
+  await initializeDateFormatting();
+
   final savedThemeMode = await AdaptiveTheme.getThemeMode();
 
   runApp(
@@ -42,13 +44,9 @@ Future<void> main() async {
         ),
       ],
       child: EasyLocalization(
-        supportedLocales: const [
-          Locale('en', ''),
-          Locale('de', ''),
-          Locale('sq', ''),
-        ],
-        path: 'assets/translations',
-        fallbackLocale: const Locale('en', ''),
+        supportedLocales: AppLocales.supported,
+        path: AppLocales.path,
+        fallbackLocale: AppLocales.fallback,
         saveLocale: true,
         child: MyApp(savedThemeMode: savedThemeMode),
       ),
@@ -62,12 +60,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Intl.defaultLocale = context.locale.toLanguageTag();
+
     return AdaptiveTheme(
       light: AppTheme.light,
       dark: AppTheme.dark,
-      // Restores the mode the user last chose. This previously hardcoded
-      // `light`, and `savedThemeMode` was declared but never read — so the app
-      // reset to light on every launch no matter what the settings toggle said.
+
       initial: savedThemeMode ?? AdaptiveThemeMode.system,
       builder: (theme, darkTheme) => MaterialApp(
         routes: AppRoutes.routes(),
@@ -77,6 +75,15 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: theme,
         darkTheme: darkTheme,
+
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(
+              context.watch<FontSizeProvider>().textScale,
+            ),
+          ),
+          child: child!,
+        ),
         home: const LoginPage(),
       ),
     );

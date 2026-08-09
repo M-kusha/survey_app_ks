@@ -1,16 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Colours the app needs that Material's [ColorScheme] has no slot for.
-///
-/// Material 3 covers primary/secondary/surface/error and their containers, but
-/// says nothing about "this person accepted the invite" or "this answer was
-/// marked correct". Those live here rather than as bare `Colors.green` calls
-/// scattered through widgets, so a theme change reaches them too.
-///
-/// Registered as a [ThemeExtension], so it is looked up with
-/// `Theme.of(context).extension<AppColors>()` and — unlike the string-keyed map
-/// this replaced — a typo is a compile error rather than a silent fallback to
-/// blue.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
@@ -27,27 +16,21 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.pending,
   });
 
-  /// A correct answer, a confirmed slot, a completed note.
   final Color success;
   final Color onSuccess;
   final Color successContainer;
 
-  /// Something that needs attention but has not failed — an expiring vote, an
-  /// answer still awaiting review.
   final Color warning;
   final Color onWarning;
   final Color warningContainer;
 
-  /// Neutral emphasis: hints, counts, "3 of 8 answered".
   final Color info;
   final Color infoContainer;
 
-  /// Attendance states on an appointment.
   final Color participated;
   final Color notParticipated;
   final Color pending;
 
-  /// Tuned for light surfaces: saturated enough to read against white.
   static const light = AppColors(
     success: Color(0xFF1B873F),
     onSuccess: Color(0xFFFFFFFF),
@@ -62,11 +45,6 @@ class AppColors extends ThemeExtension<AppColors> {
     pending: Color(0xFF8A8F98),
   );
 
-  /// Desaturated and lightened for dark surfaces.
-  ///
-  /// A fully saturated accent on a dark background vibrates and reads as
-  /// harsher than the same colour does on white, so these are not simply the
-  /// light values inverted.
   static const dark = AppColors(
     success: Color(0xFF5CD98A),
     onSuccess: Color(0xFF00391A),
@@ -138,10 +116,6 @@ class AppColors extends ThemeExtension<AppColors> {
 }
 
 extension AppColorsContext on BuildContext {
-  /// Semantic colours for the current theme.
-  ///
-  /// Falls back to the light set rather than throwing, so a widget rendered
-  /// outside the app's own MaterialApp — a test, a preview — still paints.
   AppColors get appColors =>
       Theme.of(this).extension<AppColors>() ?? AppColors.light;
 }
