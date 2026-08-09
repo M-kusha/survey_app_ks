@@ -1,18 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/pdf_kit.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/pdf_viewer_page.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:flutter/material.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
+import 'package:flutter/widgets.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
-import 'package:provider/provider.dart';
 
-class PDFResults extends StatefulWidget {
-  final Participant participant;
-  final Survey survey;
-  final Map<String, bool> textQuestionCorrect;
-
+class PDFResults extends StatelessWidget {
   const PDFResults({
     super.key,
     required this.participant,
@@ -20,307 +15,209 @@ class PDFResults extends StatefulWidget {
     required this.textQuestionCorrect,
   });
 
-  @override
-  PDFResultsState createState() => PDFResultsState();
-}
+  final Participant participant;
+  final Survey survey;
+  final Map<String, bool> textQuestionCorrect;
 
-class PDFResultsState extends State<PDFResults> {
-  pw.Document? _pdfDocument;
-
-  @override
-  void initState() {
-    super.initState();
-    Future.microtask(() {
-      _generatePdf().then((pdfDocument) {
-        setState(() {
-          _pdfDocument = pdfDocument;
-        });
-      });
-    });
-  }
+  bool get _isTest => survey.surveyType != SurveyType.survey;
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_pdfDocument == null) {
-      _generatePdf().then((pdfDocument) {
-        setState(() {
-          _pdfDocument = pdfDocument;
-        });
-      });
-    }
-  }
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final subtitle =
+        '${participant.name} · '
+        '${DateFormat.yMMMd(locale).format(DateTime.now())}';
 
-  Future<pw.Document> _generatePdf() async {
-    var fontSizeProvider = Provider.of<FontSizeProvider>(
-      context,
-      listen: false,
+    return PdfViewerPage(
+      title: 'pdf_print'.tr(),
+      fileName: pdfFileNameFrom([survey.surveyName, participant.name]),
+      build: (format) => buildDocument(format, subtitle),
     );
-    var fontSize = fontSizeProvider.fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    final pdf = pw.Document();
+  }
 
-    List<pw.Widget> answerWidgets = [];
-    List<pw.Widget> textAnswerWidgets = [];
+  @visibleForTesting
+  Future<pw.Document> buildDocument(
+    PdfPageFormat format,
+    String subtitle,
+  ) async {
+    final pdf = pw.Document(theme: await PdfKit.theme());
 
-    for (
-      int index = 0;
-      index < widget.participant.surveyAnswers.length;
-      index++
-    ) {
-      String surveyId = widget.participant.surveyAnswers.keys.elementAt(index);
-      Map<String, dynamic> questionData =
-          widget.survey.questions[int.parse(surveyId.substring(1))];
-      List<dynamic> answers = widget.participant.surveyAnswers[surveyId] ?? [];
-      String question = questionData['question'];
-      List<String>? options = questionData['options']
-          ?.map<String>((e) => e.toString())
-          .toList();
-      String uniqueQuestionKey = "${widget.survey.id}-$surveyId";
-
-      if (questionData['type'] == 'Text') {
-        bool isAnswerConfirmed =
-            widget.participant.textAnswersReviewed[uniqueQuestionKey] ?? false;
-
-        pw.Widget answerDisplay = pw.Container(
-          decoration: pw.BoxDecoration(
-            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-            color: isAnswerConfirmed ? PdfColors.green : PdfColors.red300,
-          ),
-          padding: const pw.EdgeInsets.all(8),
-          margin: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          child: pw.Row(
-            children: [
-              pw.Expanded(
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.all(5),
-                  child: pw.Text(
-                    answers.join(', '),
-                    style: pw.TextStyle(
-                      color: isAnswerConfirmed
-                          ? PdfColors.white
-                          : PdfColors.black,
-                      fontSize: 18,
-                    ),
-                    textAlign: pw.TextAlign.center,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-
-        textAnswerWidgets.add(
-          _buildQuestionCard(question, answerDisplay, timeFontSize),
-        );
-      } else {
-        List<pw.Widget> optionWidgets = [];
-
-        for (
-          int optionIndex = 0;
-          optionIndex < options!.length;
-          optionIndex++
-        ) {
-          String option = options[optionIndex];
-          bool isSelected = answers.contains(optionIndex);
-          bool isCorrect = false;
-          List<int>? correctAnswers = questionData['correctAnswers']
-              ?.cast<int>();
-          int singleCorrectAnswer = questionData['correctAnswer'] ?? -1;
-
-          if (questionData['type'] == "Single") {
-            isCorrect = singleCorrectAnswer == optionIndex;
-          } else if (questionData['type'] == "Multiple") {
-            isCorrect =
-                correctAnswers != null && correctAnswers.contains(optionIndex);
-          }
-
-          PdfColor bgColor = isCorrect
-              ? PdfColors.green
-              : isSelected
-              ? PdfColors.red300
-              : PdfColors.grey200;
-
-          optionWidgets.add(
-            pw.Container(
-              decoration: pw.BoxDecoration(
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-                color: bgColor,
-              ),
-              padding: const pw.EdgeInsets.all(13),
-              child: pw.Column(
-                children: [
-                  pw.Row(
-                    children: [
-                      pw.SizedBox(width: 16),
-                      pw.Expanded(
-                        child: pw.Text(
-                          option,
-                          style: pw.TextStyle(
-                            fontSize: 18,
-                            color: isSelected || isCorrect
-                                ? PdfColors.white
-                                : PdfColors.black,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-
-          if (optionIndex != options.length - 1) {
-            optionWidgets.add(pw.SizedBox(height: 16));
-          }
-        }
-
-        pw.Widget answerDisplay = pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: optionWidgets,
-        );
-
-        answerWidgets.add(
-          _buildQuestionCard(question, answerDisplay, timeFontSize),
-        );
-      }
-    }
+    final grade = SurveyScorer.grade(
+      surveyId: survey.id,
+      questions: survey.questions,
+      answers: participant.surveyAnswers,
+      textReviews: textQuestionCorrect,
+    );
 
     pdf.addPage(
-      _buildPdfPage(
-        widget.participant.name,
-        widget.participant.score,
-        answerWidgets,
+      pw.MultiPage(
+        pageFormat: format,
+        margin: const pw.EdgeInsets.fromLTRB(32, 28, 32, 28),
+        header: (context) =>
+            PdfKit.header(title: survey.surveyName, subtitle: subtitle),
+        footer: PdfKit.footer,
+        build: (context) => [
+          if (_isTest)
+            PdfKit.summary([
+              PdfKit.stat(
+                'score'.tr(),
+                '${grade.percentage.round()}%',
+                tint: grade.passed ? PdfKit.correct : PdfKit.wrong,
+              ),
+              PdfKit.stat(
+                'correct_answers'.tr(),
+                '${grade.correctCount} / ${grade.gradedCount}',
+              ),
+              PdfKit.stat(
+                'result'.tr(),
+                grade.passed ? 'passed'.tr() : 'not_passed'.tr(),
+                tint: grade.passed ? PdfKit.correct : PdfKit.wrong,
+              ),
+            ]),
+
+          for (var i = 0; i < survey.questions.length; i++) _question(i, grade),
+        ],
       ),
     );
-
-    pdf.addPage(_buildTextAnswersPage(textAnswerWidgets));
 
     return pdf;
   }
 
-  pw.Widget _buildQuestionCard(
-    String question,
-    pw.Widget answerDisplay,
-    double timeFontSize,
-  ) {
+  pw.Widget _question(int index, SurveyGrade grade) {
+    final question = survey.questions[index];
+    final key = SurveyScorer.answerKey(index);
+    final answer = participant.surveyAnswers[key] ?? const [];
+    final type = QuestionType.parse(question['type']);
+    final text = (question['question'] as String? ?? '').trim();
+
     return pw.Container(
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: PdfColors.grey, width: 1),
-        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
-      ),
-      margin: const pw.EdgeInsets.all(7),
-      child: pw.Padding(
-        padding: const pw.EdgeInsets.all(16),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Container(
-              constraints: pw.BoxConstraints(
-                minWidth: 450,
-                minHeight: timeFontSize * 3,
-              ),
-              child: pw.Container(
-                padding: const pw.EdgeInsets.all(16.0),
-                child: pw.Center(
-                  child: pw.Text(
-                    question,
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                    textAlign: pw.TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-            answerDisplay,
-          ],
-        ),
+      margin: const pw.EdgeInsets.only(bottom: 14),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          PdfKit.questionHeading(index + 1, text),
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 22),
+            child: switch (type) {
+              QuestionType.text => _textAnswer(index, answer),
+              _ => _options(question, answer, type),
+            },
+          ),
+        ],
       ),
     );
   }
 
-  pw.MultiPage _buildPdfPage(
-    String name,
-    double score,
-    List<pw.Widget> answerWidgets,
+  pw.Widget _options(
+    Map<String, dynamic> question,
+    List<dynamic> answer,
+    QuestionType type,
   ) {
-    return pw.MultiPage(
+    final options = (question['options'] as List<dynamic>? ?? const [])
+        .map((option) => '$option')
+        .toList();
+
+    final correct = <int>{
+      if (type == QuestionType.single && question['correctAnswer'] is int)
+        question['correctAnswer'] as int,
+      if (type == QuestionType.multiple)
+        ...((question['correctAnswers'] as List<dynamic>? ?? const [])
+            .whereType<int>()),
+    };
+
+    final graded = _isTest && correct.isNotEmpty;
+
+    return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
-      pageFormat: PdfPageFormat.a4,
-      build: (pw.Context context) {
-        return [
-          pw.Header(
-            level: 0,
-            child: pw.Row(
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                pw.Text(
-                  '"$name"',
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.Text(
-                  '${'total_score'.tr()} ${score.toStringAsFixed(1)}%',
-                  style: pw.TextStyle(
-                    fontSize: 20,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ],
+      children: [
+        for (var i = 0; i < options.length; i++)
+          () {
+            final picked = answer.contains(i);
+            final isRight = correct.contains(i);
+
+            final (chip, fill, tag) = switch ((graded, picked, isRight)) {
+              (true, true, true) => (
+                PdfKit.correct,
+                PdfKit.correctFill,
+                'chosen_correct'.tr(),
+              ),
+              (true, true, false) => (
+                PdfKit.wrong,
+                PdfKit.wrongFill,
+                'chosen_wrong'.tr(),
+              ),
+
+              (true, false, true) => (PdfKit.correct, null, 'missed'.tr()),
+              (false, true, _) => (PdfKit.chosen, null, 'chosen'.tr()),
+              _ => (PdfKit.rule, null, null),
+            };
+
+            return PdfKit.row(
+              text: options[i],
+              tag: tag,
+              chipColor: chip,
+              fill: fill,
+              picked: picked,
+              lostMark: graded && picked != isRight,
+            );
+          }(),
+        if (answer.isEmpty)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 4),
+            child: pw.Text(
+              'no_answer_given'.tr(),
+              style: const pw.TextStyle(fontSize: 9, color: PdfKit.muted),
             ),
           ),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 16),
-            child: pw.Column(children: answerWidgets),
-          ),
-        ];
-      },
+      ],
     );
   }
 
-  pw.MultiPage _buildTextAnswersPage(List<pw.Widget> textAnswerWidgets) {
-    return pw.MultiPage(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      pageFormat: PdfPageFormat.a4,
-      build: (pw.Context context) {
-        return [
-          pw.Header(
-            level: 0,
-            child: pw.Center(
-              child: pw.Text(
-                '"${'text_answers'.tr()}"',
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                ),
+  pw.Widget _textAnswer(int index, List<dynamic> answer) {
+    final written = answer.join(', ').trim();
+    final key = '${survey.id}-${SurveyScorer.answerKey(index)}';
+    final marked = textQuestionCorrect[key];
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Container(
+          width: double.infinity,
+          margin: const pw.EdgeInsets.only(top: 4),
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfKit.rule, width: 0.5),
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.Text(
+            written.isEmpty ? 'no_answer_given'.tr() : written,
+            style: pw.TextStyle(
+              fontSize: 10,
+              color: written.isEmpty ? PdfKit.muted : PdfKit.ink,
+            ),
+          ),
+        ),
+        if (_isTest)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 4),
+            child: pw.Text(
+              switch (marked) {
+                true => 'marked_correct'.tr(),
+                false => 'marked_incorrect'.tr(),
+                null => 'awaiting_review'.tr(),
+              },
+              style: pw.TextStyle(
+                fontSize: 8,
+                fontWeight: pw.FontWeight.bold,
+                color: switch (marked) {
+                  true => PdfKit.correct,
+                  false => PdfKit.wrong,
+                  null => PdfKit.muted,
+                },
               ),
             ),
           ),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 16, bottom: 16),
-            child: pw.Column(
-              mainAxisAlignment: pw.MainAxisAlignment.center,
-              crossAxisAlignment: pw.CrossAxisAlignment.center,
-              children: textAnswerWidgets,
-            ),
-          ),
-        ];
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('pdf_print'.tr()), centerTitle: true),
-      body: _pdfDocument == null
-          ? const Center(child: CircularProgressIndicator())
-          : PdfPreview(build: (format) => _pdfDocument!.save()),
+      ],
     );
   }
 }

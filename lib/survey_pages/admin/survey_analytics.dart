@@ -1,302 +1,239 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_analytics.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/text_style.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+
+List<List<int>> countAnswers(
+  List<Map<String, dynamic>> questions,
+  List<Participant> participants,
+) {
+  final counts = [
+    for (final question in questions)
+      List.filled(
+        ((question['options'] as List<dynamic>?) ?? const []).length,
+        0,
+      ),
+  ];
+
+  for (final participant in participants) {
+    for (var i = 0; i < questions.length; i++) {
+      final answer = participant.surveyAnswers[SurveyScorer.answerKey(i)];
+      if (answer == null) continue;
+
+      for (final option in answer) {
+        if (option is int && option >= 0 && option < counts[i].length) {
+          counts[i][option]++;
+        }
+      }
+    }
+  }
+
+  return counts;
+}
 
 class SurveyAnalyticsPage extends StatefulWidget {
-  final List<Participant> participants;
-  final Survey survey;
-
   const SurveyAnalyticsPage({
     super.key,
-    required this.participants,
     required this.survey,
+    required this.participants,
   });
+
+  final Survey survey;
+  final List<Participant> participants;
 
   @override
   SurveyAnalyticsPageState createState() => SurveyAnalyticsPageState();
 }
 
 class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
-  List<List<int>> _answerCounts = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _calculateAnswerCounts();
-  }
-
-  void _calculateAnswerCounts() {
-    if (widget.survey.surveyType != SurveyType.survey) {
-      return;
-    }
-
-    _answerCounts = List.generate(widget.survey.questions.length, (index) {
-      Map<String, dynamic> questionData = widget.survey.questions[index];
-
-      return List.generate(questionData['options'].length, (index) => 0);
-    });
-
-    for (var participant in widget.participants) {
-      participant.surveyAnswers.forEach((surveyId, answers) {
-        int questionIndex = int.parse(surveyId.substring(1));
-        if (questionIndex >= 0 && questionIndex < _answerCounts.length) {
-          for (var answerIndex in answers) {
-            if (answerIndex >= 0 &&
-                answerIndex < _answerCounts[questionIndex].length) {
-              _answerCounts[questionIndex][answerIndex]++;
-            }
-          }
-        }
-      });
-    }
-  }
+  late final List<List<int>> _counts = countAnswers(
+    widget.survey.questions,
+    widget.participants,
+  );
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    final questions = widget.survey.questions;
+    final responded = widget.participants.length;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${widget.survey.surveyName} - ${'analytics_off'.tr()}',
-          style: TextStyle(
-            fontSize: fontSize * 1.2,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-          child: Column(
-            children: [
-              if (widget.participants.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20.0, left: 5),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '${'number_of_participants'.tr()} ${widget.participants.length}',
-                        style: TextStyle(
-                          fontSize: fontSize * 1.2,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () async {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => PDFAnalytics(
-                                survey: widget.survey,
-                                participants: widget.participants,
-                                answerCounts: _answerCounts,
-                              ),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.print),
-                      ),
-                    ],
+        title: Text(widget.survey.surveyName, overflow: TextOverflow.ellipsis),
+        actions: [
+          if (widget.participants.isNotEmpty)
+            IconButton(
+              tooltip: 'pdf_print'.tr(),
+              icon: const Icon(Icons.ios_share_rounded),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => PDFAnalytics(
+                    survey: widget.survey,
+                    participants: widget.participants,
+                    answerCounts: _counts,
                   ),
-                ),
-              widget.participants.isEmpty
-                  ? Center(child: Text('no_participants_added_yet'.tr()))
-                  : _buildQuestionsList(context, fontSize),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuestionsList(BuildContext context, double fontSize) {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: widget.survey.questions.length,
-      itemBuilder: (context, questionIndex) {
-        Map<String, dynamic> questionData =
-            widget.survey.questions[questionIndex];
-
-        return _buildQuestionCard(
-          context,
-          questionData,
-          questionIndex,
-          fontSize,
-        );
-      },
-    );
-  }
-
-  Widget _buildQuestionCard(
-    BuildContext context,
-    Map<String, dynamic> questionData,
-    int questionIndex,
-    double fontSize,
-  ) {
-    String question = questionData['question'];
-    List<dynamic> options = questionData['options'];
-
-    int totalVotesForQuestion = _answerCounts[questionIndex].reduce(
-      (a, b) => a + b,
-    );
-
-    return Card(
-      elevation: 4.0,
-      shadowColor: getButtonColor(context),
-      margin: const EdgeInsets.only(bottom: 20.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Text(
-                question,
-                style: TextStyle(
-                  fontSize: fontSize * 1.1,
-                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            ...List<Widget>.generate(options.length, (optionIndex) {
-              return _buildOptionRow(
-                context,
-                questionIndex,
-                optionIndex,
-                fontSize,
-                totalVotesForQuestion,
-              );
-            }),
-          ],
-        ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildOptionRow(
-    BuildContext context,
-    int questionIndex,
-    int optionIndex,
-    double fontSize,
-    int totalVotesForQuestion,
-  ) {
-    String option =
-        widget.survey.questions[questionIndex]['options'][optionIndex];
-    int voteCount = _answerCounts[questionIndex][optionIndex];
-    double percentage = totalVotesForQuestion > 0
-        ? (voteCount / totalVotesForQuestion * 100)
-        : 0;
-    Color barColor = _dynamicColorBasedOnPercentage(context, percentage);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row(
-          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //   children: [
-          //     Text(
-          //       option,
-          //       style: TextStyle(
-          //         fontSize: fontSize,
-          //         fontWeight: FontWeight.w500,
-          //       ),
-          //     ),
-          //     Text("($voteCount ${'votes'.tr()})",
-          //         style: TextStyle(fontSize: fontSize)),
-          //   ],
-          // ),
-          // Row(
-          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          //   children: [
-          //     Expanded(
-          //       // This makes the text widget flexible, allowing it to fill available space
-          //       child: Text(
-          //         option,
-          //         overflow: TextOverflow
-          //             .ellipsis, // Adds ellipses when text overflows
-          //         style: TextStyle(
-          //           fontSize: fontSize,
-          //           fontWeight: FontWeight.w500,
-          //         ),
-          //       ),
-          //     ),
-          //     Text(
-          //       "($voteCount ${'votes'.tr()})",
-          //       style: TextStyle(fontSize: fontSize),
-          //     ),
-          //   ],
-          // ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
+      body: SafeArea(
+        child: widget.participants.isEmpty
+            ? EmptyState(
+                icon: Icons.insights_outlined,
+                title: 'no_participants_added_yet'.tr(),
+                body: 'no_responses_body'.tr(),
+              )
+            : PageBody(
+                maxWidth: 720,
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(
-                      option,
-                      softWrap: true,
-                      style: TextStyle(
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w500,
+                    ScreenHeader(
+                      title: 'analytics_off'.tr(),
+                      subtitle: 'responses_count'.tr(
+                        namedArgs: {'count': '$responded'},
                       ),
                     ),
+                    const SizedBox(height: Spacing.lg),
+                    for (var i = 0; i < questions.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: Spacing.md),
+                        child: _QuestionBreakdown(
+                          index: i,
+                          question: questions[i],
+                          counts: _counts[i],
+                          responded: responded,
+                        ),
+                      ),
+                    const SizedBox(height: Spacing.xxl),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+}
+
+class _QuestionBreakdown extends StatelessWidget {
+  const _QuestionBreakdown({
+    required this.index,
+    required this.question,
+    required this.counts,
+    required this.responded,
+  });
+
+  final int index;
+  final Map<String, dynamic> question;
+  final List<int> counts;
+  final int responded;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final type = QuestionType.parse(question['type']);
+    final options = ((question['options'] as List<dynamic>?) ?? const [])
+        .map((option) => '$option')
+        .toList();
+
+    final best = counts.isEmpty ? 0 : counts.reduce((a, b) => a > b ? a : b);
+
+    return ContentCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${'survey_question'.tr()} ${index + 1}',
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            question['question'] as String? ?? '',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: Spacing.md),
+          if (type == QuestionType.text)
+            Text(
+              'text_answers_not_counted'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            )
+          else
+            for (var i = 0; i < options.length; i++)
+              _OptionBar(
+                label: options[i],
+                count: i < counts.length ? counts[i] : 0,
+                total: responded,
+                leading: best > 0 && i < counts.length && counts[i] == best,
+              ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionBar extends StatelessWidget {
+  const _OptionBar({
+    required this.label,
+    required this.count,
+    required this.total,
+    required this.leading,
+  });
+
+  final String label;
+  final int count;
+  final int total;
+  final bool leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final share = total == 0 ? 0.0 : count / total;
+    final colour = leading ? scheme.primary : scheme.onSurfaceVariant;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: Spacing.sm),
               Text(
-                "($voteCount ${'votes'.tr()})",
-                style: TextStyle(fontSize: fontSize),
+                '$count · ${(share * 100).round()}%',
+                style: theme.textTheme.labelSmall?.copyWith(color: colour),
               ),
             ],
           ),
           const SizedBox(height: 4),
           ClipRRect(
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(2),
             child: LinearProgressIndicator(
-              value: percentage / 100,
-              minHeight: 14,
-              backgroundColor: Colors.grey[300],
-              valueColor: AlwaysStoppedAnimation<Color>(barColor),
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            '${percentage.toStringAsFixed(1)}%',
-            style: TextStyle(
-              fontSize: fontSize * 0.75,
-              color: barColor,
-              fontWeight: FontWeight.bold,
+              value: share.clamp(0.0, 1.0),
+              minHeight: 6,
+              backgroundColor: scheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation(
+                leading ? scheme.primary : scheme.outlineVariant,
+              ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Color _dynamicColorBasedOnPercentage(
-    BuildContext context,
-    double percentage,
-  ) {
-    if (percentage >= 75) {
-      return Colors.green;
-    } else if (percentage >= 50) {
-      return Colors.blueGrey;
-    } else if (percentage >= 25) {
-      return Colors.orange;
-    } else {
-      return Colors.red;
-    }
   }
 }

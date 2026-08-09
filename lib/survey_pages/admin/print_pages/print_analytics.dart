@@ -1,15 +1,13 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/pdf_kit.dart';
+import 'package:echomeet/survey_pages/admin/print_pages/pdf_viewer_page.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:flutter/material.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
+import 'package:flutter/widgets.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
-class PDFAnalytics extends StatefulWidget {
-  final List<Participant> participants;
-  final Survey survey;
-  final List<List<int>> answerCounts;
-
+class PDFAnalytics extends StatelessWidget {
   const PDFAnalytics({
     super.key,
     required this.participants,
@@ -17,189 +15,46 @@ class PDFAnalytics extends StatefulWidget {
     required this.answerCounts,
   });
 
-  @override
-  PdfGenerationPageState createState() => PdfGenerationPageState();
-}
+  final List<Participant> participants;
+  final Survey survey;
 
-class PdfGenerationPageState extends State<PDFAnalytics> {
-  List<List<int>> answerCounts = [];
-  pw.Document? _pdfDocument;
-  double percentage = 0;
+  final List<List<int>> answerCounts;
 
   @override
-  void initState() {
-    super.initState();
-    answerCounts = widget.answerCounts;
+  Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final subtitle =
+        '${'participants'.tr()}: ${participants.length} · '
+        '${DateFormat.yMMMd(locale).format(DateTime.now())}';
 
-    Future.microtask(() {
-      _generatePdf().then((pdfDocument) {
-        setState(() {
-          _pdfDocument = pdfDocument;
-        });
-      });
-    });
+    return PdfViewerPage(
+      title: 'pdf_print'.tr(),
+      fileName: pdfFileNameFrom([survey.surveyName, 'analytics'.tr()]),
+      build: (format) => buildDocument(format, subtitle),
+    );
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_pdfDocument == null) {
-      _generatePdf().then((pdfDocument) {
-        setState(() {
-          _pdfDocument = pdfDocument;
-        });
-      });
-    }
-  }
-
-  Future<pw.Document> _generatePdf() async {
-    final pdf = pw.Document();
-
-    final textStyle = pw.TextStyle(
-      fontSize: 16,
-      fontWeight: pw.FontWeight.bold,
-      color: PdfColors.blueGrey,
-    );
-
-    final optionTextStyle = pw.TextStyle(
-      fontSize: 16,
-      fontWeight: pw.FontWeight.normal,
-      color: PdfColors.black,
-    );
-
-    const borderColor = PdfColors.grey300;
+  @visibleForTesting
+  Future<pw.Document> buildDocument(
+    PdfPageFormat format,
+    String subtitle,
+  ) async {
+    final pdf = pw.Document(theme: await PdfKit.theme());
 
     pdf.addPage(
       pw.MultiPage(
-        margin: const pw.EdgeInsets.all(20),
+        pageFormat: format,
+        margin: const pw.EdgeInsets.fromLTRB(32, 28, 32, 28),
+        header: (context) =>
+            PdfKit.header(title: survey.surveyName, subtitle: subtitle),
+        footer: PdfKit.footer,
         build: (context) => [
-          pw.Header(
-            level: 0,
-            child: pw.Center(
-              child: pw.Text(
-                '${'analytics_off'.tr()} ${widget.survey.surveyName}',
-                style: pw.TextStyle(
-                  fontSize: 20,
-                  fontWeight: pw.FontWeight.bold,
-                  color: PdfColors.blueGrey,
-                ),
-              ),
+          for (var i = 0; i < survey.questions.length; i++) _question(i),
+          if (survey.questions.isEmpty)
+            pw.Text(
+              'no_questions_yet'.tr(),
+              style: const pw.TextStyle(fontSize: 10, color: PdfKit.muted),
             ),
-          ),
-          pw.SizedBox(height: 20),
-          ...widget.survey.questions.asMap().entries.map((entry) {
-            int questionIndex = entry.key;
-            Map<String, dynamic> questionData = entry.value;
-
-            List<String> options = List<String>.from(questionData['options']);
-            int totalVotesForQuestion = widget.answerCounts[questionIndex]
-                .reduce((sum, item) => sum + item);
-
-            return pw.Padding(
-              padding: const pw.EdgeInsets.only(bottom: 20),
-              child: pw.Container(
-                decoration: pw.BoxDecoration(
-                  border: pw.Border.all(color: borderColor, width: 2),
-                  borderRadius: pw.BorderRadius.circular(10),
-                ),
-                child: pw.Padding(
-                  padding: const pw.EdgeInsets.all(20),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Center(
-                        child: pw.Text(
-                          questionData['question'],
-                          style: textStyle,
-                        ),
-                      ),
-                      pw.Divider(),
-                      ...options.asMap().entries.map((optionEntry) {
-                        int optionIndex = optionEntry.key;
-                        String option = optionEntry.value;
-                        int voteCount =
-                            widget.answerCounts[questionIndex][optionIndex];
-                        double percentage = totalVotesForQuestion > 0
-                            ? (voteCount / totalVotesForQuestion) * 100
-                            : 0;
-
-                        return pw.Padding(
-                          padding: const pw.EdgeInsets.symmetric(
-                            vertical: 5,
-                            horizontal: 10,
-                          ),
-                          child: pw.Container(
-                            height: 40,
-                            decoration: pw.BoxDecoration(
-                              border: pw.Border.all(
-                                color: borderColor,
-                                width: 2,
-                              ),
-                              borderRadius: pw.BorderRadius.circular(10),
-                            ),
-                            child: pw.Row(
-                              mainAxisAlignment:
-                                  pw.MainAxisAlignment.spaceBetween,
-                              children: [
-                                pw.Padding(
-                                  padding: const pw.EdgeInsets.only(
-                                    left: 10,
-                                  ), // Adjust text padding as needed
-                                  child: pw.Text(
-                                    option,
-                                    style: optionTextStyle,
-                                  ),
-                                ),
-                                pw.Container(
-                                  width: 160,
-                                  height: 20,
-                                  decoration: pw.BoxDecoration(
-                                    color: percentage >= 75
-                                        ? PdfColors.green
-                                        : percentage >= 50
-                                        ? PdfColors.blueGrey
-                                        : percentage >= 25
-                                        ? PdfColors.orange
-                                        : PdfColors.red,
-                                    borderRadius: pw.BorderRadius.circular(5),
-                                  ),
-                                  child: pw.Stack(
-                                    children: [
-                                      pw.Positioned.fill(
-                                        child: pw.Container(
-                                          width: (percentage / 100) * 160,
-                                        ),
-                                      ),
-                                      pw.Center(
-                                        child: pw.Row(
-                                          mainAxisAlignment:
-                                              pw.MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            pw.Text(
-                                              '${percentage.toStringAsFixed(1)}%',
-                                              style: optionTextStyle,
-                                            ),
-                                            pw.Text(
-                                              '($voteCount)',
-                                              style: optionTextStyle,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
         ],
       ),
     );
@@ -207,13 +62,146 @@ class PdfGenerationPageState extends State<PDFAnalytics> {
     return pdf;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('pdf_print'.tr()), centerTitle: true),
-      body: _pdfDocument == null
-          ? const Center(child: CircularProgressIndicator())
-          : PdfPreview(build: (format) => _pdfDocument!.save()),
+  pw.Widget _question(int index) {
+    final question = survey.questions[index];
+    final type = QuestionType.parse(question['type']);
+    final text = (question['question'] as String? ?? '').trim();
+
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 16),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          PdfKit.questionHeading(index + 1, text),
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 22, top: 4),
+            child: type == QuestionType.text
+                ? _writtenAnswers(index)
+                : _distribution(index, question),
+          ),
+        ],
+      ),
     );
   }
+
+  pw.Widget _distribution(int index, Map<String, dynamic> question) {
+    final options = (question['options'] as List<dynamic>? ?? const [])
+        .map((option) => '$option')
+        .toList();
+
+    final counts = index < answerCounts.length
+        ? answerCounts[index]
+        : const <int>[];
+    final total = counts.fold<int>(0, (sum, count) => sum + count);
+
+    if (total == 0) {
+      return pw.Text(
+        'no_responses_yet'.tr(),
+        style: const pw.TextStyle(fontSize: 9, color: PdfKit.muted),
+      );
+    }
+
+    final top = counts.isEmpty ? -1 : counts.indexOf(counts.reduce(_max));
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < options.length; i++)
+          () {
+            final count = i < counts.length ? counts[i] : 0;
+            final share = count / total;
+
+            return pw.Container(
+              margin: const pw.EdgeInsets.only(bottom: 6),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Row(
+                    children: [
+                      pw.Expanded(
+                        child: pw.Text(
+                          options[i],
+                          style: pw.TextStyle(
+                            fontSize: 10,
+                            color: PdfKit.ink,
+                            fontWeight: i == top
+                                ? pw.FontWeight.bold
+                                : pw.FontWeight.normal,
+                          ),
+                        ),
+                      ),
+                      pw.SizedBox(width: 8),
+
+                      pw.Text(
+                        '${(share * 100).round()}%  ($count)',
+                        style: const pw.TextStyle(
+                          fontSize: 9,
+                          color: PdfKit.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  pw.SizedBox(height: 3),
+                  PdfKit.bar(
+                    share,
+                    fill: i == top ? PdfKit.chosen : PdfColors.blueGrey200,
+                  ),
+                ],
+              ),
+            );
+          }(),
+      ],
+    );
+  }
+
+  pw.Widget _writtenAnswers(int index) {
+    final key = SurveyScorer.answerKey(index);
+
+    final written = [
+      for (final participant in participants)
+        (
+          name: participant.name,
+          text: (participant.surveyAnswers[key] ?? const []).join(', ').trim(),
+        ),
+    ].where((entry) => entry.text.isNotEmpty).toList();
+
+    if (written.isEmpty) {
+      return pw.Text(
+        'no_responses_yet'.tr(),
+        style: const pw.TextStyle(fontSize: 9, color: PdfKit.muted),
+      );
+    }
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        for (final entry in written)
+          pw.Container(
+            width: double.infinity,
+            margin: const pw.EdgeInsets.only(bottom: 4),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfKit.rule, width: 0.5),
+              borderRadius: pw.BorderRadius.circular(4),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  entry.name,
+                  style: const pw.TextStyle(fontSize: 7, color: PdfKit.muted),
+                ),
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  entry.text,
+                  style: const pw.TextStyle(fontSize: 10, color: PdfKit.ink),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  static int _max(int a, int b) => a > b ? a : b;
 }

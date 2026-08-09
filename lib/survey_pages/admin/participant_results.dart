@@ -1,52 +1,61 @@
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/theme/app_colors.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_results.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 class ParticipantAnswersPage extends StatefulWidget {
-  final Participant participant;
-  final Survey survey;
-  final int correctAnswersCount;
-  final double totalScore;
-  final String userId;
-
   const ParticipantAnswersPage({
     super.key,
     required this.participant,
     required this.survey,
-    required this.correctAnswersCount,
-    required this.totalScore,
     required this.userId,
   });
 
+  final Participant participant;
+  final Survey survey;
+  final String userId;
+
   @override
-  ParticipantAnswersPageState createState() => ParticipantAnswersPageState();
+  State<ParticipantAnswersPage> createState() => _ParticipantAnswersPageState();
 }
 
-class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
-  Map<String, dynamic> textQuestionStatus = {};
-  FirebaseSurveyService firebaseSurveyService = FirebaseSurveyService();
-  Future<void> confirmCorrectAnswer(
-    String surveyId,
-    String questionId,
-    String participantId,
-    bool isCorrect,
-  ) async {
+class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
+  final _service = FirebaseSurveyService();
+
+  bool _saving = false;
+
+  bool get _isTest => widget.survey.surveyType != SurveyType.survey;
+
+  SurveyGrade get _grade => SurveyScorer.grade(
+    surveyId: widget.survey.id,
+    questions: widget.survey.questions,
+    answers: widget.participant.surveyAnswers,
+    textReviews: widget.participant.textAnswersReviewed,
+  );
+
+  Future<void> _review(int questionIndex, bool? verdict) async {
+    if (_saving) return;
+
+    final key = '${widget.survey.id}-${SurveyScorer.answerKey(questionIndex)}';
     final reviews = Map<String, bool>.from(
       widget.participant.textAnswersReviewed,
-    )..['$surveyId-$questionId'] = isCorrect;
+    );
+    if (verdict == null) {
+      reviews.remove(key);
+    } else {
+      reviews[key] = verdict;
+    }
 
-    // Re-grade the whole submission instead of nudging the stored totals.
-    // Adding a fixed slice per verdict meant marking one answer correct twice
-    // counted it twice, and reversing a verdict never took the marks back off.
     final grade = SurveyScorer.grade(
-      surveyId: surveyId,
+      surveyId: widget.survey.id,
       questions: widget.survey.questions,
       answers: widget.participant.surveyAnswers,
       textReviews: reviews,
@@ -59,32 +68,33 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     );
 
     setState(() {
+      _saving = true;
       widget.participant.textAnswersReviewed = reviews;
       widget.participant.score = grade.percentage;
       widget.participant.totalCorrectAnswers = grade.correctCount;
     });
 
     try {
-      await firebaseSurveyService.updateTextAnswersReviewed(
-        surveyId,
-        participantId,
+      await _service.updateTextAnswersReviewed(
+        widget.survey.id,
+        widget.participant.userId,
         reviews,
       );
-      await firebaseSurveyService.updateScore(
-        surveyId,
-        participantId,
+      await _service.updateScore(
+        widget.survey.id,
+        widget.participant.userId,
         grade.percentage,
       );
-      await firebaseSurveyService.updateCorrectAnswersCount(
-        surveyId,
-        participantId,
+      await _service.updateCorrectAnswersCount(
+        widget.survey.id,
+        widget.participant.userId,
         grade.correctCount,
       );
+      if (mounted) setState(() => _saving = false);
     } catch (_) {
-      // Roll the optimistic update back so the reviewer never sees a mark that
-      // was not actually persisted.
       if (!mounted) return;
       setState(() {
+        _saving = false;
         widget.participant.textAnswersReviewed = previous.reviews;
         widget.participant.score = previous.score;
         widget.participant.totalCorrectAnswers = previous.correct;
@@ -93,320 +103,452 @@ class ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     }
   }
 
+  void _download() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PDFResults(
+          participant: widget.participant,
+          survey: widget.survey,
+          textQuestionCorrect: widget.participant.textAnswersReviewed,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    List<MapEntry<String, dynamic>> nonTextQuestions = [];
-    List<MapEntry<String, dynamic>> textQuestions = [];
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-
-    for (var entry in widget.participant.surveyAnswers.entries) {
-      Map<String, dynamic> questionData =
-          widget.survey.questions[int.parse(entry.key.substring(1))];
-      if (questionData['type'] == 'Text') {
-        textQuestions.add(entry);
-      } else {
-        nonTextQuestions.add(entry);
-      }
-    }
-
-    List<MapEntry<String, dynamic>> sortedQuestions =
-        nonTextQuestions + textQuestions;
+    final grade = _grade;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${widget.participant.name}\'s ${'answers'.tr()}',
-          style: TextStyle(
-            fontSize: fontSize * 1.2,
-            fontWeight: FontWeight.bold,
-            color: _textColor(context),
+        title: Text(widget.participant.name),
+        actions: [
+          IconButton(
+            tooltip: 'download_results'.tr(),
+            onPressed: _download,
+            icon: const Icon(Icons.ios_share_rounded),
+          ),
+          const SizedBox(width: Spacing.xs),
+        ],
+      ),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 720,
+          scrollable: false,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: Spacing.xxl),
+            children: [
+              const SizedBox(height: Spacing.md),
+              if (_isTest) _Summary(grade: grade),
+              const SizedBox(height: Spacing.lg),
+
+              for (var i = 0; i < widget.survey.questions.length; i++)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.md),
+                  child: _QuestionCard(
+                    index: i,
+                    question: widget.survey.questions[i],
+                    answer:
+                        widget.participant.surveyAnswers[SurveyScorer.answerKey(
+                          i,
+                        )] ??
+                        const [],
+                    isTest: _isTest,
+                    verdict: widget
+                        .participant
+                        .textAnswersReviewed['${widget.survey.id}-${SurveyScorer.answerKey(i)}'],
+                    busy: _saving,
+                    onReview: (verdict) => _review(i, verdict),
+                  ),
+                ),
+            ],
           ),
         ),
-        backgroundColor: getAppbarColor(context),
-        centerTitle: true,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: sortedQuestions.length,
-              itemBuilder: (context, index) {
-                String surveyId = sortedQuestions[index].key;
-                Map<String, dynamic> questionData =
-                    widget.survey.questions[int.parse(surveyId.substring(1))];
+    );
+  }
+}
 
-                return buildQuestionCard(questionData, surveyId, fontSize);
-              },
+class _Summary extends StatelessWidget {
+  const _Summary({required this.grade});
+
+  final SurveyGrade grade;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final app = context.appColors;
+    final tone = grade.passed ? app.success : theme.colorScheme.error;
+
+    return ContentCard(
+      accent: tone,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '${grade.percentage.round()}%',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: tone,
+              height: 1,
             ),
           ),
-          buildScoreRow(),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'correct_of_total'.tr(
+                    namedArgs: {
+                      'correct': '${grade.correctCount}',
+                      'total': '${grade.gradedCount}',
+                    },
+                  ),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                if (grade.hasPendingReview) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'awaiting_review'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: app.warning,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          StatusPill(
+            label: grade.passed ? 'passed'.tr() : 'not_passed'.tr(),
+            tone: grade.passed ? StatusTone.positive : StatusTone.danger,
+          ),
         ],
       ),
     );
   }
+}
 
-  Widget buildQuestionCard(
-    Map<String, dynamic> questionData,
-    String surveyId,
-    final fontSize,
-  ) {
-    List<dynamic> answers = widget.participant.surveyAnswers[surveyId] ?? [];
-    String question = questionData['question'];
-    List<String> options =
-        (questionData['options'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        ['True', 'False'];
-    Widget answerDisplay;
-    if (questionData['type'] == 'Text') {
-      answerDisplay = buildTextAnswerDisplay(
-        questionData,
-        surveyId,
-        answers,
-        widget.participant.userId,
-        fontSize,
-      );
-    } else {
-      answerDisplay = buildOptionsAnswerDisplay(options, answers, questionData);
-    }
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Card(
-        shadowColor: getButtonColor(context),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              constraints: BoxConstraints(
-                minWidth: double.infinity,
-                minHeight:
-                    getTimeFontSize(
-                      context,
-                      Provider.of<FontSizeProvider>(context).fontSize,
-                    ) *
-                    3,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(18.0),
+class _QuestionCard extends StatelessWidget {
+  const _QuestionCard({
+    required this.index,
+    required this.question,
+    required this.answer,
+    required this.isTest,
+    required this.verdict,
+    required this.busy,
+    required this.onReview,
+  });
+
+  final int index;
+  final Map<String, dynamic> question;
+  final List<dynamic> answer;
+  final bool isTest;
+
+  final bool? verdict;
+
+  final bool busy;
+  final ValueChanged<bool?> onReview;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final type = QuestionType.parse(question['type']);
+
+    return ContentCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 26,
                 child: Text(
-                  question,
-                  style: TextStyle(
-                    fontSize: getTimeFontSize(
-                      context,
-                      Provider.of<FontSizeProvider>(context).fontSize,
-                    ),
-                    fontWeight: FontWeight.bold,
-                    color: _textColor(context),
+                  '${index + 1}.',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            answerDisplay,
-          ],
-        ),
+              Expanded(
+                child: Text(
+                  (question['question'] as String? ?? '').trim(),
+                  style: theme.textTheme.titleSmall,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+          Padding(
+            padding: const EdgeInsets.only(left: 26),
+            child: type == QuestionType.text
+                ? _TextAnswer(
+                    answer: answer,
+                    isTest: isTest,
+                    verdict: verdict,
+                    busy: busy,
+                    onReview: onReview,
+                  )
+                : _Options(question: question, answer: answer, isTest: isTest),
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget buildTextAnswerDisplay(
-    Map<String, dynamic> questionData,
-    String questionId,
-    List<dynamic> answers,
-    String participantId,
-    final fontSize,
-  ) {
-    String uniqueQuestionKey = "${widget.survey.id}-$questionId";
+class _Options extends StatelessWidget {
+  const _Options({
+    required this.question,
+    required this.answer,
+    required this.isTest,
+  });
 
-    bool isReviewed =
-        widget.participant.textAnswersReviewed[uniqueQuestionKey] ?? false;
+  final Map<String, dynamic> question;
+  final List<dynamic> answer;
+  final bool isTest;
 
-    Color bgColor = isReviewed ? Colors.green[300]! : Colors.red[100]!;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final app = context.appColors;
+    final type = QuestionType.parse(question['type']);
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Card(
-        shadowColor: getButtonColor(context),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        color: bgColor,
-        child: ListTile(
-          title: Text(
-            answers.join(', '),
-            style: TextStyle(color: Colors.black, fontSize: fontSize),
-          ),
-          trailing: isReviewed
-              ? Icon(Icons.check, color: getCardColor(context))
-              : IconButton(
-                  icon: const Icon(Icons.check, color: Colors.grey),
-                  onPressed: () => confirmCorrectAnswer(
-                    widget.survey.id,
-                    questionId,
-                    participantId,
-                    true,
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
+    final options = (question['options'] as List<dynamic>? ?? const [])
+        .map((option) => '$option')
+        .toList();
 
-  Widget buildOptionsAnswerDisplay(
-    List<String> options,
-    List<dynamic> answers,
-    Map<String, dynamic> questionData,
-  ) {
-    bool isSingleChoice = questionData['type'] == "Single";
+    final correct = <int>{
+      if (type == QuestionType.single && question['correctAnswer'] is int)
+        question['correctAnswer'] as int,
+      if (type == QuestionType.multiple)
+        ...(question['correctAnswers'] as List<dynamic>? ?? const [])
+            .whereType<int>(),
+    };
 
-    List<dynamic>? correctAnswers;
-    int? singleCorrectAnswer;
+    final graded = isTest && correct.isNotEmpty;
 
-    if (isSingleChoice) {
-      singleCorrectAnswer = questionData['correctAnswer'];
-    } else {
-      correctAnswers = questionData['correctAnswers'] as List<dynamic>?;
-    }
-
-    return ListView.builder(
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemCount: options.length,
-      itemBuilder: (context, optionIndex) {
-        String option = options[optionIndex];
-        bool isSelected = answers.contains(optionIndex);
-        bool isCorrect;
-
-        if (isSingleChoice) {
-          isCorrect = optionIndex == singleCorrectAnswer;
-        } else {
-          isCorrect =
-              correctAnswers != null && correctAnswers.contains(optionIndex);
-        }
-
-        Widget leadingIcon = Icon(
-          Icons.radio_button_unchecked,
-          color: getCardColor(context),
-        );
-        Color bgColor = Colors.grey[200]!;
-
-        if (isSelected) {
-          if (isCorrect) {
-            // Option is selected and correct
-            leadingIcon = Icon(Icons.check, color: getCardColor(context));
-            bgColor = Colors.green[300]!;
-          } else {
-            // Option is selected and incorrect
-            leadingIcon = const Icon(Icons.close, color: Colors.red);
-            bgColor = Colors.red[100]!;
-          }
-        } else if (isCorrect) {
-          leadingIcon = Icon(Icons.check, color: getCardColor(context));
-          bgColor = Colors.green[300]!;
-        }
-
-        return Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            color: bgColor,
-            child: Padding(
-              padding: const EdgeInsets.all(13),
-              child: Row(
-                children: [
-                  leadingIcon,
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      option,
-                      style: TextStyle(color: getCardColor(context)),
-                    ),
-                  ),
-                  if (isSelected)
-                    Icon(Icons.person, color: getCardColor(context)),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget buildScoreRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(padding: const EdgeInsets.all(16), child: buildScoreData()),
-        IconButton(
-          onPressed: () async {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => PDFResults(
-                  participant: widget.participant,
-                  survey: widget.survey,
-                  textQuestionCorrect: widget.participant.textAnswersReviewed,
+        for (var i = 0; i < options.length; i++)
+          () {
+            final picked = answer.contains(i);
+            final isRight = correct.contains(i);
+
+            final (color, icon, label, tone, lostMark) = switch ((
+              graded,
+              picked,
+              isRight,
+            )) {
+              (true, true, true) => (
+                app.success,
+                Icons.check_circle_rounded,
+                'chosen_correct',
+                StatusTone.positive,
+                false,
+              ),
+              (true, true, false) => (
+                scheme.error,
+                Icons.cancel_rounded,
+                'chosen_wrong',
+                StatusTone.danger,
+                true,
+              ),
+
+              (true, false, true) => (
+                app.success,
+                Icons.check_circle_outline_rounded,
+                'missed',
+                StatusTone.danger,
+                true,
+              ),
+              (false, true, _) => (
+                scheme.primary,
+                Icons.radio_button_checked_rounded,
+                'chosen',
+                StatusTone.info,
+                false,
+              ),
+              _ => (
+                scheme.outline,
+                Icons.radio_button_unchecked_rounded,
+                null,
+                StatusTone.neutral,
+                false,
+              ),
+            };
+
+            final border = lostMark ? scheme.error : color;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: Spacing.sm),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                color: picked
+                    ? color.withValues(alpha: 0.12)
+                    : Colors.transparent,
+                border: Border.all(
+                  color: border.withValues(
+                    alpha: picked || lostMark ? 0.65 : 0.18,
+                  ),
+                  width: picked || lostMark ? 1.5 : 1,
+                ),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      width: 4,
+                      color: picked ? color : Colors.transparent,
+                    ),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: Spacing.md,
+                          vertical: Spacing.sm,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(icon, size: 20, color: color),
+                            const SizedBox(width: Spacing.md),
+                            Expanded(
+                              child: Text(
+                                options[i],
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  fontWeight: picked
+                                      ? FontWeight.w600
+                                      : FontWeight.w400,
+                                ),
+                              ),
+                            ),
+                            if (label != null) ...[
+                              const SizedBox(width: Spacing.sm),
+                              StatusPill(label: label.tr(), tone: tone),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             );
-          },
-          icon: const Icon(Icons.print),
-        ),
+          }(),
+        if (answer.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: Spacing.xs),
+            child: Text(
+              'no_answer_given'.tr(),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            ),
+          ),
       ],
     );
   }
+}
 
-  Widget buildScoreData() {
-    final fontSize = Provider.of<FontSizeProvider>(
-      context,
-      listen: false,
-    ).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+class _TextAnswer extends StatelessWidget {
+  const _TextAnswer({
+    required this.answer,
+    required this.isTest,
+    required this.verdict,
+    required this.busy,
+    required this.onReview,
+  });
 
-    TextSpan buildTextSpan(String text, {Color? color, bool isBold = false}) {
-      return TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color ?? _textColor(context),
-          fontSize: timeFontSize,
-          fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-        ),
-      );
-    }
+  final List<dynamic> answer;
+  final bool isTest;
+  final bool? verdict;
+  final bool busy;
+  final ValueChanged<bool?> onReview;
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: RichText(
-        text: TextSpan(
-          children: [
-            buildTextSpan('total_score'.tr(), isBold: true),
-            buildTextSpan(
-              ' ${widget.participant.score.toStringAsFixed(1)}%',
-              color: widget.totalScore < 50
-                  ? Colors.red
-                  : (widget.totalScore < 75 ? Colors.orange : Colors.green),
-              isBold: true,
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final app = context.appColors;
+    final written = answer.join(', ').trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(Spacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            color: scheme.surfaceContainerHighest.withValues(alpha: 0.4),
+            border: Border.all(color: scheme.outlineVariant),
+          ),
+          child: Text(
+            written.isEmpty ? 'no_answer_given'.tr() : written,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: written.isEmpty ? scheme.onSurfaceVariant : null,
+              fontStyle: written.isEmpty ? FontStyle.italic : null,
             ),
-            buildTextSpan('\n${'correct_answers'.tr()} ', isBold: true),
-            buildTextSpan(
-              '${widget.participant.totalCorrectAnswers} / ${widget.survey.questions.length}',
-              color: Colors.green,
-              isBold: true,
-            ),
-          ],
+          ),
         ),
-      ),
+
+        if (isTest && written.isNotEmpty) ...[
+          const SizedBox(height: Spacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  switch (verdict) {
+                    true => 'marked_correct'.tr(),
+                    false => 'marked_incorrect'.tr(),
+                    null => 'awaiting_review'.tr(),
+                  },
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: switch (verdict) {
+                      true => app.success,
+                      false => scheme.error,
+                      null => app.warning,
+                    },
+                  ),
+                ),
+              ),
+
+              SegmentedButton<bool?>(
+                showSelectedIcon: false,
+                style: const ButtonStyle(
+                  visualDensity: VisualDensity.compact,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                segments: [
+                  ButtonSegment(
+                    value: false,
+                    icon: const Icon(Icons.close_rounded, size: 16),
+                    tooltip: 'marked_incorrect'.tr(),
+                  ),
+                  ButtonSegment(
+                    value: true,
+                    icon: const Icon(Icons.check_rounded, size: 16),
+                    tooltip: 'marked_correct'.tr(),
+                  ),
+                ],
+                selected: {verdict},
+                emptySelectionAllowed: true,
+                onSelectionChanged: busy
+                    ? null
+                    : (selection) {
+                        final picked = selection.firstOrNull;
+                        onReview(picked == verdict ? null : picked);
+                      },
+              ),
+            ],
+          ),
+        ],
+      ],
     );
-  }
-
-  Color? _textColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF004B96)
-        : Colors.white;
-  }
-
-  double getTimeFontSize(BuildContext context, double fontSize) {
-    return fontSize;
   }
 }
