@@ -1,15 +1,15 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
-import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
+import 'package:echomeet/core/widgets/auth_shell.dart';
+import 'package:echomeet/core/widgets/glass_panel.dart';
+import 'package:echomeet/core/widgets/product_showcase.dart';
 import 'package:echomeet/login/biometrics.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:echomeet/login/user_preferences.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/settings_controller.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:easy_localization/easy_localization.dart';
 
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
@@ -24,23 +24,18 @@ class LoginPageState extends State<LoginPage> {
   final AuthManager _authManager = AuthManager();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool isLoginIn = false;
+  final _formKey = GlobalKey<FormState>();
+
+  bool _isSigningIn = false;
   bool _rememberMe = false;
-  String _errorMessage = '';
+  String? _errorMessage;
   bool _passwordVisible = false;
-  bool _light = true;
   bool _useBiometricAuthentication = false;
 
   @override
   void initState() {
     super.initState();
     _useBiometricAuthentication = UserPreferences.getBiometricAuthEnabled();
-    SettingsController().getThemeBool().then((value) {
-      if (!mounted) return;
-      setState(() {
-        _light = value;
-      });
-    });
     _restoreRememberedUser();
   }
 
@@ -51,8 +46,6 @@ class LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  /// Pre-fills the email and greeting only. The password is deliberately never
-  /// stored, so "remember me" cannot pre-fill it.
   void _restoreRememberedUser() {
     if (!UserPreferences.getRememberMe()) return;
     setState(() {
@@ -63,297 +56,217 @@ class LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (isLoginIn) {
-      return const Scaffold(
-        body: Center(child: CustomLoadingWidget(loadingText: "login_in")),
-      );
-    }
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      // A faint tint behind the card, so the card reads as a surface sitting on
-      // a page rather than as a rectangle of the same white.
-      backgroundColor: isDark
-          ? Theme.of(context).scaffoldBackgroundColor
-          : const Color(0xFFEFF2F6),
-      body: SafeArea(
-        child: PageBody(
-          maxWidth: 460,
-          centerVertically: true,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildWelcomeBack(),
-              const SizedBox(height: Spacing.xxl),
-              _buildLoginContainer(),
-              const SizedBox(height: Spacing.xl),
-              _buildSocialLoginButtons(),
-              const SizedBox(height: Spacing.lg),
-              _buildRegisterLink(),
-            ],
-          ),
-        ),
+    return AuthShell(
+      headline: const AuthHeadline(
+        title: 'login_headline',
+        subtitle: 'login_subhead',
       ),
-    );
-  }
-
-  Widget _buildWelcomeBack() {
-    String? fullName = UserPreferences.getFullName();
-    return fullName != null
-        ? Column(
-            children: [
-              Text(
-                'welcome_back'.tr(),
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: getButtonColor(context),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                fullName,
-                style: TextStyle(fontSize: 18, color: getButtonColor(context)),
-              ),
-            ],
-          )
-        : Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.calendar_month_outlined,
-                size: 35,
-                color: getButtonColor(context),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                'app_title'.tr(),
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: getButtonColor(context),
-                ),
-              ),
-            ],
-          );
-  }
-
-  Widget buildThemeSwitch() {
-    return IconButtonTheme(
-      data: const IconButtonThemeData(),
-      child: IconButton(
-        icon: _light ? const Icon(Icons.sunny) : const Icon(Icons.brightness_3),
-        onPressed: () {
-          setState(() {
-            _light = !_light;
-            if (_light) {
-              AdaptiveTheme.of(context).setDark();
-            } else {
-              AdaptiveTheme.of(context).setLight();
-            }
-            SettingsController().saveThemeBool(_light);
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildLoginContainer() {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(Spacing.xl),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        // The card used to paint itself scaffoldBackgroundColor — the exact
-        // colour of the page behind it — so it read as a faint shadow rather
-        // than a surface. That is barely noticeable on a phone and looks washed
-        // out on a monitor, where it sits in a large empty field.
-        color: isDark ? theme.colorScheme.surface : Colors.white,
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      art: const ProductShowcase(),
+      form: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'login_title'.tr(),
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const Spacer(),
-              buildThemeSwitch(),
-            ],
-          ),
-          const SizedBox(height: 20),
-          _buildEmailField(),
-          const SizedBox(height: 20),
-          _buildPasswordField(),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Checkbox(
-                    checkColor: getTextColor(context),
-                    activeColor: getButtonColor(context),
-                    value: _rememberMe,
-                    onChanged: (value) {
-                      setState(() {
-                        _rememberMe = value!;
-                      });
-                    },
-                  ),
-                  Text(
-                    'remember_me'.tr(),
-                    style: const TextStyle(fontSize: 12.0),
-                  ),
-                ],
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () =>
-                      Navigator.pushNamed(context, '/reset_password'),
-                  child: const Text("forgot_password").tr(),
-                ),
-              ),
-            ],
-          ),
-          _buildErrorMessage(),
-          const SizedBox(height: 20),
-          _buildLoginButton(),
+          _buildFormIntro(),
+          const SizedBox(height: Spacing.lg),
+          _buildCard(),
+          const SizedBox(height: Spacing.lg),
+          _buildRegisterLink(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFormIntro() {
+    final name = UserPreferences.getFullName();
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          name == null ? 'login_title'.tr() : 'welcome_back'.tr(),
+          style: theme.textTheme.titleLarge,
+        ),
+        if (name != null) ...[
+          const SizedBox(height: Spacing.xs),
+          Text(
+            name,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCard() {
+    return GlassPanel(
+      padding: const EdgeInsets.all(Spacing.xl),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildEmailField(),
+            const SizedBox(height: Spacing.lg),
+            _buildPasswordField(),
+            const SizedBox(height: Spacing.sm),
+            _buildMetaRow(),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: Spacing.md),
+              _buildError(),
+            ],
+            const SizedBox(height: Spacing.lg),
+            GlowButton(
+              onPressed: _useBiometricAuthentication
+                  ? _handleLogin
+                  : _manualLogin,
+              busy: _isSigningIn,
+              label: _useBiometricAuthentication
+                  ? 'biometrics'.tr()
+                  : 'login_button'.tr(),
+              icon: _useBiometricAuthentication ? Icons.fingerprint : null,
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildEmailField() {
-    return TextField(
+    return AppTextField(
+      label: tr('email_label'),
       controller: _emailController,
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        labelText: tr("email_label"),
-      ),
+      icon: Icons.alternate_email_rounded,
+      keyboardType: TextInputType.emailAddress,
+      autofillHints: const [AutofillHints.username, AutofillHints.email],
+      textInputAction: TextInputAction.next,
+      validator: (value) => (value == null || value.trim().isEmpty)
+          ? 'invalid_email_message'.tr()
+          : null,
     );
   }
 
   Widget _buildPasswordField() {
-    return TextField(
+    return AppTextField(
+      label: tr('password_label'),
       controller: _passwordController,
-      obscureText: !_passwordVisible,
-      decoration: InputDecoration(
-        border: const OutlineInputBorder(),
-        labelText: tr("password_label"),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _passwordVisible ? Icons.visibility : Icons.visibility_off,
-          ),
-          onPressed: () {
-            setState(() {
-              _passwordVisible = !_passwordVisible;
-            });
-          },
+      icon: Icons.lock_outline_rounded,
+      obscure: !_passwordVisible,
+      autofillHints: const [AutofillHints.password],
+      textInputAction: TextInputAction.done,
+      onSubmitted: (_) => _manualLogin(),
+      validator: (value) =>
+          (value == null || value.isEmpty) ? 'password_empty'.tr() : null,
+      trailing: IconButton(
+        icon: Icon(
+          _passwordVisible
+              ? Icons.visibility_off_outlined
+              : Icons.visibility_outlined,
+          size: 19,
         ),
+        onPressed: () => setState(() => _passwordVisible = !_passwordVisible),
       ),
     );
   }
 
-  Widget _buildErrorMessage() {
-    if (_errorMessage.isNotEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Text(
-          _errorMessage,
-          style: const TextStyle(color: Colors.red, fontSize: 12),
-          textAlign: TextAlign.center,
-        ),
-      );
-    }
-    return Container();
-  }
+  Widget _buildMetaRow() {
+    final scheme = Theme.of(context).colorScheme;
 
-  Widget _buildLoginButton() {
-    return ElevatedButton(
-      style: ElevatedButton.styleFrom(
-        foregroundColor: getTextColor(context),
-        backgroundColor: getButtonColor(context),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30.0),
-        ),
-        elevation: 0,
-        padding: const EdgeInsets.symmetric(vertical: 16.0),
-      ),
-      onPressed: () {
-        if (_useBiometricAuthentication) {
-          _handleLogin();
-        } else {
-          _manualLogin();
-        }
-      },
-      child: const Text('login_button').tr(),
-    );
-  }
-
-  Widget _buildSocialLoginButtons() {
-    return Column(
+    return Row(
       children: [
-        const Divider(),
-        const SizedBox(height: 20),
-        const Text('or_login_with').tr(),
-        const SizedBox(height: 20),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: Icon(Icons.g_mobiledata, color: getButtonColor(context)),
-              onPressed: () {
-                // Handle Google login
-              },
+        Expanded(
+          child: InkWell(
+            onTap: () => setState(() => _rememberMe = !_rememberMe),
+            borderRadius: BorderRadius.circular(8),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(
+                    height: 22,
+                    width: 22,
+                    child: Checkbox(
+                      value: _rememberMe,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onChanged: (value) =>
+                          setState(() => _rememberMe = value ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Flexible(
+                    child: Text(
+                      'remember_me'.tr(),
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: scheme.onSurface),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const Text('google_login').tr(),
-            const SizedBox(width: 20),
-            IconButton(
-              icon: Icon(Icons.facebook, color: getButtonColor(context)),
-              onPressed: () {},
-            ),
-            Text('facebook_login'.tr(), style: const TextStyle(fontSize: 12.0)),
-          ],
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pushNamed(context, '/reset_password'),
+          child: Text('forgot_password'.tr()),
         ),
       ],
+    );
+  }
+
+  Widget _buildError() {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 18,
+            color: scheme.onErrorContainer,
+          ),
+          const SizedBox(width: Spacing.sm),
+          Expanded(
+            child: Text(
+              _errorMessage!,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: scheme.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildRegisterLink() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        const Text("dont_have_account").tr(),
+        Text(
+          'dont_have_account'.tr(),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
         TextButton(
           onPressed: () => Navigator.pushNamed(context, '/register'),
-          child: const Text('create_new_account').tr(),
+          child: Text('create_new_account'.tr()),
         ),
       ],
     );
   }
 
-  /// Unlocks an existing session with biometrics.
-  ///
-  /// Biometrics re-open a session Firebase is already holding; they are not a
-  /// credential and cannot create one. If there is no session left — after a
-  /// sign-out, or once Firebase has expired it — the app must fall back to the
-  /// password form, otherwise it would navigate to a home screen whose first
-  /// `currentUser!` read crashes on null.
   Future<void> _handleLogin() async {
     final authService = AuthService();
     final available =
@@ -380,31 +293,35 @@ class LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _manualLogin() async {
+    if (_isSigningIn) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() {
-      isLoginIn = true;
+      _isSigningIn = true;
+      _errorMessage = null;
     });
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-    bool success = await _authManager.signInWithEmailAndPassword(
-      email,
-      password,
+    final success = await _authManager.signInWithEmailAndPassword(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
       rememberMe: _rememberMe,
     );
 
+    if (!mounted) return;
+
     if (success) {
-      if (!context.mounted) return;
       _navigateToHome();
-    } else {
-      setState(() {
-        _errorMessage = 'login_failed'.tr();
-        isLoginIn = false;
-      });
+      return;
     }
+
+    setState(() {
+      _errorMessage = 'login_failed'.tr();
+      _isSigningIn = false;
+    });
   }
 
   void _navigateToHome() {
-    if (!context.mounted) return;
+    if (!mounted) return;
     Navigator.pushReplacementNamed(context, '/home');
   }
 }

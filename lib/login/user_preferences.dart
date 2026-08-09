@@ -1,12 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Small, non-sensitive preferences that survive a restart.
-///
-/// Deliberately stores no credentials. An earlier version kept the user's
-/// password here in plain text so the login form could pre-fill it, but
-/// `SharedPreferences` is an unencrypted file in app storage — readable on a
-/// rooted device and swept into Android's auto-backup. Firebase Auth already
-/// persists the session, so the password is never needed after sign-in.
 class UserPreferences {
   UserPreferences._();
 
@@ -33,16 +26,11 @@ class UserPreferences {
       _prefs.setBool(_keyRememberMe, rememberMe);
   static bool getRememberMe() => _prefs.getBool(_keyRememberMe) ?? false;
 
-  /// Whether the user opted into unlocking with biometrics on this device.
-  ///
-  /// This is a device preference rather than part of the session, so it
-  /// survives [clearSession].
   static Future<void> setBiometricAuthEnabled(bool isEnabled) =>
       _prefs.setBool(_keyBiometricAuth, isEnabled);
   static bool getBiometricAuthEnabled() =>
       _prefs.getBool(_keyBiometricAuth) ?? false;
 
-  /// Forgets who was signed in. Called on sign-out and account deletion.
   static Future<void> clearSession() async {
     await Future.wait([
       _prefs.remove(_keyEmail),

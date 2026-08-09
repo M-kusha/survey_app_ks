@@ -29,8 +29,7 @@ class AuthService {
       authenticated = await auth.authenticate(
         localizedReason: 'authenticate_with_biometrics'.tr(),
         authMessages: const <AuthMessages>[AndroidAuthMessages()],
-        // local_auth 3.x flattened AuthenticationOptions into named args;
-        // stickyAuth is now persistAcrossBackgrounding.
+
         persistAcrossBackgrounding: true,
       );
     } catch (e) {

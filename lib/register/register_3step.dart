@@ -1,23 +1,23 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
+import 'package:echomeet/core/widgets/password_strength_meter.dart';
 import 'package:echomeet/register/register_4step.dart';
 import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/register/register_shell.dart';
 import 'package:echomeet/register/registered_sucesfully.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:password_strength/password_strength.dart';
 
 class Register3step extends StatefulWidget {
   final RegisterLogic registerLogic;
   final ProfileType profileType;
-  final String? companyId;
 
   const Register3step({
     super.key,
     required this.registerLogic,
     required this.profileType,
-    this.companyId,
   });
 
   @override
@@ -25,113 +25,46 @@ class Register3step extends StatefulWidget {
 }
 
 class Register3stepState extends State<Register3step> {
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
-  double _strength = 0;
-  bool _isPasswordVisible = false;
-  final double _minPasswordStrength = 0.3;
+  final _formKey = GlobalKey<FormState>();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
 
-  bool _isSaving = false;
+  bool _visible = false;
+  bool _saving = false;
 
+  static const _minimum = PasswordStrengthMeter.minimum;
+
+  bool get _isCompany => widget.profileType == ProfileType.company;
   @override
-  void initState() {
-    super.initState();
+  void dispose() {
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
   }
 
-  void _updateStrength(String password) {
-    bool hasUppercase = password.contains(RegExp(r'[A-Z]'));
-    bool hasLowercase = password.contains(RegExp(r'[a-z]'));
-    bool hasDigitsOrSpecialCharacters = password.contains(
-      RegExp(r'[\d!@#$%^&*(),.?":{}|<>]'),
+  void _submit() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    widget.registerLogic.passwordController.text = _passwordController.text;
+
+    if (_isCompany) {
+      _finish();
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            Register4step(registerLogic: widget.registerLogic),
+      ),
     );
-    final length = password.length;
-
-    double strength = 0.0;
-    if (length >= 3) strength = 0.2;
-    if (length > 6) strength = 0.4;
-    if (hasUppercase && hasLowercase && length > 6) {
-      strength = 0.6;
-    }
-    if (hasUppercase &&
-        hasLowercase &&
-        hasDigitsOrSpecialCharacters &&
-        length > 6) {
-      strength = 1.0;
-    }
-
-    setState(() {
-      _strength = strength;
-    });
   }
 
-  Color _getBorderColorBasedOnStrength(double strength) {
-    if (strength <= 0.2) {
-      return _passwordController.text.isEmpty ? Colors.grey : Colors.red;
-    } else if (strength <= 0.4) {
-      return Colors.yellow;
-    } else if (strength <= 0.6) {
-      return Colors.orange;
-    } else {
-      return Colors.green;
-    }
-  }
-
-  Color _getConfirmPasswordBorderColor() {
-    bool passwordsMatch =
-        _passwordController.text == _confirmPasswordController.text &&
-        _passwordController.text.isNotEmpty;
-
-    return passwordsMatch ? Colors.green : Colors.grey;
-  }
-
-  void _onPressed() {
-    final password = _passwordController.text;
-    final confirmPassword = _confirmPasswordController.text;
-
-    if (password.isEmpty || confirmPassword.isEmpty) {
-      UIUtils.showSnackBar(context, 'password_empty'.tr());
-      return;
-    }
-
-    if (password != confirmPassword) {
-      UIUtils.showSnackBar(context, 'passwords_dont_match'.tr());
-      return;
-    }
-
-    final passwordStrength = estimatePasswordStrength(password);
-    if (passwordStrength < _minPasswordStrength) {
-      UIUtils.showSnackBar(context, 'validate_password_strong'.tr());
-
-      return;
-    }
-
-    widget.registerLogic.passwordController.text = password;
-
-    if (widget.profileType == ProfileType.company) {
-      _finishRegistration();
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              Register4step(registerLogic: widget.registerLogic),
-        ),
-      ).then((_) {
-        if (widget.registerLogic.selectedCompanyName != null) {
-          _finishRegistration();
-        }
-      });
-    }
-  }
-
-  void _finishRegistration() async {
-    setState(() {
-      _isSaving = true;
-    });
+  Future<void> _finish() async {
+    setState(() => _saving = true);
 
     try {
-      // Registering a new company: registerUser creates it after sign-up.
       await widget.registerLogic.registerUser(profileType: widget.profileType);
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -139,166 +72,94 @@ class Register3stepState extends State<Register3step> {
         MaterialPageRoute(
           builder: (context) => const RegistrationSuccessPage(),
         ),
-        (Route<dynamic> route) => false,
+        (route) => false,
       );
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        UIUtils.showSnackBar(context, 'email_already_exists'.tr());
-      } else {
-        UIUtils.showSnackBar(context, 'Registration failed: ${e.message}');
-      }
     } catch (e) {
       if (!mounted) return;
-      UIUtils.showSnackBar(context, registrationErrorKey(e));
+      UIUtils.showSnackBar(context, registrationErrorKey(e).tr());
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('set_your_password'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: _isSaving
-          ? const Center(
-              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
-            )
-          : Center(
-              child: Card(
-                shadowColor: getButtonColor(
-                  context,
-                ), // ThemeBasedAppColors.getColor(context, 'buttonColor'
-                margin: const EdgeInsets.symmetric(
-                  vertical: 50.0,
-                  horizontal: 25.0,
-                ),
-                elevation: 5,
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(height: 20),
-                      Padding(
-                        padding: const EdgeInsets.only(left: 8.0, bottom: 8.0),
-                        child: Text(
-                          'secure_password'.tr(),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 50),
-                      TextFormField(
-                        controller: _passwordController,
-                        onChanged: (value) {
-                          _updateStrength(value);
-                          widget.registerLogic.passwordController.text = value;
-                        },
-                        obscureText: !_isPasswordVisible,
-                        decoration: InputDecoration(
-                          labelText: 'set_your_password'.tr(),
-                          hintStyle: const TextStyle(fontSize: 10),
-                          border: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            borderSide: BorderSide(
-                              color: _getConfirmPasswordBorderColor(),
-                              width: 1.0,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            borderSide: BorderSide(
-                              color: _getBorderColorBasedOnStrength(_strength),
-                              width: 2.0,
-                            ),
-                          ),
-                          prefixIcon: const Icon(Icons.lock),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isPasswordVisible = !_isPasswordVisible;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        controller: _confirmPasswordController,
-                        obscureText: !_isPasswordVisible,
-                        onChanged: (value) {
-                          setState(() {});
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'confirm_password'.tr(),
-                          border: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            borderSide: BorderSide(
-                              color: _getConfirmPasswordBorderColor(),
-                              width: 1.0,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: const BorderRadius.all(
-                              Radius.circular(12),
-                            ),
-                            borderSide: BorderSide(
-                              color: _getConfirmPasswordBorderColor(),
-                              width: 2.0,
-                            ),
-                          ),
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _isPasswordVisible
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isPasswordVisible = !_isPasswordVisible;
-                              });
-                            },
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 50),
-                    ],
-                  ),
-                ),
+    return RegisterShell(
+      step: 3,
+      titleKey: 'register_step3_title',
+      subtitleKey: 'register_step3_subhead',
+      continueLabelKey: _isCompany ? 'finish_registration' : 'next',
+      onContinue: _saving ? null : _submit,
+      busy: _saving,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppTextField(
+              label: 'set_your_password'.tr(),
+              controller: _passwordController,
+              icon: Icons.lock_outline_rounded,
+              obscure: !_visible,
+              autofillHints: const [AutofillHints.newPassword],
+              textInputAction: TextInputAction.next,
+              validator: (value) {
+                if (value == null || value.isEmpty) {
+                  return 'password_empty'.tr();
+                }
+                return estimatePasswordStrength(value) < _minimum
+                    ? 'validate_password_strong'.tr()
+                    : null;
+              },
+              trailing: _VisibilityToggle(
+                visible: _visible,
+                onChanged: (value) => setState(() => _visible = value),
               ),
             ),
-      bottomNavigationBar: !_isSaving
-          ? buildBottomElevatedButton(
-              context: context,
-              onPressed: _onPressed,
-              buttonText: widget.profileType == ProfileType.company
-                  ? 'finish_registration'
-                  : 'next',
-            )
-          : null,
+
+            ValueListenableBuilder(
+              valueListenable: _passwordController,
+              builder: (context, _, _) =>
+                  PasswordStrengthMeter(password: _passwordController.text),
+            ),
+            const SizedBox(height: Spacing.md),
+            AppTextField(
+              label: 'confirm_password'.tr(),
+              controller: _confirmController,
+              icon: Icons.lock_reset_rounded,
+              obscure: !_visible,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _submit(),
+              validator: (value) => value == _passwordController.text
+                  ? null
+                  : 'passwords_dont_match'.tr(),
+              trailing: _VisibilityToggle(
+                visible: _visible,
+                onChanged: (value) => setState(() => _visible = value),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VisibilityToggle extends StatelessWidget {
+  const _VisibilityToggle({required this.visible, required this.onChanged});
+
+  final bool visible;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: Icon(
+        visible ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        size: 19,
+      ),
+      onPressed: () => onChanged(!visible),
     );
   }
 }

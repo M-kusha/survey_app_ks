@@ -1,9 +1,11 @@
 import 'dart:io';
+
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/register/register_3step.dart';
 import 'package:echomeet/register/register_logics.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
+import 'package:echomeet/register/register_shell.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -22,208 +24,191 @@ class Register2step extends StatefulWidget {
 }
 
 class _Register2stepState extends State<Register2step> {
-  late final TextEditingController _fullnameController =
-      widget.registerLogic.fullnameController;
-  late final TextEditingController _birthdateController =
-      widget.registerLogic.birthdateController;
-  late final TextEditingController _emailController =
-      widget.registerLogic.emailController;
-  late final _companyNameController =
-      widget.registerLogic.companyNameController;
+  final _formKey = GlobalKey<FormState>();
 
-  bool _areFieldsValid() {
-    bool isValid =
-        _fullnameController.text.isNotEmpty &&
-        _birthdateController.text.isNotEmpty &&
-        _emailController.text.isNotEmpty;
+  RegisterLogic get _logic => widget.registerLogic;
+  bool get _registeringCompany => widget.profileType == ProfileType.company;
 
-    if (widget.profileType == ProfileType.company) {
-      isValid =
-          isValid && widget.registerLogic.companyNameController.text.isNotEmpty;
-    }
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
-    return isValid;
-  }
+  void _next() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
 
-  bool _validateEmail(String email) {
-    final emailRegex = RegExp(r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+');
-    return emailRegex.hasMatch(email);
-  }
-
-  void _onNextPressed() async {
-    if (!_areFieldsValid()) {
-      UIUtils.showSnackBar(context, 'please_fill_all_fields'.tr());
-      return;
-    }
-
-    if (!_validateEmail(_emailController.text)) {
-      UIUtils.showSnackBar(context, 'invalid_email_message'.tr());
-
-      return;
-    }
-
-    // The company is no longer created here. It is written after sign-up in
-    // registerUser(), so the request is authenticated and nothing is left
-    // behind if the user abandons the flow on the next screen.
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => Register3step(
-          registerLogic: widget.registerLogic,
+          registerLogic: _logic,
           profileType: widget.profileType,
-          companyId: null,
         ),
       ),
     );
   }
 
   Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? pickedImage = await picker.pickImage(
-      source: ImageSource.gallery,
-    );
-
-    if (pickedImage != null) {
-      setState(() {
-        widget.registerLogic.setProfileImage(File(pickedImage.path));
-      });
-    }
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (picked == null || !mounted) return;
+    setState(() => _logic.setProfileImage(File(picked.path)));
   }
 
-  Widget _profileImageSection() {
-    return GestureDetector(
-      onTap: _pickImage,
-      child: CircleAvatar(
-        radius: 50,
-        backgroundColor: getButtonColor(context),
-        backgroundImage: widget.registerLogic.profileImage != null
-            ? FileImage(widget.registerLogic.profileImage!) as ImageProvider
-            : null,
-        child: widget.registerLogic.profileImage == null
-            ? Icon(Icons.camera_alt, size: 40, color: getTextColor(context))
-            : null,
-      ),
+  Future<void> _pickBirthdate() async {
+    final now = DateTime.now();
+
+    final latest = DateTime(now.year - 18, now.month, now.day);
+
+    final chosen = await showDatePicker(
+      context: context,
+      initialDate: latest,
+      firstDate: DateTime(1900),
+      lastDate: latest,
     );
+    if (chosen == null || !mounted) return;
+
+    setState(() {
+      _logic.birthdateController.text = DateFormat.yMMMMd().format(chosen);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('basic_information'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: Center(
-        child: Card(
-          shadowColor: getButtonColor(context),
-          margin: const EdgeInsets.all(20),
-          elevation: 5,
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 30),
-                _profileImageSection(),
-                const SizedBox(height: 30),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextFormField(
-                    controller: _fullnameController,
-                    decoration: InputDecoration(
-                      labelText: 'fullname'.tr(),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.person,
-                        color: getButtonColor(context),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextFormField(
-                    controller: _birthdateController,
-                    decoration: InputDecoration(
-                      labelText: 'birthdate'.tr(),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.calendar_today,
-                        color: getButtonColor(context),
-                      ),
-                    ),
-                    onTap: () {
-                      final DateTime currentDate = DateTime.now();
-                      final DateTime minDate = DateTime(
-                        currentDate.year - 18,
-                        currentDate.month,
-                        currentDate.day,
-                      );
-                      showDatePicker(
-                        context: context,
-                        initialDate: minDate,
-                        firstDate: DateTime(1900),
-                        lastDate: minDate,
-                      ).then((value) {
-                        if (value != null) {
-                          _birthdateController.text = DateFormat(
-                            'd MMMM yyyy',
-                          ).format(value);
-                        }
-                      });
-                    },
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: TextFormField(
-                    controller: _emailController,
-                    decoration: InputDecoration(
-                      labelText: 'email'.tr(),
-                      border: const OutlineInputBorder(
-                        borderRadius: BorderRadius.all(Radius.circular(12)),
-                      ),
-                      prefixIcon: Icon(
-                        Icons.email,
-                        color: getButtonColor(context),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                if (widget.profileType == ProfileType.company)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: TextFormField(
-                      controller: _companyNameController,
-                      decoration: InputDecoration(
-                        labelText: 'company_name'.tr(),
-                        prefixIcon: Icon(
-                          Icons.business,
-                          color: getButtonColor(context),
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 30),
-              ],
+    return RegisterShell(
+      step: 2,
+      titleKey: 'register_step2_title',
+      subtitleKey: 'register_step2_subhead',
+      continueLabelKey: 'next',
+      onContinue: _next,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _AvatarPicker(image: _logic.profileImage, onTap: _pickImage),
+            const SizedBox(height: Spacing.xl),
+            AppTextField(
+              label: 'fullname'.tr(),
+              controller: _logic.fullnameController,
+              icon: Icons.person_outline_rounded,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.name],
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'please_fill_all_fields'.tr()
+                  : null,
             ),
-          ),
+            const SizedBox(height: Spacing.sm),
+
+            _BirthdateField(
+              controller: _logic.birthdateController,
+              onTap: _pickBirthdate,
+            ),
+            const SizedBox(height: Spacing.sm),
+            AppTextField(
+              label: 'email'.tr(),
+              controller: _logic.emailController,
+              icon: Icons.alternate_email_rounded,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: _registeringCompany
+                  ? TextInputAction.next
+                  : TextInputAction.done,
+              validator: (value) {
+                final email = value?.trim() ?? '';
+                if (email.isEmpty) return 'please_fill_all_fields'.tr();
+                return _emailPattern.hasMatch(email)
+                    ? null
+                    : 'invalid_email_message'.tr();
+              },
+            ),
+            if (_registeringCompany) ...[
+              const SizedBox(height: Spacing.sm),
+              AppTextField(
+                label: 'company_name'.tr(),
+                controller: _logic.companyNameController,
+                icon: Icons.business_outlined,
+                textInputAction: TextInputAction.done,
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'please_fill_all_fields'.tr()
+                    : null,
+              ),
+            ],
+          ],
         ),
       ),
-      bottomNavigationBar: buildBottomElevatedButton(
-        context: context,
-        onPressed: _onNextPressed,
-        buttonText: 'next',
+    );
+  }
+}
+
+class _AvatarPicker extends StatelessWidget {
+  const _AvatarPicker({required this.image, required this.onTap});
+
+  final File? image;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final hasImage = image != null;
+
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            height: 84,
+            width: 84,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: scheme.primary.withValues(alpha: 0.10),
+              border: Border.all(
+                color: scheme.primary.withValues(alpha: hasImage ? 0.9 : 0.35),
+                width: 2,
+              ),
+              image: hasImage
+                  ? DecorationImage(image: FileImage(image!), fit: BoxFit.cover)
+                  : null,
+            ),
+            child: hasImage
+                ? null
+                : Icon(
+                    Icons.add_a_photo_outlined,
+                    color: scheme.primary,
+                    size: 26,
+                  ),
+          ),
+        ),
+        const SizedBox(height: Spacing.sm),
+        Text(
+          hasImage
+              ? 'change_photo'.tr()
+              : '${'add_photo'.tr()} · ${'optional'.tr()}',
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _BirthdateField extends StatelessWidget {
+  const _BirthdateField({required this.controller, required this.onTap});
+
+  final TextEditingController controller;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AbsorbPointer(
+        child: AppTextField(
+          label: 'birthdate'.tr(),
+          controller: controller,
+          icon: Icons.cake_outlined,
+          validator: (value) => (value == null || value.trim().isEmpty)
+              ? 'please_fill_all_fields'.tr()
+              : null,
+        ),
       ),
     );
   }

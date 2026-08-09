@@ -1,18 +1,23 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/login/user_preferences.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
+import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-/// Sign-in and sign-out.
 class AuthManager {
   AuthManager({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _auth = auth ?? FirebaseAuth.instance,
-      _firestore = firestore ?? FirebaseFirestore.instance;
+    : _authOverride = auth,
+      _firestoreOverride = firestore;
 
-  final FirebaseAuth _auth;
-  final FirebaseFirestore _firestore;
+  final FirebaseAuth? _authOverride;
+  final FirebaseFirestore? _firestoreOverride;
 
-  /// Returns true when the credentials were accepted.
+  late final FirebaseAuth _auth = _authOverride ?? FirebaseAuth.instance;
+  late final FirebaseFirestore _firestore =
+      _firestoreOverride ?? FirebaseFirestore.instance;
+
   Future<bool> signInWithEmailAndPassword(
     String email,
     String password, {
@@ -24,15 +29,14 @@ class AuthManager {
         password: password,
       );
       await _rememberSession(credential.user, email, rememberMe: rememberMe);
+
+      unawaited(PushService().start());
       return true;
     } on FirebaseAuthException {
       return false;
     }
   }
 
-  /// Records just enough to greet the user by name next launch.
-  ///
-  /// Only the email and display name are kept — never the password.
   Future<void> _rememberSession(
     User? user,
     String email, {
@@ -45,8 +49,6 @@ class AuthManager {
       return;
     }
 
-    // A missing or malformed profile document must not fail a sign-in that
-    // Firebase already accepted, so the name is read defensively.
     final snapshot = await _firestore.collection('users').doc(user.uid).get();
     final fullName = snapshot.data()?['fullName'] as String? ?? '';
 
@@ -55,11 +57,8 @@ class AuthManager {
     await UserPreferences.setRememberMe(true);
   }
 
-  /// Ends the session and forgets the signed-in user.
-  ///
-  /// The cached profile must be dropped too, otherwise the next user to sign in
-  /// on this device would inherit the previous user's role and company.
   Future<void> signOut() async {
+    await PushService().stop();
     await _auth.signOut();
     await UserPreferences.clearSession();
     FirebaseServices.invalidateCache();

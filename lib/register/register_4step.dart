@@ -1,9 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/register/register_logics.dart';
+import 'package:echomeet/register/register_shell.dart';
 import 'package:echomeet/register/registered_sucesfully.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class Register4step extends StatefulWidget {
@@ -16,52 +18,53 @@ class Register4step extends StatefulWidget {
 }
 
 class Register4stepState extends State<Register4step> {
-  final TextEditingController _searchController = TextEditingController();
-  List<Map<String, dynamic>> _allCompanies = [];
-  List<Map<String, dynamic>> _filteredCompanies = [];
-  String? _selectedCompanyId;
-  bool _isSaving = false;
-  bool _isLoading = true;
-  bool _isSearching = false;
+  final _searchController = TextEditingController();
+
+  List<Map<String, dynamic>> _companies = [];
+  String? _selectedId;
+  bool _loading = true;
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() => setState(() {}));
     _fetchCompanies();
-    _searchController.addListener(_filterCompanies);
   }
 
-  void _fetchCompanies() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchCompanies() async {
     final companies = await widget.registerLogic.searchCompanies('');
     if (!mounted) return;
     setState(() {
-      _allCompanies = companies;
-      _filteredCompanies = companies;
-      _isLoading = false;
+      _companies = companies;
+      _loading = false;
     });
   }
 
-  void _filterCompanies() {
-    final query = _searchController.text.toLowerCase();
-    final filtered = _allCompanies.where((company) {
-      final nameLower = company['name'].toLowerCase();
-      return nameLower.contains(query);
-    }).toList();
-
-    setState(() => _filteredCompanies = filtered);
+  List<Map<String, dynamic>> get _visible {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _companies;
+    return _companies
+        .where(
+          (company) =>
+              (company['name'] as String).toLowerCase().contains(query),
+        )
+        .toList();
   }
 
-  void _finishRegistration() async {
-    setState(() {
-      _isSaving = true;
-    });
+  Future<void> _finish() async {
+    setState(() => _saving = true);
 
     try {
-      // Joining a company that already exists — never a company registration,
-      // so this screen is always the ordinary-user path.
       await widget.registerLogic.registerUser(
         profileType: ProfileType.user,
-        existingCompanyId: _selectedCompanyId,
+        existingCompanyId: _selectedId,
       );
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -69,181 +72,187 @@ class Register4stepState extends State<Register4step> {
         MaterialPageRoute(
           builder: (context) => const RegistrationSuccessPage(),
         ),
-        (Route<dynamic> route) => false,
+        (route) => false,
       );
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'email-already-in-use') {
-        UIUtils.showSnackBar(context, 'email_already_exists'.tr());
-      } else {
-        UIUtils.showSnackBar(context, 'Registration failed: ${e.message}');
-      }
     } catch (e) {
       if (!mounted) return;
-      UIUtils.showSnackBar(context, registrationErrorKey(e));
+      UIUtils.showSnackBar(context, registrationErrorKey(e).tr());
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+      if (mounted) setState(() => _saving = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('select_company'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: _isSaving
-          ? const Center(
-              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
-            )
-          : Center(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  children: [const SizedBox(height: 20), _buildCompanyList()],
-                ),
-              ),
-            ),
-      bottomNavigationBar: _selectedCompanyId != null && !_isSaving
-          ? buildBottomElevatedButton(
-              context: context,
-              onPressed: _finishRegistration,
-              buttonText: 'finish_registration'.tr(),
-            )
-          : null,
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 30),
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
-        child: _isSearching
-            ? Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      decoration: InputDecoration(
-                        hintText: 'search_company'.tr(),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 20,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderSide: BorderSide(
-                            color: getButtonColor(context), // Color(0xFFE8E8E8
-                            width: 2,
-                          ),
-                          borderRadius: BorderRadius.circular(32),
-                        ),
-                      ),
-                      onChanged: (value) => setState(() {}),
-                    ),
+    return RegisterShell(
+      step: 4,
+      titleKey: 'register_step4_title',
+      subtitleKey: 'register_step4_subhead',
+      continueLabelKey: 'finish_registration',
+      onContinue: _selectedId == null || _saving ? null : _finish,
+      busy: _saving,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AppTextField(
+            label: 'search_company'.tr(),
+            controller: _searchController,
+            icon: Icons.search_rounded,
+            trailing: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    onPressed: _searchController.clear,
                   ),
-                  IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {
-                        _isSearching = false;
-                      });
-                    },
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              )
-            : InkWell(
-                onTap: () {
-                  setState(() {
-                    _isSearching = true;
-                  });
-                },
-                child: const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: Icon(Icons.search, color: Colors.grey),
-                ),
-              ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          _buildList(),
+        ],
       ),
     );
   }
 
-  Widget _buildCompanyList() {
-    final itemCount = _filteredCompanies.length;
-    final columnCount = (itemCount / 15).ceil();
+  Widget _buildList() {
+    if (_loading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: Spacing.xxl),
+        child: CustomLoadingWidget(loadingText: 'loading'),
+      );
+    }
 
-    return Expanded(
-      child: _isLoading
-          ? const CustomLoadingWidget(loadingText: 'loading')
-          : ListView.builder(
-              itemCount: columnCount,
-              itemBuilder: (context, columnIndex) {
-                final start = columnIndex * 15;
-                final end = (columnIndex + 1) * 15;
-                final companies = _filteredCompanies.sublist(
-                  start,
-                  end > itemCount ? itemCount : end,
-                );
+    final companies = _visible;
+    if (companies.isEmpty) {
+      return _EmptyState(
+        message: _companies.isEmpty
+            ? 'no_companies_yet'.tr()
+            : 'no_companies_found'.tr(),
+      );
+    }
 
-                return Column(
-                  children: [
-                    _buildSearchBar(),
-                    const SizedBox(height: 20),
-                    Card(
-                      elevation: 5,
-                      margin: const EdgeInsets.all(20),
-                      shadowColor: getButtonColor(context), // Color(0xFFE8E8E8
-                      child: Column(
-                        children: companies
-                            .map((company) => _buildCompanyTile(company))
-                            .toList(),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxHeight: 260),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: EdgeInsets.zero,
+        itemCount: companies.length,
+        separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
+        itemBuilder: (context, index) {
+          final company = companies[index];
+          final id = company['id'] as String;
+
+          return _CompanyTile(
+            name: company['name'] as String,
+            selected: _selectedId == id,
+            onTap: () => setState(() => _selectedId = id),
+          );
+        },
+      ),
     );
   }
+}
 
-  Widget _buildCompanyTile(Map<String, dynamic> company) => Padding(
-    padding: const EdgeInsets.all(12.0),
-    child: Column(
-      children: [
-        Card(
-          elevation: isSelected(company['id']) ? 5 : 1,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-            side: BorderSide(
-              color: isSelected(company['id'])
-                  ? getButtonColor(context)
-                  : Colors.transparent,
-              width: 2,
+class _CompanyTile extends StatelessWidget {
+  const _CompanyTile({
+    required this.name,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(Radii.md),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(
+            horizontal: Spacing.md,
+            vertical: Spacing.md,
+          ),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(Radii.md),
+            color: selected
+                ? scheme.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
+            border: Border.all(
+              color: selected
+                  ? scheme.primary
+                  : scheme.outlineVariant.withValues(alpha: 0.7),
+              width: selected ? 2 : 1,
             ),
           ),
-          child: ListTile(
-            leading: Icon(Icons.business, color: getButtonColor(context)),
-            title: Text(company['name']),
-            trailing: isSelected(company['id'])
-                ? Icon(Icons.check, color: getButtonColor(context))
-                : null,
-            onTap: () => selectCompany(company['id']),
+          child: Row(
+            children: [
+              Icon(
+                Icons.business_outlined,
+                size: 20,
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Text(
+                  name,
+                  style: theme.textTheme.bodyLarge,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              SizedBox(
+                width: 20,
+                child: selected
+                    ? Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: scheme.primary,
+                      )
+                    : null,
+              ),
+            ],
           ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
+}
 
-  bool isSelected(String id) => _selectedCompanyId == id;
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.message});
 
-  void selectCompany(String id) {
-    setState(() => _selectedCompanyId = id);
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xxl),
+      child: Column(
+        children: [
+          Icon(
+            Icons.domain_disabled_outlined,
+            size: 28,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

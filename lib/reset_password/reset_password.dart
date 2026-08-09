@@ -1,15 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/utilities/text_style.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
+import 'package:echomeet/core/widgets/auth_shell.dart';
+import 'package:echomeet/core/widgets/glass_panel.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Starts Firebase's password reset.
-///
-/// Firebase emails the user a **link**; they set the new password in the
-/// browser and then sign in again here. There is no in-app code to type and no
-/// in-app "set new password" form — earlier builds showed both, but the code
-/// was never verified and the new password was never applied, so a user could
-/// walk the whole flow and end up with their old password unchanged.
 class ResetPasswordPage extends StatefulWidget {
   const ResetPasswordPage({super.key});
 
@@ -47,9 +43,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
       setState(() => _linkSent = true);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
-      // A malformed address is the user's own typo and worth pointing out.
-      // Everything else — including 'user-not-found' — reports success, so this
-      // screen cannot be used to discover which addresses have accounts.
+
       setState(() {
         if (e.code == 'invalid-email') {
           _error = 'invalid_email_message'.tr();
@@ -64,133 +58,136 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('reset_password'.tr()),
-        backgroundColor: getAppbarColor(context),
-        elevation: 0,
-        centerTitle: true,
+    return AuthShell(
+      onBack: () => Navigator.of(context).maybePop(),
+
+      headline: const AuthHeadline(
+        title: 'reset_headline',
+        subtitle: 'reset_subhead',
       ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Card(
-                elevation: 5.0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: _linkSent ? _buildConfirmation() : _buildForm(),
-                ),
-              ),
-            ),
-          ),
+      form: GlassPanel(
+        padding: const EdgeInsets.all(Spacing.xl),
+
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 260),
+          switchInCurve: Curves.easeOutCubic,
+          child: _linkSent ? _buildConfirmation() : _buildForm(),
         ),
       ),
     );
   }
 
   Widget _buildForm() {
-    return Form(
-      key: _formKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'reset_password'.tr(),
-            style: Theme.of(context).textTheme.titleLarge,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24.0),
-          TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            autofillHints: const [AutofillHints.email],
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _sendResetLink(),
-            decoration: InputDecoration(
-              labelText: 'email'.tr(),
-              hintText: 'enter_email'.tr(),
-              errorText: _error,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              prefixIcon: const Icon(Icons.email),
+    return KeyedSubtree(
+      key: const ValueKey('form'),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppTextField(
+              label: 'email'.tr(),
+              controller: _emailController,
+              icon: Icons.alternate_email_rounded,
+              keyboardType: TextInputType.emailAddress,
+              autofillHints: const [AutofillHints.email],
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _sendResetLink(),
+              validator: (value) {
+                if (_error != null) return _error;
+                return (value == null || value.trim().isEmpty)
+                    ? 'invalid_email_message'.tr()
+                    : null;
+              },
             ),
-            validator: (value) => (value == null || value.trim().isEmpty)
-                ? 'invalid_email_message'.tr()
-                : null,
-          ),
-          const SizedBox(height: 24.0),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isSending ? null : _sendResetLink,
-              style: ElevatedButton.styleFrom(
-                foregroundColor: getTextColor(context),
-                backgroundColor: getButtonColor(context),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30.0),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 16.0),
-              ),
-              child: _isSending
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text('send_reset_link'.tr()),
+            const SizedBox(height: Spacing.xl),
+            GlowButton(
+              onPressed: _sendResetLink,
+              busy: _isSending,
+              label: 'send_reset_link'.tr(),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildConfirmation() {
+    final scheme = Theme.of(context).colorScheme;
+    final app = Theme.of(context);
     return Column(
+      key: const ValueKey('sent'),
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(
-          Icons.mark_email_read_outlined,
-          size: 56,
-          color: getButtonColor(context),
+        _Halo(
+          icon: Icons.mark_email_read_rounded,
+          colors: [scheme.tertiary, scheme.primary],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: Spacing.xl),
         Text(
           'reset_link_sent'.tr(),
-          style: Theme.of(context).textTheme.titleLarge,
           textAlign: TextAlign.center,
+          style: app.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.5,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: Spacing.sm),
         Text(
           'reset_link_sent_body'.tr(
             namedArgs: {'email': _emailController.text.trim()},
           ),
           textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(),
-            style: ElevatedButton.styleFrom(
-              foregroundColor: getTextColor(context),
-              backgroundColor: getButtonColor(context),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(30.0),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 16.0),
-            ),
-            child: Text('back_to_login'.tr()),
+          style: app.textTheme.bodyMedium?.copyWith(
+            color: scheme.onSurfaceVariant,
           ),
         ),
+        const SizedBox(height: Spacing.xl),
+        GlowButton(
+          onPressed: () => Navigator.of(context).pop(),
+          label: 'back_to_login'.tr(),
+        ),
       ],
+    );
+  }
+}
+
+class _Halo extends StatelessWidget {
+  const _Halo({required this.icon, required this.colors});
+
+  final IconData icon;
+  final List<Color> colors;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        height: 64,
+        width: 64,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: colors,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colors.first.withValues(alpha: 0.45),
+              blurRadius: 26,
+              spreadRadius: -4,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Icon(
+          icon,
+          size: 30,
+          color: Theme.of(context).colorScheme.onPrimary,
+        ),
+      ),
     );
   }
 }
