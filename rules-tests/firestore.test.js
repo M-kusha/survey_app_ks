@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { deleteDoc, deleteField, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 
 // Two companies and three people, so every "can A see B's data" question has a
 // concrete answer.
@@ -17,6 +17,8 @@ const ALICE = 'alice'; // superadmin at Acme
 const BOB = 'bob'; //     ordinary user at Acme
 const CAROL = 'carol'; //  ordinary user at Rival — the outsider
 const DAVE = 'dave'; //    not registered yet
+const MOLLY = 'molly'; //  moderator at Acme — runs content, not people
+const ADA = 'ada'; //      admin at Acme — runs people
 
 let testEnv;
 
@@ -52,6 +54,12 @@ beforeEach(async () => {
     });
     await setDoc(doc(db, 'users', CAROL), {
       fullName: 'Carol', role: 'user', companyId: RIVAL,
+    });
+    await setDoc(doc(db, 'users', MOLLY), {
+      fullName: 'Molly', role: 'moderator', companyId: ACME,
+    });
+    await setDoc(doc(db, 'users', ADA), {
+      fullName: 'Ada', role: 'admin', companyId: ACME,
     });
 
     await setDoc(doc(db, 'surveys', 'acme-survey'), {
@@ -152,6 +160,55 @@ describe('roles cannot be self-awarded', () => {
   it('an ordinary user cannot change a colleague\'s role', async () => {
     await assertFails(
       updateDoc(doc(as(BOB), 'users', ALICE), { role: 'user' }),
+    );
+  });
+
+  // The self-award rule and the admin rule used to be a plain OR, so an admin
+  // editing their own document satisfied the admin branch — which never
+  // required the role to stay put.
+  it('an admin cannot promote themselves', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', DAVE), {
+        fullName: 'Dave', role: 'admin', companyId: ACME,
+      });
+    });
+
+    await assertFails(
+      updateDoc(doc(as(DAVE), 'users', DAVE), { role: 'superadmin' }),
+    );
+  });
+
+  // `isAdmin()` counts moderators, which made this the shortest path from the
+  // lowest elevated role to the highest.
+  it('a moderator cannot promote themselves', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', DAVE), {
+        fullName: 'Dave', role: 'moderator', companyId: ACME,
+      });
+    });
+
+    await assertFails(
+      updateDoc(doc(as(DAVE), 'users', DAVE), { role: 'superadmin' }),
+    );
+  });
+
+  it('an admin cannot award superadmin to a colleague either', async () => {
+    // Ownership is established at sign-up by createdCompany() and must not be
+    // handed out afterwards.
+    await assertFails(
+      updateDoc(doc(as(ALICE), 'users', BOB), { role: 'superadmin' }),
+    );
+  });
+
+  it('an admin can still edit their own harmless fields', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', DAVE), {
+        fullName: 'Dave', role: 'admin', companyId: ACME,
+      });
+    });
+
+    await assertSucceeds(
+      updateDoc(doc(as(DAVE), 'users', DAVE), { fullName: 'Davey' }),
     );
   });
 });
@@ -406,5 +463,317 @@ describe('notes are private', () => {
     await assertFails(
       setDoc(doc(as(ALICE), 'notes', BOB, 'userNotes', 'n3'), { title: 'x' }),
     );
+  });
+});
+
+// The split the user asked for: a moderator runs the content, an admin runs the
+// people. Enforced here rather than only in the UI, because the UI is a
+// suggestion and this is the rule.
+describe('moderators run content, not people', () => {
+  it('a moderator may write surveys and appointments', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(MOLLY), 'surveys', 'new-survey'), {
+        surveyName: 'By a moderator', companyId: ACME,
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(as(MOLLY), 'appointments', 'new-meeting'), {
+        title: 'By a moderator', companyId: ACME,
+      }),
+    );
+  });
+
+  it('a moderator may mark a written answer', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(MOLLY), 'surveys', 'acme-survey', 'participants', BOB), {
+        score: 80, totalCorrectAnswers: 4,
+      }),
+    );
+  });
+
+  it('a moderator may delete a survey or a meeting', async () => {
+    await assertSucceeds(deleteDoc(doc(as(MOLLY), 'surveys', 'acme-survey')));
+    await assertSucceeds(
+      deleteDoc(doc(as(MOLLY), 'appointments', 'acme-standup')),
+    );
+  });
+
+  it('a moderator may NOT change anyone\'s role', async () => {
+    await assertFails(updateDoc(doc(as(MOLLY), 'users', BOB), { role: 'admin' }));
+    await assertFails(
+      updateDoc(doc(as(MOLLY), 'users', BOB), { role: 'moderator' }),
+    );
+  });
+
+  it('a moderator may NOT ban or remove anyone', async () => {
+    await assertFails(updateDoc(doc(as(MOLLY), 'users', BOB), { banned: true }));
+    await assertFails(
+      updateDoc(doc(as(MOLLY), 'users', BOB), { companyId: '', role: 'user' }),
+    );
+  });
+
+  it('an admin may do all three', async () => {
+    await assertSucceeds(updateDoc(doc(as(ADA), 'users', BOB), { role: 'moderator' }));
+    await assertSucceeds(updateDoc(doc(as(ADA), 'users', BOB), { banned: true }));
+    await assertSucceeds(
+      updateDoc(doc(as(ADA), 'users', BOB), { companyId: '', role: 'user' }),
+    );
+  });
+
+  it('an admin may not move a colleague into another company', async () => {
+    // Removal clears the company. Anything else would be a transfer, and there
+    // is no such thing here.
+    await assertFails(
+      updateDoc(doc(as(ADA), 'users', BOB), { companyId: RIVAL, role: 'user' }),
+    );
+  });
+});
+
+describe('a ban is the company\'s, not the account\'s', () => {
+  // The ban lives at companies/{c}/bans/{uid}. That is what lets the account
+  // outlive it: the login, the notes and the ability to go elsewhere all stay.
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'companies', ACME, 'bans', BOB), {
+        name: 'Bob', bannedAt: new Date(),
+      });
+    });
+  });
+
+  it('a banned member loses the company\'s content', async () => {
+    await assertFails(getDoc(doc(as(BOB), 'surveys', 'acme-survey')));
+    await assertFails(getDoc(doc(as(BOB), 'appointments', 'acme-standup')));
+    await assertFails(getDoc(doc(as(BOB), 'users', ALICE)));
+  });
+
+  it('a banned member cannot answer a survey', async () => {
+    await assertFails(
+      setDoc(doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB), {
+        userId: BOB, name: 'Bob', score: 100,
+      }),
+    );
+  });
+
+  it('a banned member can read their own profile and their own ban', async () => {
+    // Both are needed for the app to say "you are banned from Acme" rather than
+    // failing silently and looking broken.
+    await assertSucceeds(getDoc(doc(as(BOB), 'users', BOB)));
+    await assertSucceeds(getDoc(doc(as(BOB), 'companies', ACME, 'bans', BOB)));
+  });
+
+  it('a banned member cannot lift their own ban', async () => {
+    await assertFails(deleteDoc(doc(as(BOB), 'companies', ACME, 'bans', BOB)));
+  });
+
+  it('a banned member can leave and join elsewhere', async () => {
+    // The whole point: the account survives the ban.
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'users', BOB), { companyId: '', role: 'user' }),
+    );
+  });
+
+  it('a banned member cannot rejoin the company that banned them', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', BOB), {
+        fullName: 'Bob', role: 'user', companyId: '', membership: 'active',
+      });
+    });
+
+    await assertFails(
+      updateDoc(doc(as(BOB), 'users', BOB), {
+        companyId: ACME, role: 'user', membership: 'active',
+      }),
+    );
+  });
+
+  it('an admin can lift it, a moderator cannot', async () => {
+    await assertFails(deleteDoc(doc(as(MOLLY), 'companies', ACME, 'bans', BOB)));
+    await assertSucceeds(deleteDoc(doc(as(ADA), 'companies', ACME, 'bans', BOB)));
+  });
+
+  it('an admin cannot ban themselves out of their own company', async () => {
+    await assertFails(
+      setDoc(doc(as(ADA), 'companies', ACME, 'bans', ADA), { name: 'Ada' }),
+    );
+  });
+});
+
+describe('joining a company', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      // Bob is between companies — the state a removed or banned member lands
+      // in, and the one a fresh account starts from.
+      await setDoc(doc(db, 'users', BOB), {
+        fullName: 'Bob', role: 'user', companyId: '', membership: 'active',
+      });
+      await setDoc(doc(db, 'companies', RIVAL), {
+        name: 'Rival', createdBy: CAROL, joinPolicy: 'approval',
+      });
+    });
+  });
+
+  it('an open company lets you straight in', async () => {
+    // Acme has no joinPolicy at all, which must read as open so companies made
+    // before the setting existed keep working.
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'users', BOB), {
+        companyId: ACME, role: 'user', membership: 'active',
+      }),
+    );
+  });
+
+  it('a company requiring approval holds you pending', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'users', BOB), {
+        companyId: RIVAL, role: 'user', membership: 'pending',
+      }),
+    );
+  });
+
+  it('you cannot approve yourself into one', async () => {
+    // Otherwise "approval required" is a suggestion the client can decline.
+    await assertFails(
+      updateDoc(doc(as(BOB), 'users', BOB), {
+        companyId: RIVAL, role: 'user', membership: 'active',
+      }),
+    );
+  });
+
+  it('you cannot arrive as an admin', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'users', BOB), {
+        companyId: ACME, role: 'admin', membership: 'active',
+      }),
+    );
+  });
+});
+
+describe('pending members are held out', () => {
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'users', BOB), {
+        fullName: 'Bob', role: 'user', companyId: ACME, membership: 'pending',
+      });
+    });
+  });
+
+  it('they cannot read the company\'s content', async () => {
+    await assertFails(getDoc(doc(as(BOB), 'surveys', 'acme-survey')));
+    await assertFails(getDoc(doc(as(BOB), 'appointments', 'acme-standup')));
+  });
+
+  it('they cannot approve themselves', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'users', BOB), { membership: 'active' }),
+    );
+  });
+
+  it('they can still edit their own name, and leave', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'users', BOB), { fullName: 'Robert' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(as(BOB), 'users', BOB), { companyId: '', role: 'user' }),
+    );
+  });
+
+  it('an admin can approve them, a moderator cannot', async () => {
+    await assertFails(
+      updateDoc(doc(as(MOLLY), 'users', BOB), { membership: 'active' }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(as(ADA), 'users', BOB), { membership: 'active' }),
+    );
+  });
+});
+
+describe('the join policy is admin-only', () => {
+  it('an admin may set it', async () => {
+    await assertSucceeds(
+      updateDoc(doc(as(ADA), 'companies', ACME), { joinPolicy: 'approval' }),
+    );
+  });
+
+  it('a moderator may not', async () => {
+    await assertFails(
+      updateDoc(doc(as(MOLLY), 'companies', ACME), { joinPolicy: 'open' }),
+    );
+  });
+
+  it('an ordinary member may not', async () => {
+    await assertFails(
+      updateDoc(doc(as(BOB), 'companies', ACME), { joinPolicy: 'open' }),
+    );
+  });
+});
+
+describe('closing a company', () => {
+  const past = new Date(Date.now() - 60_000);
+  const future = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  const schedule = async (at) => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'companies', ACME), {
+        name: 'Acme', createdBy: ALICE, deletionScheduledFor: at,
+      });
+    });
+  };
+
+  it('only the owner may schedule it', async () => {
+    // Ada is an admin and still may not: running a company and ending it are
+    // different powers.
+    await assertFails(
+      updateDoc(doc(as(ADA), 'companies', ACME), {
+        deletionScheduledFor: future,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(doc(as(ALICE), 'companies', ACME), {
+        deletionScheduledFor: future,
+      }),
+    );
+  });
+
+  it('the owner may call it off', async () => {
+    await schedule(future);
+    await assertSucceeds(
+      updateDoc(doc(as(ALICE), 'companies', ACME), {
+        deletionScheduledFor: deleteField(),
+      }),
+    );
+  });
+
+  it('the week cannot be skipped', async () => {
+    // The grace period is enforced here, not by a countdown in the app — a
+    // client-side wait lasts only until somebody sends the request themselves,
+    // and this one destroys everybody's work.
+    await schedule(future);
+    await assertFails(deleteDoc(doc(as(ALICE), 'companies', ACME)));
+  });
+
+  it('an unscheduled company cannot be deleted at all', async () => {
+    await assertFails(deleteDoc(doc(as(ALICE), 'companies', ACME)));
+  });
+
+  it('once the time has passed, the owner may delete it', async () => {
+    await schedule(past);
+    await assertSucceeds(deleteDoc(doc(as(ALICE), 'companies', ACME)));
+  });
+
+  it('an admin still may not, even once due', async () => {
+    await schedule(past);
+    await assertFails(deleteDoc(doc(as(ADA), 'companies', ACME)));
+  });
+
+  it('the name is released only by whoever reserved it', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'companyNames', 'acme'), {
+        companyId: ACME, createdBy: ALICE,
+      });
+    });
+
+    await assertFails(deleteDoc(doc(as(BOB), 'companyNames', 'acme')));
+    await assertSucceeds(deleteDoc(doc(as(ALICE), 'companyNames', 'acme')));
   });
 });

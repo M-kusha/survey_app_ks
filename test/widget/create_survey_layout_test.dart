@@ -1,26 +1,32 @@
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/localization/app_locales.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
+import 'package:echomeet/survey_pages/create_survey/question_editor.dart';
 import 'package:echomeet/survey_pages/create_survey/step3_create_survey.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../support/load_translations.dart';
 
 /// Layout guards for the survey builder.
 ///
-/// This screen has now been broken twice by changes to where the finish button
-/// lives, and both times the failure was invisible to `flutter analyze`:
+/// This screen has now been broken three times by where the finish button
+/// lives, and none of it was visible to `flutter analyze`:
 ///
-///   1. the button sat on the last page of the PageView, so it disappeared the
+///   1. the button sat on the last page of a PageView, so it disappeared the
 ///      moment you added a question and were carried onto that question's card
 ///   2. moving it into `bottomNavigationBar` handed a bare `Center` loose
 ///      constraints, and `Center` expands to fill them — the bar grew to the
 ///      full screen height and squeezed the page to nothing
+///   3. the same `Center` mistake again, in the shared action bar
 ///
-/// The assertions below are deliberately about *geometry* rather than about
-/// which widgets exist. Both bugs left a perfectly valid widget tree.
-
-Survey _survey() => Survey(
+/// The builder is a scrolling list now rather than a swipe deck, so these
+/// assert the properties that survived the redesign: the button exists before
+/// you have written anything, the bar is a bar, and adding a question adds an
+/// editor without navigating anywhere.
+Survey _survey({SurveyType type = SurveyType.survey}) => Survey(
   surveyName: 'Test',
   surveyDescription: 'Test survey',
   timeCreated: DateTime(2026, 1, 1),
@@ -28,120 +34,142 @@ Survey _survey() => Survey(
   id: 'survey-1',
   deadline: DateTime(2026, 12, 31),
   participants: const [],
+  surveyType: type,
   companyId: 'company-1',
 );
 
-Future<void> _pump(WidgetTester tester, Size size) async {
+Future<void> _pump(
+  WidgetTester tester,
+  Size size, {
+  SurveyType type = SurveyType.survey,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
   await tester.pumpWidget(
-    ChangeNotifierProvider<FontSizeProvider>(
-      create: (_) => FontSizeProvider(),
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: CreateTrainingSurveyStep3(survey: _survey()),
-      ),
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light,
+      supportedLocales: AppLocales.supported,
+      localizationsDelegates: const [
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+      ],
+      home: CreateTrainingSurveyStep3(survey: _survey(type: type)),
     ),
   );
   await tester.pumpAndSettle();
 }
 
+/// The three "add a question" buttons at the foot of the list.
+Finder get _addButtons => find.byType(OutlinedButton);
+
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+    await loadAppTranslations();
   });
 
-  group('survey builder layout', () {
-    testWidgets('the page keeps most of the screen, not the bottom bar', (
+  group('layout', () {
+    testWidgets('the action bar is a bar, not a full-height panel', (
       tester,
     ) async {
       const screen = Size(390, 844);
       await _pump(tester, screen);
 
-      final pageView = tester.getSize(find.byType(PageView));
-
-      // The exact split does not matter; what matters is that the pager is
-      // still the dominant element. When the bottom bar expanded it took the
-      // entire height and this was 0.
+      final bar = tester.getSize(find.byType(WizardActionBar));
       expect(
-        pageView.height,
-        greaterThan(screen.height * 0.5),
-        reason: 'the bottom bar has swallowed the page',
+        bar.height,
+        lessThan(screen.height / 4),
+        reason: 'the bar swallowed the page twice before',
       );
     });
 
-    testWidgets('the finish button is a bar, not a full-height panel', (
-      tester,
-    ) async {
-      const screen = Size(390, 844);
-      await _pump(tester, screen);
-
-      final button = tester.getSize(find.byType(ElevatedButton).first);
-      expect(
-        button.height,
-        lessThan(screen.height * 0.25),
-        reason: 'the finish button is filling the screen',
-      );
-    });
-
-    testWidgets('the finish button is reachable with no questions yet', (
+    testWidgets('the finish button is there before any questions exist', (
       tester,
     ) async {
       await _pump(tester, const Size(390, 844));
-      // Regression one: it used to live on the last page of the pager, so it
-      // was only reachable by swiping there.
-      expect(find.byType(ElevatedButton), findsWidgets);
+      expect(find.byType(FilledButton), findsWidgets);
     });
 
     testWidgets('nothing overflows on a short window', (tester) async {
-      // Landscape phone is the tightest realistic case, and the page starts
-      // with a fixed 200px spacer.
       await _pump(tester, const Size(844, 390));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('nothing overflows on a narrow one either', (tester) async {
+      // 320 is the narrowest phone still in use, and the three add-buttons sit
+      // in a row with translated labels.
+      await _pump(tester, const Size(320, 700));
       expect(tester.takeException(), isNull);
     });
   });
 
   group('adding questions', () {
-    int pageCount(WidgetTester tester) =>
-        (tester.widget<PageView>(find.byType(PageView)).childrenDelegate
-                as SliverChildListDelegate)
-            .children
-            .length;
-
-    testWidgets('a question can be added without swiping anywhere', (
+    testWidgets('a question can be added without navigating anywhere', (
       tester,
     ) async {
       await _pump(tester, const Size(390, 844));
+      expect(find.byType(QuestionEditor), findsNothing);
 
-      // One page to begin with: the "add a question" placeholder.
-      expect(pageCount(tester), 1);
-
-      // The toolbar action, not the one buried on the last page of the pager.
-      await tester.tap(find.byType(OutlinedButton).last);
+      await tester.tap(_addButtons.first);
       await tester.pumpAndSettle();
 
-      expect(
-        pageCount(tester),
-        2,
-        reason: 'tapping Add question did not add one',
-      );
+      expect(find.byType(QuestionEditor), findsOneWidget);
     });
 
-    testWidgets('more than one question can be added', (tester) async {
+    testWidgets('several are visible at once', (tester) async {
+      // The whole point of dropping the PageView: you can see the survey.
       await _pump(tester, const Size(390, 844));
 
-      // The complaint that prompted this test was being stuck at a single
-      // question, because adding another meant swiping forward to an
-      // unlabelled page nobody would think to look for.
       for (var i = 0; i < 3; i++) {
-        await tester.tap(find.byType(OutlinedButton).last);
+        // The add buttons sit below the questions, so they move down the page
+        // as it fills — which is the point of a list, and means the test has to
+        // scroll to them the way a person would.
+        await tester.ensureVisible(_addButtons.first);
+        await tester.pumpAndSettle();
+        await tester.tap(_addButtons.first);
         await tester.pumpAndSettle();
       }
 
-      expect(pageCount(tester), 4, reason: '3 questions + the add page');
+      expect(find.byType(QuestionEditor), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a choice question starts with two blank options', (
+      tester,
+    ) async {
+      // Starting with none made the card look finished when it was not, and
+      // the old editor happily saved a choice with nothing to choose between.
+      await _pump(tester, const Size(390, 844));
+
+      await tester.tap(_addButtons.first);
+      await tester.pumpAndSettle();
+
+      // One field for the question, two for the options.
+      expect(find.byType(TextFormField), findsNWidgets(3));
+    });
+
+    testWidgets('a text question has no options', (tester) async {
+      await _pump(tester, const Size(390, 844));
+
+      await tester.tap(_addButtons.last);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextFormField), findsOneWidget);
+    });
+
+    testWidgets('removing a question removes its editor', (tester) async {
+      await _pump(tester, const Size(390, 844));
+
+      await tester.tap(_addButtons.first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(QuestionEditor), findsNothing);
     });
   });
 }
