@@ -46,5 +46,28 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Rules test dependencies
+# Node dependencies and build output
 rules-tests/node_modules/
+functions/node_modules/
+functions/lib/
+functions/*.log
+
+# Golden test failures.
+#
+# Written by `flutter test` whenever a golden does not match: four PNGs per
+# failing case (master, test, masked diff, isolated diff). They are debugging
+# output for the run that produced them and are stale the moment it is fixed.
+# The baselines in test/golden/goldens/ are the opposite — they are the
+# reference the tests assert against, and belong in the repository.
+test/golden/failures/
+
+# Local Firebase emulator state
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Editor and OS noise
+Thumbs.db
+*.tmp
+*.bak
