@@ -76,7 +76,6 @@ class SurveyDataProvider extends ChangeNotifier {
   }
 }
 
-// Assuming UserRole is defined like this
 enum UserRole { admin, moderator, user }
 
 extension UserRoleExtension on UserRole {
@@ -85,13 +84,16 @@ extension UserRoleExtension on UserRole {
   }
 }
 
-// Your UserModel needs to properly handle the role
 class UserModel {
   final String id;
   final String name;
   final String profileImage;
   final String companyId;
-  String role; // Role is now a String
+  String role;
+
+  String membership;
+
+  bool banned;
 
   UserModel({
     required this.id,
@@ -99,7 +101,11 @@ class UserModel {
     required this.profileImage,
     required this.companyId,
     required this.role,
+    this.membership = 'active',
+    this.banned = false,
   });
+
+  bool get isPending => membership == 'pending';
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>? ?? {};
@@ -109,6 +115,7 @@ class UserModel {
       profileImage: data['profileImage'] ?? '',
       companyId: data['companyId'] ?? '',
       role: data['role'] ?? 'user',
+      membership: data['membership'] ?? 'active',
     );
   }
 }

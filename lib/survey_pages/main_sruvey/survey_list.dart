@@ -1,303 +1,323 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/theme/app_colors.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/deadline.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/admin/survey_analytics.dart';
 import 'package:echomeet/survey_pages/admin/survey_participants.dart';
 import 'package:echomeet/survey_pages/user_survey/step1_participate_survey.dart';
+import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:timeago/timeago.dart';
 
 class SurveyListItem extends StatelessWidget {
-  final Survey survey;
-  final bool isAdmin;
-  final bool hasParticipated;
-
   const SurveyListItem({
     super.key,
     required this.survey,
     required this.isAdmin,
     required this.hasParticipated,
+    this.onChanged,
+    this.now,
   });
 
-  Color? _textColor(BuildContext context) {
-    return Theme.of(context).brightness == Brightness.light
-        ? const Color(0xFF004B96)
-        : Colors.grey[900];
-  }
+  final Survey survey;
+  final bool isAdmin;
+  final bool hasParticipated;
+
+  final VoidCallback? onChanged;
+
+  final DateTime? now;
+
+  bool _canParticipate(Deadline deadline) =>
+      !deadline.isPassed && !hasParticipated;
 
   @override
   Widget build(BuildContext context) {
-    final userProvider = Provider.of<UserDataProvider>(context);
-    final userId = userProvider.currentUser?.id ?? "Unknown ID";
-    final userName = userProvider.currentUser?.name ?? "Guest";
-    final profileImage = userProvider.currentUser?.profileImage ?? '';
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final isExpired = survey.deadline.isBefore(DateTime.now()) ? true : false;
-    final timeFontSize = screenWidth < 600
-        ? fontSize.clamp(0.0, 15.0)
-        : fontSize.clamp(0.0, 30.0);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final app = context.appColors;
 
-    return Stack(
-      children: [
-        GestureDetector(
-          onTap: (!isExpired && !hasParticipated)
-              ? () => navigateToSurvey(context, userId, userName, profileImage)
-              : null,
-          child: Opacity(
-            opacity: (isExpired || hasParticipated) ? 0.7 : 1.0,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Card(
-                elevation: 3,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                  side: BorderSide(
-                    color: isExpired
-                        ? getButtonColor(context).withValues(alpha: 0.5)
-                        : getButtonColor(context),
-                    width: 2,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    children: [
-                      builTitle(context, timeFontSize),
-                      const SizedBox(height: 8.0),
-                      _buildInfoRow(context, timeFontSize, isExpired),
-                    ],
-                  ),
+    final deadline = deadlineFor(
+      survey.deadline,
+      now: now ?? DateTime.now(),
+      openedAt: survey.timeCreated,
+    );
+    final open = _canParticipate(deadline);
+
+    final isTest = survey.surveyType == SurveyType.test;
+
+    final (statusKey, tone, icon, accent) = switch (this) {
+      _ when deadline.isPassed => (
+        'expired',
+        StatusTone.neutral,
+        Icons.lock_outline_rounded,
+        scheme.outline,
+      ),
+      _ when hasParticipated => (
+        'already_participated',
+        StatusTone.positive,
+        Icons.check_rounded,
+        app.success,
+      ),
+
+      _ when deadline.urgency == DeadlineUrgency.imminent => (
+        deadline.labelKey,
+        StatusTone.caution,
+        Icons.bolt_rounded,
+        app.warning,
+      ),
+      _ => (
+        'open_status',
+        StatusTone.info,
+        Icons.edit_outlined,
+        scheme.primary,
+      ),
+    };
+
+    return ContentCard(
+      onTap: open ? () => _openSurvey(context) : null,
+      muted: !open,
+      accent: accent,
+      progress: deadline.progress,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TypeGlyph(isTest: isTest, tint: accent),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (isTest ? 'label_test' : 'label_survey').tr(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      survey.surveyName,
+                      style: theme.textTheme.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
               ),
-            ),
+              if (isAdmin) ...[
+                const SizedBox(width: Spacing.sm),
+                _AdminButton(survey: survey, onChanged: onChanged),
+              ],
+            ],
           ),
-        ),
-        if (isAdmin) adminButton(context, getButtonColor(context)),
-      ],
-    );
-  }
+          const SizedBox(height: Spacing.md),
 
-  Text builTitle(BuildContext context, double timeFontSize) {
-    return Text(
-      survey.surveyName,
-      style: TextStyle(
-        color: Theme.of(context).brightness == Brightness.light
-            ? _textColor(context)
-            : Colors.white,
-        fontWeight: FontWeight.bold,
-        fontSize: timeFontSize,
-      ),
-    );
-  }
+          Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              StatusPill(
+                label: statusKey.tr(namedArgs: {'count': '${deadline.days}'}),
+                tone: tone,
+                icon: icon,
+              ),
+              MetaChip(
+                icon: Icons.help_outline_rounded,
+                label: 'question_count'.tr(
+                  namedArgs: {'count': '${survey.questions.length}'},
+                ),
+              ),
+              MetaChip(
+                icon: Icons.event_outlined,
 
-  Positioned adminButton(BuildContext context, Color buttonColor) {
-    return Positioned(
-      top: -5,
-      right: -8,
-      child: IconButton(
-        icon: Icon(Icons.admin_panel_settings, color: buttonColor),
-        onPressed: () async {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (BuildContext context) {
-              return const CustomLoadingWidget(loadingText: 'loading');
-            },
-          );
-
-          final provider = Provider.of<SurveyDataProvider>(
-            context,
-            listen: false,
-          );
-          await provider.loadParticipants(survey.id);
-
-          if (!context.mounted) return;
-          Navigator.pop(context);
-          navigateToAdminOverview(context);
-        },
-      ),
-    );
-  }
-
-  RichText _buildRichText(
-    BuildContext context,
-    double timeFontSize,
-    bool isExpired,
-    Color buttonColor,
-  ) {
-    String statusText;
-    Color statusColor;
-
-    if (isExpired) {
-      statusText = 'expired'.tr();
-      statusColor = Colors.red;
-    } else if (hasParticipated) {
-      statusText = 'already_participated'.tr();
-      statusColor = buttonColor;
-    } else {
-      statusText = 'open'.tr();
-      statusColor = buttonColor;
-    }
-
-    return RichText(
-      text: TextSpan(
-        children: [
-          TextSpan(
-            text: survey.surveyType == SurveyType.survey
-                ? '${'survey_status'.tr()}: '
-                : survey.surveyType == SurveyType.test
-                ? '${'test_status'.tr()}: '
-                : 'Survey: ',
-            style: TextStyle(
-              color: Theme.of(context).brightness == Brightness.light
-                  ? _textColor(context)
-                  : Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: timeFontSize,
-            ),
-          ),
-          TextSpan(
-            text: statusText,
-            style: TextStyle(
-              color: statusColor,
-              fontWeight: FontWeight.bold,
-              fontSize: timeFontSize,
-            ),
+                label: (deadline.isPassed ? 'closed_on' : 'closes_on').tr(
+                  namedArgs: {
+                    'date': DateFormat.MMMEd().format(survey.deadline),
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Row _buildInfoRow(BuildContext context, double timeFontSize, bool isExpired) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildColumnLeft(
-          context,
-          timeFontSize,
-          isExpired,
-          getButtonColor(context),
-        ),
-        _buildColumnRight(context, timeFontSize),
-      ],
-    );
-  }
-
-  Column _buildColumnLeft(
-    BuildContext context,
-    double timeFontSize,
-    bool isExpired,
-    Color buttonColor,
-  ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        _buildRichText(
-          context,
-          timeFontSize,
-          isExpired,
-          getButtonColor(context),
-        ),
-        SizedBox(height: timeFontSize),
-        Text(
-          '${'expires'.tr()} ${DateFormat('EEEE dd MMMM').format(survey.deadline)}',
-          style: TextStyle(fontSize: timeFontSize, fontWeight: FontWeight.bold),
-        ),
-      ],
-    );
-  }
-
-  Column _buildColumnRight(BuildContext context, double timeFontSize) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          'ID: ${survey.id}',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.light
-                ? _textColor(context)
-                : Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: timeFontSize,
-          ),
-        ),
-        SizedBox(height: timeFontSize),
-        Text(
-          format(survey.timeCreated),
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.light
-                ? _textColor(context)
-                : Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: timeFontSize,
-          ),
-        ),
-      ],
-    );
-  }
-
-  void navigateToAdminOverview(BuildContext context) {
-    final participantsData = Provider.of<SurveyDataProvider>(
+  void _openSurvey(BuildContext context) {
+    final user = Provider.of<UserDataProvider>(
       context,
       listen: false,
-    ).participants;
+    ).currentUser;
 
-    if (participantsData != null) {
-      if (survey.surveyType == SurveyType.survey) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SurveyAnalyticsPage(
-              survey: survey,
-              participants: participantsData,
-            ),
-          ),
-        );
-      } else {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => SurveyParticipantsPage(
-              survey: survey,
-              participants: participantsData,
-              surveyId: survey.id,
-            ),
-          ),
-        );
-      }
-    }
-  }
-
-  void navigateToSurvey(
-    BuildContext context,
-    String userId,
-    String userName,
-    String profileImage,
-  ) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) {
-          return Step1ParticipateSurvey(
-            survey: survey,
-            participant: Participant(
-              name: userName,
-              userId: userId,
-              surveyAnswers: {},
-              score: 0,
-              textAnswersReviewed: {},
+        builder: (context) => Step1ParticipateSurvey(
+          survey: survey,
+          participant: Participant(
+            name: user?.name ?? 'Guest',
+            userId: user?.id ?? '',
+            surveyAnswers: {},
+            score: 0,
+            textAnswersReviewed: {},
+          ),
+          imageProfile: user?.profileImage ?? '',
+        ),
+      ),
+    );
+  }
+}
+
+class _AdminButton extends StatelessWidget {
+  const _AdminButton({required this.survey, required this.onChanged});
+
+  final Survey survey;
+
+  final VoidCallback? onChanged;
+
+  Future<void> _open(BuildContext context) async {
+    final provider = Provider.of<SurveyDataProvider>(context, listen: false);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const CustomLoadingWidget(loadingText: 'loading'),
+    );
+
+    await provider.loadParticipants(survey.id);
+    if (!context.mounted) return;
+
+    Navigator.pop(context);
+
+    final participants = provider.participants;
+    if (participants == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => survey.surveyType == SurveyType.survey
+            ? SurveyAnalyticsPage(survey: survey, participants: participants)
+            : SurveyParticipantsPage(
+                survey: survey,
+                participants: participants,
+                surveyId: survey.id,
+              ),
+      ),
+    );
+  }
+
+  Future<void> _delete(BuildContext context) async {
+    final provider = Provider.of<SurveyDataProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    await provider.loadParticipants(survey.id);
+    if (!context.mounted) return;
+    final responses = provider.participants?.length ?? 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('delete_survey'.tr()),
+        content: Text(
+          'delete_survey_confirm'.tr(
+            namedArgs: {'name': survey.surveyName, 'count': '$responses'},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('cancel'.tr()),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+              foregroundColor: Theme.of(context).colorScheme.onError,
             ),
-            imageProfile: profileImage,
-          );
-        },
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('delete'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await FirebaseSurveyService().deleteSurvey(survey.id);
+      messenger.showSnackBar(SnackBar(content: Text('survey_deleted'.tr())));
+      onChanged?.call();
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<void Function()>(
+      tooltip: 'manage'.tr(),
+      onSelected: (action) => action(),
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: () => _open(context),
+          child: Row(
+            children: [
+              const Icon(Icons.insights_rounded, size: 18),
+              const SizedBox(width: Spacing.md),
+              Text('view_results'.tr()),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: () => _delete(context),
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18, color: scheme.error),
+              const SizedBox(width: Spacing.md),
+              Text('delete_survey'.tr(), style: TextStyle(color: scheme.error)),
+            ],
+          ),
+        ),
+      ],
+      child: CircleAction(
+        icon: Icons.more_horiz_rounded,
+        tooltip: 'manage'.tr(),
+        onTap: null,
+      ),
+    );
+  }
+}
+
+class _TypeGlyph extends StatelessWidget {
+  const _TypeGlyph({required this.isTest, required this.tint});
+
+  final bool isTest;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 40,
+      width: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.md),
+        color: tint.withValues(alpha: 0.12),
+        border: Border.all(color: tint.withValues(alpha: 0.28)),
+      ),
+      child: Icon(
+        isTest ? Icons.workspace_premium_outlined : Icons.poll_outlined,
+        size: 20,
+        color: tint,
       ),
     );
   }

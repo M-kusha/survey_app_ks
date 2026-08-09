@@ -1,12 +1,11 @@
-import 'package:echomeet/utilities/text_style.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:flutter/material.dart';
 
 Widget buildCreateQuestionarySurveyButton(BuildContext context) {
-  return FloatingActionButton(
-    backgroundColor: getButtonColor(context),
+  return CreateFab(
+    label: 'create_survey'.tr(),
     onPressed: () =>
         Navigator.of(context).pushNamed('/create_training_survey_1'),
-    tooltip: 'Add Survey',
-    child: Icon(Icons.add, color: getTextColor(context)),
   );
 }

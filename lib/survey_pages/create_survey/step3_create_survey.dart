@@ -1,17 +1,18 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
+import 'package:echomeet/survey_pages/create_survey/question_editor.dart';
 import 'package:echomeet/survey_pages/create_survey/step4_create_survey.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class CreateTrainingSurveyStep3 extends StatefulWidget {
   const CreateTrainingSurveyStep3({super.key, required this.survey});
+
   final Survey survey;
 
   @override
@@ -20,569 +21,71 @@ class CreateTrainingSurveyStep3 extends StatefulWidget {
 }
 
 class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
-  final List<Map<String, dynamic>> questions = [];
-  late PageController _pageController;
-  final ValueNotifier<int> _currentPage = ValueNotifier<int>(0);
-  bool _isCreatingSurvey = false;
+  final _questions = <Map<String, dynamic>>[];
 
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController();
-    _pageController.addListener(() {
-      _currentPage.value = _pageController.page!.round();
-    });
-  }
+  bool _saving = false;
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _currentPage.dispose();
-    super.dispose();
-  }
+  Map<int, String> _problems = {};
 
-  void addQuestion(String type) {
-    List<String> initialOptions = [];
-    Map<String, dynamic> newQuestion = {'type': type, 'question': ''};
+  bool get _isTest => widget.survey.surveyType == SurveyType.test;
 
-    if (type == 'Single' || type == 'Multiple') {
-      initialOptions = ['', '', '', ''];
-      newQuestion.addAll({'options': initialOptions});
-    } else if (type == 'Text') {
-      newQuestion.addAll({'options': initialOptions});
-    }
-
+  void _add(String type) {
     setState(() {
-      questions.add(newQuestion);
-    });
+      _questions.add({
+        'type': type,
+        'question': '',
 
-    _pageController.jumpToPage(questions.length - 1);
+        if (type != 'Text') 'options': ['', ''],
+        if (type == 'Multiple') 'correctAnswers': <int>[],
+      });
+    });
   }
 
-  /// Asks which kind of question to add, then adds it.
-  ///
-  /// Plain surveys only have one kind, so they skip the sheet entirely.
-  ///
-  /// Pulled out of the add-question page so the toolbar can call it too. Adding
-  /// a question used to be reachable *only* by swiping forward to an unlabelled
-  /// last page, which is not something anyone discovers — it looked as though
-  /// the survey was limited to a single question.
-  void promptAddQuestion() {
-    if (widget.survey.surveyType == SurveyType.survey) {
-      addQuestion('Single');
+  void _remove(int index) {
+    setState(() {
+      _questions.removeAt(index);
+
+      _problems = {};
+    });
+  }
+
+  Future<void> _finish() async {
+    final problems = validateQuestions(_questions, isTest: _isTest);
+
+    if (_questions.length < kMinimumQuestions) {
+      UIUtils.showSnackBar(
+        context,
+        'survey_needs_questions'.tr(namedArgs: {'count': '$kMinimumQuestions'}),
+      );
       return;
     }
 
-    showModalBottomSheet(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final entry in const {
-              'single_choice_question': 'Single',
-              'multiple_choice_question': 'Multiple',
-              'text_question': 'Text',
-            }.entries)
-              ListTile(
-                title: Text(entry.key.tr()),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  addQuestion(entry.value);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuestionCard(Map<String, dynamic> questionData) {
-    String type = questionData['type'];
-    String question = questionData['question'];
-
-    void addOption() {
+    if (problems.isNotEmpty) {
       setState(() {
-        questionData['options'].add('');
-      });
-    }
-
-    void removeOption(int index) {
-      setState(() {
-        questionData['options'].removeAt(index);
-      });
-    }
-
-    Widget buildOptions(int index) {
-      return Column(
-        children: [
-          Card(
-            margin: const EdgeInsets.all(3.0),
-            shadowColor: getButtonColor(context),
-            elevation: 5,
-            child: SizedBox(
-              height: 60,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  widget.survey.surveyType == SurveyType.survey
-                      ? const SizedBox(width: 20)
-                      : buildCheckbox(type, index, questionData),
-                  buildAnswerField(questionData, index),
-                  buildRemoveOptionButton(removeOption, index),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16.0),
-        ],
-      );
-    }
-
-    Widget answerWidget;
-
-    switch (type) {
-      case 'Single':
-        answerWidget = buildSingleOrMultipleChoice(
-          questionData,
-          buildOptions,
-          addOption,
-        );
-        break;
-      case 'Multiple':
-        answerWidget = buildSingleOrMultipleChoice(
-          questionData,
-          buildOptions,
-          addOption,
-        );
-        break;
-      case 'Text':
-        answerWidget = buildTextAnswer(questionData);
-
-        break;
-      default:
-        throw Exception('Invalid question type');
-    }
-
-    return buildCard(questionData, question, answerWidget, type);
-  }
-
-  Widget buildSingleOrMultipleChoice(
-    Map<String, dynamic> questionData,
-    Widget Function(int index) buildOptions,
-    Function addOption,
-  ) {
-    return Column(
-      children: [
-        for (int i = 0; i < questionData['options'].length; i++)
-          buildOptions(i),
-        buildAddOptionButton(addOption),
-      ],
-    );
-  }
-
-  Widget buildQuestionTitle(String type) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    String questionTypeDescription;
-    switch (type) {
-      case 'Single':
-        questionTypeDescription = tr('single_choice');
-        break;
-      case 'Multiple':
-        questionTypeDescription = tr('multiple_choice');
-        break;
-      case 'Text':
-        questionTypeDescription = tr('text_answer');
-        break;
-      default:
-        questionTypeDescription = '';
-    }
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Center(
-        child: Text(
-          questionTypeDescription,
-          style: TextStyle(
-            fontSize: timeFontSize,
-            fontWeight: FontWeight.bold,
-            color: getListTileColor(context),
-          ),
-          textAlign: TextAlign.center,
-        ),
-      ),
-    );
-  }
-
-  Widget buildQuestionField(
-    String question,
-    Map<String, dynamic> questionData,
-  ) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
-    return TextFormField(
-      initialValue: question,
-      onChanged: (value) {
-        setState(() {
-          questionData['question'] = value;
-        });
-      },
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'please_enter_question'.tr();
-        }
-        return null;
-      },
-      style: TextStyle(
-        fontSize: timeFontSize * 1.0,
-        color: getListTileColor(context),
-      ),
-      textAlign: TextAlign.center,
-      keyboardType: TextInputType.multiline,
-      maxLines: null,
-      maxLength: 256,
-      decoration: InputDecoration(
-        labelStyle: TextStyle(color: Colors.grey, fontSize: timeFontSize),
-        focusedBorder: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        border: InputBorder.none,
-        hintText: 'enter_question'.tr(),
-        hintStyle: TextStyle(color: Colors.grey[500]),
-        contentPadding: const EdgeInsets.symmetric(vertical: 10),
-        counterStyle: TextStyle(
-          color: Colors.grey[600],
-          fontSize: timeFontSize * 0.8,
-        ),
-      ),
-    );
-  }
-
-  Widget buildAnswerSection(Widget answerWidget, String type) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        answerWidget,
-        if (type == 'Single' || type == 'Multiple')
-          Center(
-            child: Text(
-              'create_survey_tips'.tr(),
-              style: TextStyle(
-                color: Colors.grey[400],
-                fontStyle: FontStyle.italic,
-                fontSize: timeFontSize - 4,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  Widget buildCheckbox(
-    String type,
-    int index,
-    Map<String, dynamic> questionData,
-  ) {
-    if (type == 'Single') {
-      int? correctAnswerIndex = questionData['correctAnswer'];
-      return Checkbox(
-        value: correctAnswerIndex == index,
-        onChanged: (value) {
-          setState(() {
-            if (value!) {
-              correctAnswerIndex = index;
-            } else {
-              correctAnswerIndex = null;
-            }
-            questionData['correctAnswer'] = correctAnswerIndex;
-          });
-        },
-        activeColor: getButtonColor(context),
-      );
-    } else {
-      List<int> correctAnswerIndices = questionData['correctAnswers'] ?? [];
-      return Checkbox(
-        value: correctAnswerIndices.contains(index),
-        onChanged: (value) {
-          setState(() {
-            if (value!) {
-              correctAnswerIndices.add(index);
-            } else {
-              correctAnswerIndices.remove(index);
-            }
-            questionData['correctAnswers'] = correctAnswerIndices;
-          });
-        },
-        checkColor: getTextColor(context),
-        fillColor: WidgetStateProperty.resolveWith<Color>((
-          Set<WidgetState> states,
-        ) {
-          if (states.contains(WidgetState.selected)) {
-            return getButtonColor(context);
-          }
-          return getTextColor(context);
-        }),
-      );
-    }
-  }
-
-  Widget buildAnswerField(Map<String, dynamic> questionData, int index) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
-    return Expanded(
-      child: TextFormField(
-        initialValue: questionData['options'][index],
-        onChanged: (value) {
-          setState(() {
-            questionData['options'][index] = value;
-          });
-        },
-        validator: (value) {
-          if (value == null || value.isEmpty) {
-            return 'please_enter_option'.tr();
-          }
-          return null;
-        },
-        style: TextStyle(
-          fontSize: timeFontSize,
-          color: getListTileColor(context),
-        ),
-        decoration: InputDecoration(
-          labelStyle: TextStyle(
-            color: Colors.grey[400],
-            fontSize: timeFontSize,
-          ),
-          focusedBorder: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          border: InputBorder.none,
-          hintText: '${'answer'.tr()} ${index + 1}',
-          hintStyle: TextStyle(color: Colors.grey[500]),
-        ),
-      ),
-    );
-  }
-
-  Widget buildRemoveOptionButton(
-    void Function(int index) removeOption,
-    int index,
-  ) {
-    return IconButton(
-      icon: const Icon(Icons.close, color: Colors.red),
-      onPressed: () => removeOption(index),
-    );
-  }
-
-  Widget buildTextAnswer(Map<String, dynamic> questionData) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return TextFormField(
-      initialValue: questionData['correctAnswer'],
-      decoration: InputDecoration(
-        labelStyle: TextStyle(
-          color: getButtonColor(context), //getColor(context, 'buttonColor'
-          fontWeight: FontWeight.bold,
-          fontSize: timeFontSize,
-        ),
-        hintText: 'enter_answer'.tr(),
-        hintStyle: TextStyle(
-          color: Colors.grey[400],
-          fontStyle: FontStyle.italic,
-          fontSize: timeFontSize,
-        ),
-      ),
-      onChanged: (value) {
-        setState(() {
-          questionData['correctAnswer'] = value;
-        });
-      },
-    );
-  }
-
-  Widget buildAddOptionButton(Function addOption) {
-    return IconButton(
-      icon: Icon(Icons.add_circle_outline, color: getButtonColor(context)),
-      onPressed: () => addOption(),
-    );
-  }
-
-  Widget buildCard(
-    Map<String, dynamic> questionData,
-    String question,
-    Widget answerWidget,
-    String type,
-  ) {
-    return Card(
-      margin: const EdgeInsets.all(3.0),
-      elevation: 4.0,
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              buildQuestionTitle(type),
-              const SizedBox(height: 16.0),
-              Card(
-                elevation: 5,
-                shadowColor: getButtonColor(context),
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 40, right: 40),
-                  child: buildQuestionField(question, questionData),
-                ),
-              ),
-              if (type != 'Text')
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 36.0),
-                    buildAnswerSection(answerWidget, type),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddQuestionPage() {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // No fixed spacer here. There used to be a hardcoded 200px one, which
-        // overflowed on a short window — a phone in landscape has less height
-        // than that leaves room for once the finish bar is accounted for. The
-        // Expanded below centres the content on its own.
-        Expanded(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.add_circle_outline,
-                  size: 38,
-                  color: getButtonColor(context),
-                ),
-                onPressed: promptAddQuestion,
-              ),
-              const SizedBox(height: 16.0),
-              Text(
-                'add_question'.tr(),
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                  fontSize: timeFontSize,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFinishButton() {
-    final fontSize = Provider.of<FontSizeProvider>(
-      context,
-      listen: false,
-    ).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
-    void attemptSurveySubmission() {
-      bool isAnyFieldEmpty = questions.any((question) {
-        if (question['type'] != 'Text') {
-          final options = List<String>.from(question['options']);
-          // Check if any option is empty
-          return options.any((option) => option.trim().isEmpty);
-        }
-
-        return question['question'].trim().isEmpty;
+        _problems = {
+          for (final problem in problems) problem.index: problem.messageKey,
+        };
       });
 
-      if (isAnyFieldEmpty || questions.isEmpty) {
-        UIUtils.showSnackBar(context, 'empty_fields_warning'.tr());
-        return;
-      }
-
-      _handleSurveySubmission();
-    }
-
-    // heightFactor: 1 makes this hug its children's height. A plain Center is an
-    // Align with null factors, which expands to fill whatever bounded
-    // constraints it is given — in a bottomNavigationBar that is the full
-    // screen height, so the bar swallowed the page and only the button showed.
-    return Align(
-      alignment: Alignment.center,
-      heightFactor: 1,
-      child: Row(
-        children: [
-          // Adding a question is a toolbar action now rather than something you
-          // have to know to swipe for. "Continue" also used to sit here alone,
-          // which read as "next question" when it actually submitted.
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: promptAddQuestion,
-              icon: const Icon(Icons.add),
-              style: OutlinedButton.styleFrom(
-                minimumSize: Size(0, timeFontSize * 3.2),
-                side: BorderSide(color: getButtonColor(context)),
-              ),
-              label: Text(
-                'add_new_question'.tr(),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: timeFontSize,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                minimumSize: Size(0, timeFontSize * 3.2),
-                backgroundColor: getButtonColor(context),
-                foregroundColor: getTextColor(context),
-              ),
-              onPressed: () => attemptSurveySubmission(),
-              child: Text(
-                'finish'.tr(),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: timeFontSize,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleSurveySubmission() async {
-    if (!validateSurveySubmission()) {
+      UIUtils.showSnackBar(
+        context,
+        'questions_need_attention'.tr(
+          namedArgs: {'count': '${problems.length}'},
+        ),
+      );
       return;
     }
+
     setState(() {
-      _isCreatingSurvey = true;
+      _problems = {};
+      _saving = true;
     });
 
-    Survey newSurvey = Survey(
+    final survey = Survey(
       surveyName: widget.survey.surveyName,
       surveyDescription: widget.survey.surveyDescription,
       timeCreated: DateTime.now(),
-      questions: questions,
+      questions: _questions,
       id: '',
       participants: [],
       deadline: widget.survey.deadline,
@@ -593,144 +96,175 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
 
     try {
       final companyId = await FirebaseServices().currentCompanyId();
-      // Defaulting to an empty companyId used to create a survey that no
-      // company query could ever match — invisible to everyone, including its
-      // author. Better to fail here than to write an orphan.
+
       if (companyId == null) {
-        throw StateError(
-          'Cannot create a survey: the signed-in user has no companyId.',
-        );
+        throw StateError('The signed-in user has no companyId.');
       }
-      newSurvey.companyId = companyId;
+      survey.companyId = companyId;
+
+      survey.id = await FirebaseSurveyService().createSurvey(survey);
       if (!mounted) return;
-      String surveyId = await FirebaseSurveyService().createSurvey(newSurvey);
-      newSurvey.id = surveyId;
-      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => Step4CreateSurvey(survey: newSurvey),
+          builder: (context) => Step4CreateSurvey(survey: survey),
         ),
       );
     } on StateError {
-      // The signed-in user has no company. Distinct message because it is a
-      // broken profile rather than anything wrong with the survey.
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'no_company_error'.tr());
     } catch (_) {
-      // Raw exception text used to be concatenated onto the message and shown
-      // to the user, which is neither readable nor translated.
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     } finally {
-      if (mounted) {
-        setState(() {
-          _isCreatingSurvey = false;
-        });
-      }
+      if (mounted) setState(() => _saving = false);
     }
-  }
-
-  bool validateSurveySubmission() {
-    for (var question in questions) {
-      if (question['question'].trim().isEmpty) {
-        UIUtils.showSnackBar(context, 'question_empty_warning'.tr());
-        return false;
-      }
-
-      if (widget.survey.surveyType == SurveyType.test) {
-        if (question['type'] == 'Single') {
-          int? correctAnswerIndex = question['correctAnswer'];
-          if (correctAnswerIndex == null) {
-            UIUtils.showSnackBar(
-              context,
-              'single_choice_validation_warning'.tr(),
-            );
-            return false;
-          }
-        }
-
-        if (question['type'] == 'Multiple') {
-          List<int> correctAnswerIndices = question['correctAnswers'] ?? [];
-          if (correctAnswerIndices.length < 2) {
-            UIUtils.showSnackBar(
-              context,
-              'multiple_choice_validation_warning'.tr(),
-            );
-            return false;
-          }
-        }
-      }
-    }
-    return true;
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('create_survey'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: _isCreatingSurvey
-          ? const Center(
-              child: CustomLoadingWidget(loadingText: 'saving_regisration'),
+    return WizardScaffold(
+      step: 3,
+      totalSteps: 3,
+      appBarTitle: 'create_survey'.tr(),
+      title: 'create_survey_step3_title'.tr(),
+      subtitle: _isTest
+          ? 'create_survey_step3_subhead_test'.tr()
+          : 'create_survey_step3_subhead'.tr(),
+      primaryLabel: 'finish'.tr(),
+      busy: _saving,
+      onPrimary: _finish,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (!_isTest) ...[
+            _SwitchToTest(
+              onSwitch: () => setState(() {
+                widget.survey.surveyType = SurveyType.test;
+              }),
+            ),
+            const SizedBox(height: Spacing.md),
+          ],
+          if (_questions.isEmpty)
+            EmptyState(
+              icon: Icons.help_outline_rounded,
+              title: 'no_questions_yet'.tr(),
+              body: 'no_questions_body'.tr(),
             )
-          : GestureDetector(
-              onTap: () => FocusScope.of(context).unfocus(),
-              child: Stack(
+          else
+            for (var i = 0; i < _questions.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.md),
+                child: QuestionEditor(
+                  key: ValueKey(_questions[i]),
+                  index: i,
+                  question: _questions[i],
+                  isTest: _isTest,
+                  problem: _problems[i],
+                  onChanged: () => setState(() {}),
+                  onRemove: () => _remove(i),
+                ),
+              ),
+          const SizedBox(height: Spacing.sm),
+
+          if (_questions.isNotEmpty && _questions.length < kMinimumQuestions)
+            Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.sm),
+              child: Row(
                 children: [
-                  PageView(
-                    controller: _pageController,
-                    children: [
-                      ...List.generate(questions.length, (index) {
-                        return _buildQuestionCard(questions[index]);
-                      }),
-                      _buildAddQuestionPage(),
-                    ],
+                  Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 32.0,
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
-                      child: ValueListenableBuilder<int>(
-                        valueListenable: _currentPage,
-                        builder: (context, value, child) {
-                          return Text(
-                            '${'survey_question'.tr()} ${value + 1}/${questions.length}',
-                            style: TextStyle(
-                              fontSize: timeFontSize,
-                              fontWeight: FontWeight.bold,
-                              color: getButtonColor(context),
-                            ),
-                          );
-                        },
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text(
+                      'survey_needs_questions'.tr(
+                        namedArgs: {'count': '$kMinimumQuestions'},
+                      ),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-      // The finish button lives outside the PageView on purpose.
-      //
-      // It used to sit at the bottom of the "add a question" page, which meant
-      // it vanished the moment you added a question and were carried onto that
-      // question's card — there was no way to finish without swiping back to
-      // the last page. It was also drawn over by the "Question x/y" indicator,
-      // which is positioned 32px from the bottom of the stack above it.
-      bottomNavigationBar: _isCreatingSurvey
-          ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: _buildFinishButton(),
+          _AddQuestion(onAdd: _add),
+        ],
+      ),
+    );
+  }
+}
+
+class _SwitchToTest extends StatelessWidget {
+  const _SwitchToTest({required this.onSwitch});
+
+  final VoidCallback onSwitch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(Spacing.md),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline_rounded,
+            size: 18,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: Spacing.md),
+          Expanded(
+            child: Text(
+              'not_a_test_hint'.tr(),
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          const SizedBox(width: Spacing.sm),
+          TextButton(onPressed: onSwitch, child: Text('make_it_a_test'.tr())),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddQuestion extends StatelessWidget {
+  const _AddQuestion({required this.onAdd});
+
+  final ValueChanged<String> onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final (type, icon, labelKey) in const [
+          ('Single', Icons.radio_button_checked_rounded, 'single_choice'),
+          ('Multiple', Icons.checklist_rounded, 'multiple_choice'),
+          ('Text', Icons.notes_rounded, 'text_answer'),
+        ]) ...[
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => onAdd(type),
+              icon: Icon(icon, size: 16),
+              label: Text(
+                labelKey.tr(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+          ),
+          if (type != 'Text') const SizedBox(width: Spacing.sm),
+        ],
+      ],
     );
   }
 }

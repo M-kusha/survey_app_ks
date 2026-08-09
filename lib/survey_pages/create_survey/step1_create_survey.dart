@@ -1,11 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/widgets/app_text_field.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:echomeet/survey_pages/create_survey/step2_create_survey.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 class Step1CreateSurvey extends StatefulWidget {
@@ -16,112 +15,92 @@ class Step1CreateSurvey extends StatefulWidget {
 }
 
 class Step1CreateSurveyState extends State<Step1CreateSurvey> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-  final TextEditingController _surveyNameController = TextEditingController();
-  final TextEditingController _surveyDescriptionController =
-      TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _description = TextEditingController();
 
-  void _onNextPressed() {
-    if (_formKey.currentState!.validate()) {
-      final survey = Survey(
-        surveyName: _surveyNameController.text,
-        surveyDescription: _surveyDescriptionController.text,
-        timeCreated: DateTime.now(),
-        questions: [],
-        id: const Uuid().v4(),
-        deadline: DateTime.now(),
-        participants: [],
-        companyId: '',
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => Step2CreateSurvey(
-            survey: survey,
-            onSurveyCreated: (survey) {
-              Navigator.pop(context, survey);
-            },
+  @override
+  void dispose() {
+    _name.dispose();
+    _description.dispose();
+    super.dispose();
+  }
+
+  void _next() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Step2CreateSurvey(
+          survey: Survey(
+            surveyName: _name.text.trim(),
+            surveyDescription: _description.text.trim(),
+            timeCreated: DateTime.now(),
+            questions: [],
+            id: const Uuid().v4(),
+
+            deadline: DateTime.now().add(const Duration(days: 7)),
+            participants: [],
+            companyId: '',
           ),
+          onSurveyCreated: (survey) => Navigator.pop(context, survey),
         ),
-      );
-    }
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
+    final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'create_survey'.tr(),
-          style: TextStyle(fontSize: fontSize * 1.5),
-        ),
-        backgroundColor: getAppbarColor(context),
-        centerTitle: true,
-      ),
-      body: Center(
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            return SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(fontSize * 1.5),
-                child: Card(
-                  elevation: 5,
-                  shadowColor: getButtonColor(context),
-                  child: Form(
-                    key: _formKey,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextFormField(
-                            controller: _surveyNameController,
-                            decoration: InputDecoration(
-                              hintText: 'survey_title'.tr(),
-                              hintStyle: TextStyle(fontSize: fontSize),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'survey_name_error'.tr();
-                              }
-                              return null;
-                            },
-                          ),
-                          const SizedBox(height: 20.0),
-                          TextFormField(
-                            controller: _surveyDescriptionController,
-                            maxLength: 1000,
-                            maxLines: null,
-                            keyboardType: TextInputType.multiline,
-                            textInputAction: TextInputAction.newline,
-                            decoration: InputDecoration(
-                              hintText: 'survey_description'.tr(),
-                              hintStyle: TextStyle(fontSize: fontSize),
-                            ),
-                            validator: (value) {
-                              if (value == null || value.isEmpty) {
-                                return 'survey_description_error'.tr();
-                              }
-                              return null;
-                            },
-                          ),
-                          SizedBox(height: constraints.maxHeight * 0.4),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
+    return WizardScaffold(
+      step: 1,
+      totalSteps: 3,
+      appBarTitle: 'create_survey'.tr(),
+      title: 'create_survey_step1_title'.tr(),
+      subtitle: 'create_survey_step1_subhead'.tr(),
+      primaryLabel: 'next'.tr(),
+      onPrimary: _next,
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppTextField(
+              label: 'survey_title'.tr(),
+              controller: _name,
+              icon: Icons.title_rounded,
+              textInputAction: TextInputAction.next,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'survey_name_error'.tr()
+                  : null,
+            ),
+            const SizedBox(height: Spacing.md),
+            Text(
+              'survey_description'.tr().toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
               ),
-            );
-          },
+            ),
+            const SizedBox(height: Spacing.sm),
+            TextFormField(
+              controller: _description,
+              maxLines: null,
+              minLines: 4,
+              maxLength: 1000,
+              keyboardType: TextInputType.multiline,
+              style: theme.textTheme.bodyLarge,
+              decoration: InputDecoration(
+                hintText: 'survey_description_hint'.tr(),
+                alignLabelWithHint: true,
+              ),
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? 'survey_description_error'.tr()
+                  : null,
+            ),
+          ],
         ),
-      ),
-      bottomNavigationBar: buildBottomElevatedButton(
-        context: context,
-        onPressed: _onNextPressed,
-        buttonText: 'next',
       ),
     );
   }

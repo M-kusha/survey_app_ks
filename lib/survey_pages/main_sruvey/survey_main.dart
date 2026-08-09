@@ -1,18 +1,21 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
-import 'package:echomeet/survey_pages/main_sruvey/survey_action_field.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/membership/company_gate.dart';
+import 'package:echomeet/core/membership/membership.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_create_button.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_list.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/colors.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:timeago/timeago.dart';
+
+enum SurveySort { newest, oldest, closingSoon, closingLast }
 
 class QuestionarySurveyPageUI extends StatefulWidget {
   const QuestionarySurveyPageUI({super.key});
@@ -20,115 +23,174 @@ class QuestionarySurveyPageUI extends StatefulWidget {
   @override
   State<QuestionarySurveyPageUI> createState() =>
       _QuestionarySurveyPageUIState();
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 80);
 }
 
 class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
-  final int _surveysPerPage = 4;
-  int focusIndex = -1;
-  int _currentPage = 0;
-  int selectedSortOption = 0;
-  bool isSearching = false;
+  final _searchController = TextEditingController();
+
+  SurveySort _sort = SurveySort.newest;
   bool _isAdmin = false;
-  String searchQuery = '';
-  late FirebaseServices _firebaseServices;
-  bool _isLoading = false;
-  TextEditingController searchController = TextEditingController();
+  bool _isLoading = true;
+  String? _error;
+  Membership? _membership;
 
   @override
   void initState() {
-    _firebaseServices = FirebaseServices();
     super.initState();
-    _loadUserAndSurveys();
-  }
-
-  void _loadUserAndSurveys() async {
-    final provider = Provider.of<SurveyDataProvider>(context, listen: false);
-    _firebaseServices = Provider.of<FirebaseServices>(context, listen: false);
-    setState(() {
-      _isLoading = true;
-    });
-
-    await Provider.of<UserDataProvider>(
-      context,
-      listen: false,
-    ).loadCurrentUser();
-    if (!mounted) return;
-    final companyId =
-        Provider.of<UserDataProvider>(
-          context,
-          listen: false,
-        ).currentUser?.companyId ??
-        '';
-
-    if (companyId.isNotEmpty) {
-      if (!context.mounted) return;
-      Future.microtask(
-        () => provider.loadSurveys(companyId).then((_) {
-          final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
-          provider.checkParticipationForCurrentUser(userId);
-        }),
-      );
-    }
-    final isAdmin = await _firebaseServices.fetchAdminStatus();
-    if (!mounted) return;
-    setState(() {
-      _isAdmin = isAdmin;
-    });
-    {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
+    _searchController.addListener(() => setState(() {}));
+    _load();
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     super.dispose();
-    searchController.dispose();
   }
 
-  void _onSearchTextChanged(String text) async {
+  Future<void> _refresh() => _load(silent: true);
+
+  Future<void> _load({bool silent = false}) async {
+    final surveys = Provider.of<SurveyDataProvider>(context, listen: false);
+    final users = Provider.of<UserDataProvider>(context, listen: false);
+    final services = Provider.of<FirebaseServices>(context, listen: false);
+
     setState(() {
-      searchQuery = text;
+      _isLoading = true;
+      _error = null;
     });
+
+    try {
+      await users.loadCurrentUser();
+      if (!mounted) return;
+
+      final membership = await MembershipService().resolve();
+      if (!mounted) return;
+
+      if (!membership.isActive) {
+        setState(() {
+          _membership = membership;
+          _isLoading = false;
+        });
+        return;
+      }
+
+      _membership = membership;
+      final companyId = membership.companyId;
+
+      await surveys.loadSurveys(companyId);
+      if (!mounted) return;
+      await surveys.checkParticipationForCurrentUser(
+        FirebaseAuth.instance.currentUser?.uid ?? '',
+      );
+
+      final isAdmin = await services.fetchAdminStatus();
+      if (!mounted) return;
+
+      setState(() {
+        _isAdmin = isAdmin;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = '$e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  ({List<Survey> waiting, List<Survey> done, List<Survey> closed}) _group(
+    List<Survey> surveys,
+    SurveyDataProvider provider,
+  ) {
+    final now = DateTime.now();
+    bool answered(Survey s) => provider.userParticipationStatus[s.id] ?? false;
+    bool live(Survey s) => s.deadline.isAfter(now);
+
+    return (
+      waiting: surveys.where((s) => live(s) && !answered(s)).toList(),
+      done: surveys.where((s) => live(s) && answered(s)).toList(),
+      closed: surveys.where((s) => !live(s)).toList(),
+    );
+  }
+
+  String _waitingLabel(int count) => count == 0
+      ? 'all_caught_up'.tr()
+      : 'needs_you_count'.tr(namedArgs: {'count': '$count'});
+
+  List<Survey> _visible(List<Survey> surveys) {
+    final needle = _searchController.text.trim().toLowerCase();
+
+    final result = surveys
+        .where(
+          (survey) =>
+              needle.isEmpty ||
+              survey.surveyName.toLowerCase().contains(needle),
+        )
+        .toList();
+
+    result.sort(
+      (a, b) => switch (_sort) {
+        SurveySort.newest => b.timeCreated.compareTo(a.timeCreated),
+        SurveySort.oldest => a.timeCreated.compareTo(b.timeCreated),
+        SurveySort.closingSoon => a.deadline.compareTo(b.deadline),
+        SurveySort.closingLast => b.deadline.compareTo(a.deadline),
+      },
+    );
+
+    return result;
   }
 
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    Color buttonColor = ThemeBasedAppColors.getColor(context, 'buttonColor');
-    Color appbarColor = ThemeBasedAppColors.getColor(context, 'appbarColor');
-    Color listTileColor = ThemeBasedAppColors.getColor(
-      context,
-      'listTileColor',
-    );
+    final provider = Provider.of<SurveyDataProvider>(context);
+    final surveys = _visible(provider.surveys);
+
+    if (!_isLoading && _membership?.isActive != true) {
+      return CompanyGate(
+        membership: _membership,
+        onChanged: _load,
+        child: const SizedBox.shrink(),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(
-        leading: buildPopupMenuButton(context, buttonColor, listTileColor),
-        title: isSearching
-            ? ActionField(
-                isSearching: isSearching,
-                searchController: searchController,
-                onSearchTextChanged: _onSearchTextChanged,
-              )
-            : Text(
-                'surveys'.tr(),
-                style: TextStyle(fontSize: timeFontSize * 1.5),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 720,
+
+          scrollable: false,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.xl),
+              ScreenHeader(
+                title: 'surveys'.tr(),
+                subtitle: _isLoading
+                    ? null
+                    : _waitingLabel(
+                        _group(provider.surveys, provider).waiting.length,
+                      ),
+                actions: const [SignOutOnCompact()],
               ),
-        centerTitle: true,
-        backgroundColor: appbarColor,
-        actions: [buildSearchBar(buttonColor)],
-        automaticallyImplyLeading: false,
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 22.0),
-          buildExpandedField(context, isSearching, searchQuery),
-        ],
+              const SizedBox(height: Spacing.lg),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: SearchPill(
+                      controller: _searchController,
+                      hint: 'search_hint'.tr(),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  _buildSortMenu(),
+                ],
+              ),
+              Expanded(child: _buildBody(provider, surveys)),
+            ],
+          ),
+        ),
       ),
       floatingActionButton: _isAdmin
           ? buildCreateQuestionarySurveyButton(context)
@@ -136,231 +198,99 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     );
   }
 
-  PopupMenuItem<int> buildPopupMenuItem(
-    BuildContext context,
-    String text,
-    int value,
-    IconData icon,
-    Color buttonColor,
-    Color listTileColor,
-  ) {
-    bool isSelected = selectedSortOption == value;
-
-    return PopupMenuItem(
-      value: value,
-      child: ListTile(
-        leading: Icon(icon, color: isSelected ? buttonColor : listTileColor),
-        title: Text(
-          text.tr(),
-          style: TextStyle(
-            color: isSelected ? buttonColor : listTileColor,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Widget _buildSortMenu() {
+    return PopupMenuButton<SurveySort>(
+      tooltip: 'sort'.tr(),
+      initialValue: _sort,
+      onSelected: (value) => setState(() => _sort = value),
+      itemBuilder: (context) => [
+        for (final (sort, labelKey, icon) in const [
+          (SurveySort.newest, 'newest', Icons.arrow_downward_rounded),
+          (SurveySort.oldest, 'oldest', Icons.arrow_upward_rounded),
+          (SurveySort.closingSoon, 'exp_date_asc', Icons.event_busy_rounded),
+          (SurveySort.closingLast, 'exp_date_des', Icons.event_rounded),
+        ])
+          PopupMenuItem(
+            value: sort,
+            child: Row(
+              children: [
+                Icon(icon, size: 18),
+                const SizedBox(width: Spacing.md),
+                Text(labelKey.tr()),
+              ],
+            ),
           ),
-        ),
-        trailing: isSelected
-            ? Icon(Icons.check, color: buttonColor, size: 17.0)
-            : null,
-      ),
-    );
-  }
-
-  PopupMenuButton<int> buildPopupMenuButton(
-    BuildContext context,
-    Color buttonColor,
-    Color listTileColor,
-  ) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return PopupMenuButton<int>(
-      icon: Icon(
-        Icons.sort_by_alpha_sharp,
-        color: buttonColor,
-        size: timeFontSize * 1.8,
-      ),
-      offset: const Offset(0, 60),
-      onSelected: (int result) {
-        setState(() {
-          selectedSortOption = result;
-        });
-      },
-      itemBuilder: (BuildContext context) => <PopupMenuEntry<int>>[
-        buildPopupMenuItem(
-          context,
-          'newest',
-          0,
-          Icons.new_label,
-          buttonColor,
-          listTileColor,
-        ),
-        buildPopupMenuItem(
-          context,
-          'oldest',
-          1,
-          Icons.history,
-          buttonColor,
-          listTileColor,
-        ),
-        buildPopupMenuItem(
-          context,
-          'exp_date_asc',
-          4,
-          Icons.date_range_sharp,
-          buttonColor,
-          listTileColor,
-        ),
-        buildPopupMenuItem(
-          context,
-          'exp_date_des',
-          5,
-          Icons.date_range,
-          buttonColor,
-          listTileColor,
-        ),
       ],
+      child: CircleAction(
+        icon: Icons.sort_rounded,
+        tooltip: 'sort'.tr(),
+        active: _sort != SurveySort.newest,
+        onTap: null,
+      ),
     );
   }
 
-  Widget buildSearchBar(Color buttonColor) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-    return isSearching
-        ? IconButton(
-            icon: Icon(
-              Icons.close,
-              size: timeFontSize * 1.8,
-              color: buttonColor,
-            ),
-            onPressed: () {
-              setState(() {
-                isSearching = !isSearching;
-                searchController.clear();
-              });
-            },
-          )
-        : IconButton(
-            icon: Icon(
-              Icons.search,
-              size: timeFontSize * 1.8,
-              color: buttonColor,
-            ),
-            onPressed: () {
-              setState(() {
-                isSearching = !isSearching;
-              });
-            },
-          );
-  }
-
-  Widget buildExpandedField(
-    BuildContext context,
-    bool isSearching,
-    String searchQuery,
-  ) {
-    final surveyListProvider = Provider.of<SurveyDataProvider>(context);
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
-
+  Widget _buildBody(SurveyDataProvider provider, List<Survey> surveys) {
     if (_isLoading) {
-      return const Expanded(
-        child: Center(child: CustomLoadingWidget(loadingText: 'loading')),
+      return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
+    }
+
+    if (_error case final error?) {
+      return EmptyState(
+        icon: Icons.cloud_off_rounded,
+        title: 'error_occurred'.tr(),
+        body: error,
+        action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }
 
-    List<Survey> filteredSurveys = surveyListProvider.surveys.where((survey) {
-      final lowerCaseQuery = searchQuery.toLowerCase();
-      return survey.surveyName.toLowerCase().contains(lowerCaseQuery) ||
-          survey.id.toLowerCase().contains(lowerCaseQuery) ||
-          format(survey.timeCreated).toLowerCase().contains(lowerCaseQuery);
-    }).toList();
-
-    switch (selectedSortOption) {
-      case 0:
-        filteredSurveys.sort((a, b) => b.timeCreated.compareTo(a.timeCreated));
-        break;
-      case 1:
-        filteredSurveys.sort((a, b) => a.timeCreated.compareTo(b.timeCreated));
-        break;
-      case 2:
-        filteredSurveys.sort((a, b) => a.deadline.compareTo(b.deadline));
-        break;
-      case 3:
-        filteredSurveys.sort((b, a) => a.deadline.compareTo(b.deadline));
-        break;
+    if (surveys.isEmpty) {
+      return _searchController.text.isEmpty
+          ? EmptyState(
+              icon: Icons.fact_check_outlined,
+              title: 'no_test_surveys_yet'.tr(),
+              body: 'no_surveys_body'.tr(),
+            )
+          : EmptyState(
+              icon: Icons.search_off_rounded,
+              title: 'search_survey_or_test_not_found'.tr(),
+              action: TextButton(
+                onPressed: _searchController.clear,
+                child: Text('clear_search'.tr()),
+              ),
+            );
     }
 
-    final totalPages = (filteredSurveys.length / _surveysPerPage).ceil();
-    final startIndex = _currentPage * _surveysPerPage;
-    final endIndex = startIndex + _surveysPerPage > filteredSurveys.length
-        ? filteredSurveys.length
-        : startIndex + _surveysPerPage;
-    final surveysForCurrentPage = filteredSurveys.sublist(startIndex, endIndex);
-    if (filteredSurveys.isEmpty) {
-      return Expanded(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text(
-              isSearching
-                  ? 'search_survey_or_test_not_found'.tr()
-                  : 'no_test_surveys_yet'.tr(),
-              style: TextStyle(fontSize: timeFontSize * 1.2),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      );
-    } else {
-      return Expanded(
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView.separated(
-                separatorBuilder: (context, index) =>
-                    const SizedBox(height: 20.0),
-                itemCount: surveysForCurrentPage.length,
-                itemBuilder: (context, index) {
-                  final survey = filteredSurveys[index];
-                  final hasParticipated =
-                      surveyListProvider.userParticipationStatus[survey.id] ??
-                      false;
-                  return SurveyListItem(
-                    survey: surveysForCurrentPage[index],
+    final (:waiting, :done, :closed) = _group(surveys, provider);
+
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.only(bottom: 96),
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          for (final (labelKey, group) in [
+            ('section_needs_you', waiting),
+            ('section_done', done),
+            ('section_closed', closed),
+          ])
+            if (group.isNotEmpty) ...[
+              SectionLabel(label: labelKey.tr(), count: group.length),
+              for (final survey in group)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.md),
+                  child: SurveyListItem(
+                    survey: survey,
                     isAdmin: _isAdmin,
-                    hasParticipated: hasParticipated,
-                  );
-                },
-              ),
-            ),
-            if (totalPages > 1)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left_outlined),
-                    onPressed: _currentPage > 0
-                        ? () {
-                            setState(() {
-                              _currentPage--;
-                            });
-                          }
-                        : null,
+
+                    hasParticipated:
+                        provider.userParticipationStatus[survey.id] ?? false,
+                    onChanged: _refresh,
                   ),
-                  Text('${'page'.tr()} ${_currentPage + 1} of $totalPages'),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right_outlined),
-                    onPressed: _currentPage < totalPages - 1
-                        ? () {
-                            setState(() {
-                              _currentPage++;
-                            });
-                          }
-                        : null,
-                  ),
-                ],
-              ),
-          ],
-        ),
-      );
-    }
+                ),
+            ],
+        ],
+      ),
+    );
   }
 }

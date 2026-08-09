@@ -1,103 +1,201 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/settings/font_size_provider.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/theme/app_colors.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/status_pill.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
+import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:echomeet/utilities/bottom_navigation.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/tablet_size.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-class Step3ParticipateSurvey extends StatefulWidget {
-  final Participant participant;
-  final Survey survey;
-
+class Step3ParticipateSurvey extends StatelessWidget {
   const Step3ParticipateSurvey({
     super.key,
     required this.participant,
     required this.survey,
   });
 
-  @override
-  State<Step3ParticipateSurvey> createState() => Step3ParticipateSurveyState();
-}
+  final Participant participant;
+  final Survey survey;
 
-class Step3ParticipateSurveyState extends State<Step3ParticipateSurvey> {
+  bool get _isTest => survey.surveyType != SurveyType.survey;
+
+  SurveyGrade get _grade => SurveyScorer.grade(
+    surveyId: survey.id,
+    questions: survey.questions,
+    answers: participant.surveyAnswers,
+    textReviews: participant.textAnswersReviewed,
+  );
+
   @override
   Widget build(BuildContext context) {
-    final fontSize = Provider.of<FontSizeProvider>(context).fontSize;
-    final timeFontSize = getTimeFontSize(context, fontSize);
+    final theme = Theme.of(context);
+    final grade = _isTest ? _grade : null;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.survey.surveyType == SurveyType.survey
-              ? 'survey_finished'.tr()
-              : 'test_finished'.tr(),
-          style: TextStyle(fontSize: timeFontSize * 1.5),
-        ),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: SizedBox(
-              height: 300,
-              child: Card(
-                elevation: 5,
-                shadowColor: getButtonColor(context),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        widget.survey.surveyType == SurveyType.survey
-                            ? 'thank_you'.tr()
-                            : 'thank_you_participation'.tr(),
-                        style: TextStyle(
-                          fontSize: timeFontSize + 2,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 20),
-                      const SizedBox(height: 20),
-                      Text(
-                        widget.survey.surveyType == SurveyType.survey
-                            ? 'survey_finished_message'.tr()
-                            : 'test_finished_message'.tr(),
-                        style: TextStyle(fontSize: timeFontSize + 2),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 520,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.xxl),
+              _Mark(passed: grade?.passed),
+              const SizedBox(height: Spacing.xl),
+              Text(
+                _isTest ? 'test_finished'.tr() : 'thank_you'.tr(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                _isTest
+                    ? 'test_finished_message'.tr()
+                    : 'survey_finished_message'.tr(),
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (grade case final grade?) ...[
+                const SizedBox(height: Spacing.xl),
+                _ScoreCard(grade: grade),
+              ],
+              const SizedBox(height: Spacing.xxl),
+            ],
           ),
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: buildBottomElevatedButton(
-          context: context,
-          onPressed: () {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const BottomNavigation(initialIndex: 2),
-              ),
-              (route) => false,
-            );
-          },
-          buttonText: 'return_back'.tr(),
+      bottomNavigationBar: WizardActionBar(
+        maxWidth: 520,
+        child: FilledButton(
+          onPressed: () => Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BottomNavigation(initialIndex: 2),
+            ),
+            (route) => false,
+          ),
+          child: Text('back_to_surveys'.tr()),
         ),
+      ),
+    );
+  }
+}
+
+class _ScoreCard extends StatelessWidget {
+  const _ScoreCard({required this.grade});
+
+  final SurveyGrade grade;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final app = context.appColors;
+    final tone = grade.passed ? app.success : theme.colorScheme.error;
+
+    return ContentCard(
+      accent: tone,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                '${grade.percentage.round()}%',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: tone,
+                  height: 1,
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: StatusPill(
+                    label: grade.passed ? 'passed'.tr() : 'not_passed'.tr(),
+                    tone: grade.passed
+                        ? StatusTone.positive
+                        : StatusTone.danger,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: Spacing.md),
+
+          Text(
+            'correct_of_total'.tr(
+              namedArgs: {
+                'correct': '${grade.correctCount}',
+                'total': '${grade.gradedCount}',
+              },
+            ),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          if (grade.hasPendingReview) ...[
+            const SizedBox(height: Spacing.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.hourglass_bottom_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: Spacing.sm),
+
+                Expanded(
+                  child: Text(
+                    'score_pending_review'.tr(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _Mark extends StatelessWidget {
+  const _Mark({required this.passed});
+
+  final bool? passed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final app = context.appColors;
+
+    final (color, icon) = switch (passed) {
+      null => (scheme.primary, Icons.check_rounded),
+      true => (app.success, Icons.check_rounded),
+      false => (scheme.error, Icons.remove_rounded),
+    };
+
+    return Center(
+      child: Container(
+        height: 72,
+        width: 72,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: color.withValues(alpha: 0.12),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Icon(icon, size: 34, color: color),
       ),
     );
   }

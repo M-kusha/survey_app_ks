@@ -1,15 +1,14 @@
 import 'package:easy_localization/easy_localization.dart';
-import 'package:echomeet/survey_pages/user_survey/step2_participate_survey.dart';
+import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/core/widgets/wizard_scaffold.dart';
+import 'package:echomeet/survey_pages/user_survey/survey_answer_page.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
-import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:echomeet/utilities/text_style.dart';
 import 'package:flutter/material.dart';
 
 class Step1ParticipateSurvey extends StatefulWidget {
-  final Survey survey;
-  final Participant participant;
-  final String imageProfile;
-
   const Step1ParticipateSurvey({
     super.key,
     required this.survey,
@@ -17,168 +16,148 @@ class Step1ParticipateSurvey extends StatefulWidget {
     required this.imageProfile,
   });
 
+  final Survey survey;
+  final Participant participant;
+  final String imageProfile;
+
   @override
   State<Step1ParticipateSurvey> createState() => _Step1ParticipateSurveyState();
 }
 
 class _Step1ParticipateSurveyState extends State<Step1ParticipateSurvey> {
+  bool get _isTest => widget.survey.surveyType == SurveyType.test;
+
   @override
   void initState() {
     super.initState();
-    // A plain survey has no rules to read, so skip straight to the questions.
-    // Done once after the first frame rather than from build(), which can run
-    // many times and would queue a duplicate navigation on each rebuild.
-    if (widget.survey.surveyType == SurveyType.survey) {
+
+    if (!_isTest) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => Step2ParticipateSurvey(
-              survey: widget.survey,
-              participant: widget.participant,
-              imageProfile: '',
-            ),
-          ),
-        );
+        if (mounted) _start(replace: true);
       });
     }
   }
 
+  void _start({bool replace = false}) {
+    final route = MaterialPageRoute<void>(
+      builder: (context) => SurveyAnswerPage(
+        survey: widget.survey,
+        participant: widget.participant,
+        imageProfile: widget.imageProfile,
+      ),
+    );
+
+    replace
+        ? Navigator.of(context).pushReplacement(route)
+        : Navigator.of(context).push(route);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('survey_participation_rules'.tr()),
-        centerTitle: true,
-        backgroundColor: getAppbarColor(context),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Center(
-          child: Card(
-            elevation: 5,
-            shadowColor: getButtonColor(context),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    const SizedBox(height: 10),
-                    _buildWelcomeCard(context, getButtonColor(context)),
-                    const SizedBox(height: 10),
-                    _buildRulesCard(context, getButtonColor(context)),
-                    if (widget.survey.timeLimitPerQuestion > 0)
-                      _buildTimerCard(context, getButtonColor(context)),
-                    const SizedBox(height: 10),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: buildBottomElevatedButton(
-          context: context,
-          onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => Step2ParticipateSurvey(
-                  survey: widget.survey,
-                  participant: widget.participant,
-                  imageProfile: widget.imageProfile,
-                ),
-              ),
-            );
-          },
-          buttonText: 'start_survey'.tr(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeCard(BuildContext context, Color buttonColor) {
-    return Card(
-      elevation: 5.0,
-      shadowColor: buttonColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              '${'welcome'.tr()}${widget.participant.name}!',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 10),
-            Text('read_rules'.tr(), textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRulesCard(BuildContext context, Color buttonColor) {
-    return Card(
-      elevation: 5,
-      shadowColor: buttonColor,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'rules_for_participating'.tr(),
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(),
-            ),
-            const SizedBox(height: 10),
-            _buildRulesBasedOnSurveyType(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRulesBasedOnSurveyType() {
-    switch (widget.survey.surveyType) {
-      case SurveyType.test:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('single_choice_rule'.tr()),
-            const SizedBox(height: 5),
-            Text('multiple_choice_rule'.tr()),
-            const SizedBox(height: 5),
-            Text('text_question_rule'.tr()),
-            const SizedBox(height: 5),
-            Text('hint_for_survey'.tr()),
-          ],
-        );
-      default:
-        return const SizedBox.shrink();
+    if (!_isTest) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-  }
 
-  Widget _buildTimerCard(BuildContext context, Color buttonColor) {
-    return Card(
-      margin: const EdgeInsets.only(top: 20),
-      elevation: 4.0,
-      shadowColor: Colors.red.withValues(alpha: 0.5), // Red shadow for emphasis
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Center(
-          // Center the timer rule text
-          child: Text(
-            '${'time_limit_text_1'.tr()} ${widget.survey.timeLimitPerQuestion} ${'time_limit_text_2'.tr()}',
-            style: const TextStyle(
-              fontStyle: FontStyle.italic,
-              color: Colors.red,
-            ), // Red text for urgency
+    final theme = Theme.of(context);
+    final questions = widget.survey.questions.length;
+    final limit = widget.survey.timeLimitPerQuestion;
+
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.survey.surveyName)),
+      body: SafeArea(
+        child: PageBody(
+          maxWidth: 520,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: Spacing.md),
+              Text(
+                'before_you_start'.tr(),
+                style: theme.textTheme.headlineSmall,
+              ),
+              if (widget.survey.surveyDescription.isNotEmpty) ...[
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  widget.survey.surveyDescription,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              const SizedBox(height: Spacing.xl),
+
+              _Rule(
+                icon: Icons.help_outline_rounded,
+                title: 'question_count'.tr(namedArgs: {'count': '$questions'}),
+                body: 'rule_answer_all'.tr(),
+              ),
+              _Rule(
+                icon: Icons.timer_outlined,
+                title: limit > 0
+                    ? 'seconds_per_question'.tr(namedArgs: {'s': '$limit'})
+                    : 'no_time_limit'.tr(),
+                body: limit > 0 ? 'rule_timed'.tr() : 'rule_untimed'.tr(),
+              ),
+              _Rule(
+                icon: Icons.workspace_premium_outlined,
+                title: 'rule_graded_title'.tr(),
+                body: 'rule_graded'.tr(),
+              ),
+              const SizedBox(height: Spacing.xxl),
+            ],
           ),
+        ),
+      ),
+      bottomNavigationBar: WizardActionBar(
+        child: FilledButton(onPressed: _start, child: Text('start'.tr())),
+      ),
+    );
+  }
+}
+
+class _Rule extends StatelessWidget {
+  const _Rule({required this.icon, required this.title, required this.body});
+
+  final IconData icon;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: Spacing.md),
+      child: ContentCard(
+        child: Row(
+          children: [
+            Container(
+              height: 36,
+              width: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(Radii.md),
+                color: scheme.primary.withValues(alpha: 0.12),
+              ),
+              child: Icon(icon, size: 18, color: scheme.primary),
+            ),
+            const SizedBox(width: Spacing.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.textTheme.titleSmall),
+                  const SizedBox(height: 2),
+                  Text(
+                    body,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

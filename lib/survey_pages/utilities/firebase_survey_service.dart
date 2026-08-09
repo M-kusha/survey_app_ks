@@ -1,15 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 
 class FirebaseSurveyService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<String> createSurvey(Survey survey) async {
-    // A Firestore auto-id, rather than a truncated UUID. The previous
-    // `Uuid().v1().substring(0, 6)` kept only 24 bits of a 100ns clock, which
-    // wraps roughly every seven minutes — and because the write below is a
-    // `set`, a collision silently overwrote an existing survey along with its
-    // participants subcollection.
     final document = _firestore.collection('surveys').doc();
     final uniqueId = document.id;
 
@@ -26,10 +22,36 @@ class FirebaseSurveyService {
       'timeLimitPerQuestion': survey.timeLimitPerQuestion,
       'surveyType': survey.surveyType.index,
       'companyId': survey.companyId,
+
+      'createdBy': FirebaseAuth.instance.currentUser?.uid,
     };
 
     await document.set(surveyData);
     return uniqueId;
+  }
+
+  Future<void> deleteSurvey(String surveyId) async {
+    final survey = _firestore.collection('surveys').doc(surveyId);
+    final responses = await survey.collection('participants').get();
+
+    const chunkSize = 400;
+    for (var start = 0; start < responses.docs.length; start += chunkSize) {
+      final batch = _firestore.batch();
+      final end = (start + chunkSize).clamp(0, responses.docs.length);
+      for (final doc in responses.docs.sublist(start, end)) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    await survey.delete();
+  }
+
+  Future<void> removeUserFromCompany(String userId) async {
+    await _firestore.collection('users').doc(userId).update({
+      'companyId': '',
+      'role': 'user',
+    });
   }
 
   Future<void> updateTextAnswersReviewed(
