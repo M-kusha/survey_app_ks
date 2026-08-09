@@ -78,7 +78,7 @@ void main() {
     expect(find.text('row 2'), findsOneWidget);
   });
 
-  testWidgets('the accent stripe spans the full height of the card', (
+  testWidgets('the accent stripe stays clear of the rounded corners', (
     tester,
   ) async {
     await _pump(
@@ -95,18 +95,32 @@ void main() {
 
     final card = tester.getRect(find.byType(ContentCard));
     // By colour, not by type: Material and the ink machinery contribute their
-    // own ColoredBoxes, and `.first` picked one of those.
+    // own decorated boxes, and `.first` picked one of those.
     final stripe = tester.getRect(
       find.byWidgetPredicate(
         (widget) =>
-            widget is ColoredBox && widget.color == const Color(0xFF00FF00),
+            widget is DecoratedBox &&
+            widget.decoration is BoxDecoration &&
+            (widget.decoration as BoxDecoration).color ==
+                const Color(0xFF00FF00),
       ),
     );
 
-    // Stretched by the Stack rather than by a Row, but it still has to reach
-    // both edges or it reads as a stray dash beside the title.
-    expect(stripe.height, card.height);
     expect(stripe.width, 4);
+
+    // Inset by the corner radius at both ends, and not by accident.
+    //
+    // This used to run the full height of the card. The Material clips to an
+    // 18px radius, so the last 18px at each end were being sliced by the curve
+    // and left a coloured sliver in the corner - at the bottom it met the
+    // progress rule and the two stacked, which is what read as colour leaking
+    // out of the card.
+    expect(stripe.top - card.top, 18);
+    expect(card.bottom - stripe.bottom, 18);
+
+    // Still the dominant vertical mark, not a stray dash beside the title.
+    expect(stripe.height, card.height - 36);
+    expect(stripe.height, greaterThan(card.height * 0.6));
   });
 
   testWidgets('a card with a deadline rule still lays out in a list', (
