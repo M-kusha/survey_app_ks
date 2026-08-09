@@ -102,7 +102,6 @@ class _ProfileSectionState extends State<ProfileSection> {
                 onTap: _pickAndUpload,
                 avatarRevision: _avatarRevision,
                 profileImageRevision: profileImageRevision,
-                userId: widget.userId,
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
@@ -152,7 +151,6 @@ class _Avatar extends StatelessWidget {
     required this.onTap,
     required this.avatarRevision,
     required this.profileImageRevision,
-    required this.userId,
   });
 
   final String? url;
@@ -161,7 +159,6 @@ class _Avatar extends StatelessWidget {
   final VoidCallback onTap;
   final int avatarRevision;
   final int profileImageRevision;
-  final String userId;
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +193,6 @@ class _Avatar extends StatelessWidget {
                     AuthenticatedProfileImage(
                       storedReference: storedReference,
                       refreshKey: (profileImageRevision, avatarRevision),
-                      userId: userId,
                     ),
                 ],
               ),

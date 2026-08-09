@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -60,13 +59,11 @@ class AuthenticatedProfileImage extends StatefulWidget {
     required this.storedReference,
     this.fit = BoxFit.cover,
     this.refreshKey,
-    this.userId,
   });
 
   final String storedReference;
   final BoxFit fit;
   final Object? refreshKey;
-  final String? userId;
 
   @override
   State<AuthenticatedProfileImage> createState() =>
@@ -74,82 +71,6 @@ class AuthenticatedProfileImage extends StatefulWidget {
 }
 
 class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
-  Stream<DocumentSnapshot<Map<String, dynamic>>>? _memberStream;
-
-  @override
-  void initState() {
-    super.initState();
-    _memberStream = _streamFor(widget.userId);
-  }
-
-  @override
-  void didUpdateWidget(covariant AuthenticatedProfileImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.userId != widget.userId) {
-      _memberStream = _streamFor(widget.userId);
-    }
-  }
-
-  static Stream<DocumentSnapshot<Map<String, dynamic>>>? _streamFor(
-    String? userId,
-  ) {
-    final id = userId?.trim() ?? '';
-    if (id.isEmpty) return null;
-    return FirebaseFirestore.instance
-        .collection('memberDirectory')
-        .doc(id)
-        .snapshots();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final memberStream = _memberStream;
-    if (memberStream == null) {
-      return _AuthenticatedProfileImageBytes(
-        storedReference: widget.storedReference,
-        fit: widget.fit,
-        refreshKey: widget.refreshKey,
-      );
-    }
-
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: memberStream,
-      builder: (context, snapshot) {
-        final member = snapshot.data?.data();
-        final storedReference = member == null
-            ? widget.storedReference
-            : member['profileImage'] as String? ?? '';
-        final refreshKey = member == null
-            ? widget.refreshKey
-            : member['profileImageRevision'] ?? 0;
-        return _AuthenticatedProfileImageBytes(
-          storedReference: storedReference,
-          fit: widget.fit,
-          refreshKey: refreshKey,
-        );
-      },
-    );
-  }
-}
-
-class _AuthenticatedProfileImageBytes extends StatefulWidget {
-  const _AuthenticatedProfileImageBytes({
-    required this.storedReference,
-    required this.fit,
-    required this.refreshKey,
-  });
-
-  final String storedReference;
-  final BoxFit fit;
-  final Object? refreshKey;
-
-  @override
-  State<_AuthenticatedProfileImageBytes> createState() =>
-      _AuthenticatedProfileImageBytesState();
-}
-
-class _AuthenticatedProfileImageBytesState
-    extends State<_AuthenticatedProfileImageBytes> {
   late Future<Uint8List?> _bytes;
 
   @override
@@ -159,7 +80,7 @@ class _AuthenticatedProfileImageBytesState
   }
 
   @override
-  void didUpdateWidget(covariant _AuthenticatedProfileImageBytes oldWidget) {
+  void didUpdateWidget(covariant AuthenticatedProfileImage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.storedReference != widget.storedReference ||
         oldWidget.refreshKey != widget.refreshKey) {

@@ -549,7 +549,6 @@ class _Avatar extends StatelessWidget {
               AuthenticatedProfileImage(
                 storedReference: user.profileImage,
                 refreshKey: user.profileImageRevision,
-                userId: user.id,
               ),
             ],
           ),
