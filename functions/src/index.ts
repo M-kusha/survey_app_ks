@@ -9,9 +9,21 @@ import { purgeCompany } from './purge';
 
 initializeApp();
 
-// Kept close to where the users are. Cross-region traffic is the one thing here
-// that would cost anything at this scale.
-const region = 'europe-west1';
+// Dictated by the database, not chosen.
+//
+// This project's Firestore lives in `eur3`, a Europe multi-region. Eventarc
+// routes events out of a multi-region from one fixed place — `europe-west4` for
+// `eur3`, `us-central1` for `nam5` — and a v2 Firestore trigger deployed
+// anywhere else simply cannot be created.
+//
+// The failure is worth recognising by shape: on the first deploy the two
+// scheduled functions succeeded and all four Firestore triggers failed.
+// Scheduled functions have no such constraint, so a clean split down that line
+// means the region, not the code.
+//
+// Everything is kept here rather than only the triggers. Two regions for six
+// functions buys nothing and makes the next person wonder why.
+const region = 'europe-west4';
 
 /**
  * A new survey or test, announced to the company.

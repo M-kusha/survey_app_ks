@@ -31,6 +31,45 @@ firebase deploy --only functions,firestore:indexes --project echomeet-app
 The indexes matter: two of the queries the functions run are composite and will
 fail without them.
 
+### The region is not a preference
+
+Everything deploys to **`europe-west4`**, and that is dictated by the database.
+This project's Firestore is in `eur3`, a Europe multi-region, and Eventarc
+routes events out of a multi-region from exactly one place:
+
+| Firestore location | Functions region |
+| --- | --- |
+| `eur3` | `europe-west4` |
+| `nam5` | `us-central1` |
+| any single region | the same region |
+
+A v2 Firestore trigger deployed anywhere else cannot be created. The first
+attempt used `europe-west1` and failed in a way worth recognising:
+
+```
++  functions[purgeScheduledCompanies(europe-west1)] Successful create operation.
++  functions[remindExpiring(europe-west1)]          Successful create operation.
+!  Deploys failed: onSurveyCreated, onAppointmentCreated,
+   onTimeSlotConfirmed, onJoinRequested
+```
+
+Both scheduled functions succeeded and all four Firestore triggers failed.
+Scheduled functions have no region constraint, so a clean split down that line
+means the region, not the code.
+
+Check the location before changing it:
+
+```bash
+firebase firestore:databases:get "(default)" --project echomeet-app
+```
+
+### Container image cleanup
+
+The CLI asks how many days to keep container images. **1** is the right answer
+and is the default. They are build artefacts left behind by each deploy, not
+your functions, and keeping them accrues a small Artifact Registry bill for
+nothing.
+
 ## What gets sent
 
 | Trigger | Who hears about it |
