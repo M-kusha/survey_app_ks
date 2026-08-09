@@ -349,6 +349,7 @@ class TodoListState extends State<TodoList> {
         ),
       ),
       floatingActionButton: CreateFab(
+        heroTag: 'notes-create-fab',
         label: 'add_note'.tr(),
         onPressed: _create,
       ),

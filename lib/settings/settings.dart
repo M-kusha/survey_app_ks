@@ -315,11 +315,14 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             onTap: membership.isClosing ? _cancelClosure : _closeCompany,
           ),
         if (_canManagePeople && inCompany) ...[
-          SwitchListTile(
-            secondary: const Icon(Icons.door_front_door_outlined),
-            title: Text('open_to_join'.tr()),
-            value: _openToJoin,
-            onChanged: _setJoinPolicy,
+          Material(
+            type: MaterialType.transparency,
+            child: SwitchListTile(
+              secondary: const Icon(Icons.door_front_door_outlined),
+              title: Text('open_to_join'.tr()),
+              value: _openToJoin,
+              onChanged: _setJoinPolicy,
+            ),
           ),
           SettingsTile(
             icon: Icons.block_outlined,

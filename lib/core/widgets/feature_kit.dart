@@ -359,15 +359,22 @@ class SectionLabel extends StatelessWidget {
 }
 
 class CreateFab extends StatelessWidget {
-  const CreateFab({super.key, required this.label, required this.onPressed});
+  const CreateFab({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    required this.heroTag,
+  });
 
   final String label;
   final VoidCallback onPressed;
+  final Object heroTag;
 
   @override
   Widget build(BuildContext context) {
     if (context.isCompact) {
       return FloatingActionButton(
+        heroTag: heroTag,
         onPressed: onPressed,
         tooltip: label,
         child: const Icon(Icons.add_rounded),
@@ -375,6 +382,7 @@ class CreateFab extends StatelessWidget {
     }
 
     return FloatingActionButton.extended(
+      heroTag: heroTag,
       onPressed: onPressed,
       tooltip: label,
       icon: const Icon(Icons.add_rounded),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 Widget buildCreateQuestionarySurveyButton(BuildContext context) {
   return CreateFab(
+    heroTag: 'surveys-create-fab',
     label: 'create_survey'.tr(),
     onPressed: () =>
         Navigator.of(context).pushNamed('/create_training_survey_1'),

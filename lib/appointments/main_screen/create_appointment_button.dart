@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 Widget buildCreateAppointmentButton(BuildContext context) {
   return CreateFab(
+    heroTag: 'appointments-create-fab',
     label: 'add_appointments'.tr(),
     onPressed: () =>
         Navigator.of(context).pushNamed('/create_appointment_step_1'),
