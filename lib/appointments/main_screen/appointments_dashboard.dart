@@ -227,7 +227,11 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
             'exp_date_asc',
             Icons.event_busy_rounded,
           ),
-          (AppointmentSort.mostVotes, 'participants', Icons.groups_rounded),
+          (
+            AppointmentSort.mostVotes,
+            'sort_most_responses',
+            Icons.groups_rounded,
+          ),
         ])
           PopupMenuItem(
             value: sort,
