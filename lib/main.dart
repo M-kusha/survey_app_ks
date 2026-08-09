@@ -28,15 +28,27 @@ import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await AppCheckBootstrap.activate();
-  await UserPreferences.init();
-
-  await EasyLocalization.ensureInitialized();
-
-  await initializeDateFormatting();
-
-  final savedThemeMode = await AdaptiveTheme.getThemeMode();
+  late final AdaptiveThemeMode? savedThemeMode;
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    await AppCheckBootstrap.activate();
+    await UserPreferences.init();
+    await EasyLocalization.ensureInitialized();
+    await initializeDateFormatting();
+    savedThemeMode = await AdaptiveTheme.getThemeMode();
+  } catch (error, stackTrace) {
+    FlutterError.reportError(
+      FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'EchoMeet startup',
+      ),
+    );
+    runApp(const _StartupFailureApp());
+    return;
+  }
 
   runApp(
     MultiProvider(
@@ -65,6 +77,31 @@ Future<void> main() async {
     ),
   );
   PushService().observeAuthentication();
+}
+
+class _StartupFailureApp extends StatelessWidget {
+  const _StartupFailureApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'EchoMeet could not start because its release configuration '
+                'is incomplete. Please contact support.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {

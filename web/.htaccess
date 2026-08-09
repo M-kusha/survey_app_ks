@@ -24,23 +24,21 @@
 
 # 2. Visitors get stuck on an old build for ever.
 #
-# The service worker caches aggressively and index.html points at hashed
-# bundles. Cache index.html or the worker itself and the browser keeps serving
-# the version it already has, with no way for a normal user to escape it — they
-# do not know what a hard refresh is. The hashed assets are safe to cache hard,
-# because their names change whenever the contents do.
+# Flutter's web shell uses stable filenames such as main.dart.js and
+# flutter_bootstrap.js. Caching those as immutable can pin a visitor to a
+# broken or obsolete release even after the server has been updated.
 <IfModule mod_headers.c>
-  <FilesMatch "^(index\.html|flutter_service_worker\.js|firebase-messaging-sw\.js|manifest\.json)$">
+  <FilesMatch "^(index\.html|flutter\.js|flutter_bootstrap\.js|main\.dart\.js|flutter_service_worker\.js|firebase-messaging-sw\.js|version\.json|manifest\.json)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
   </FilesMatch>
 
   <FilesMatch "\.(js|css|wasm|ttf|otf|woff2?|png|jpg|jpeg|svg|json)$">
-    Header set Cache-Control "public, max-age=31536000, immutable"
+    Header set Cache-Control "public, max-age=3600"
   </FilesMatch>
 
   # Undo the above for the files that must stay fresh — FilesMatch order is not
   # guaranteed to favour the first block.
-  <FilesMatch "^(flutter_service_worker\.js|firebase-messaging-sw\.js|manifest\.json)$">
+  <FilesMatch "^(flutter\.js|flutter_bootstrap\.js|main\.dart\.js|flutter_service_worker\.js|firebase-messaging-sw\.js|version\.json|manifest\.json)$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
   </FilesMatch>
 </IfModule>
