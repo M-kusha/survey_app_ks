@@ -2,32 +2,80 @@ rules_version = '2';
 
 // EchoMeet Storage rules.
 //
-// The bucket holds exactly one kind of object: profile pictures, one per user,
-// at profile_images/<uid>.jpg. Anything else is denied.
+// New profile pictures live at profile_images/<uid>/avatar.jpg. The legacy
+// profile_images/<uid>.jpg shape remains get/delete-only during the migration;
+// no client may create another legacy bearer-token object.
 
 service firebase.storage {
   match /b/{bucket}/o {
 
-    match /profile_images/{fileName} {
-      // Avatars are shown next to survey and appointment participants, so any
-      // signed-in user can read them. They are not public: an unauthenticated
-      // request gets nothing.
-      allow read: if request.auth != null;
-
-      // You may only write your own, and only an image, and only a small one.
-      // Without the size cap the bucket is a free file host for anyone with an
-      // account; without the content-type check it will happily store anything
-      // renamed to .jpg.
-      allow write: if request.auth != null
-        && fileName == request.auth.uid + '.jpg'
-        && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
-
-      allow delete: if request.auth != null
-        && fileName == request.auth.uid + '.jpg';
+    function accountActive() {
+      return request.auth != null
+        && !firestore.exists(
+          /databases/(default)/documents/accountDeletionLocks/$(request.auth.uid)
+        );
     }
 
-    // Nothing else belongs in this bucket.
+    function verifiedOwner(ownerId) {
+      return accountActive()
+        && request.auth.uid == ownerId
+        && request.auth.token.email_verified == true;
+    }
+
+    // Storage Rules permit at most two Firestore document accesses in one
+    // evaluation. Use exactly the viewer and owner member projections; repeat
+    // accesses are cached by the rules engine.
+    function activeSameCompany(ownerId) {
+      let viewer = firestore.get(
+        /databases/(default)/documents/memberDirectory/$(request.auth.uid)
+      ).data;
+      let owner = firestore.get(
+        /databases/(default)/documents/memberDirectory/$(ownerId)
+      ).data;
+      return viewer.membership == 'active'
+        && owner.membership == 'active'
+        && viewer.companyId != ''
+        && viewer.companyId == owner.companyId;
+    }
+
+    function mayGet(ownerId) {
+      return request.auth != null
+        && (
+          request.auth.uid == ownerId
+          || activeSameCompany(ownerId)
+        );
+    }
+
+    match /profile_images/{ownerId}/avatar.jpg {
+      // getData() is authorized here. Enumeration is never needed by the app.
+      allow get: if mayGet(ownerId);
+      allow list: if false;
+
+      // Firebase client uploads mint a bearer download token after Rules have
+      // evaluated, even when request metadata contains no token. Creation and
+      // replacement therefore go only through the App Check + verified-Auth
+      // callable, which re-encodes the JPEG and derives this path from Auth.
+      allow create, update: if false;
+      allow delete: if verifiedOwner(ownerId);
+    }
+
+    match /profile_images/{legacyFileName} {
+      function legacyOwnerId() {
+        return legacyFileName.replace('[.]jpg$', '');
+      }
+
+      allow get: if legacyFileName.matches('[^/]{1,128}[.]jpg')
+        && mayGet(legacyOwnerId());
+      allow list: if false;
+
+      // Updated clients cannot recreate or mutate the old token-addressable
+      // shape. The owner may remove it; the trusted migration/Admin SDK also
+      // bypasses these rules.
+      allow create, update: if false;
+      allow delete: if legacyFileName.matches('[^/]{1,128}[.]jpg')
+        && verifiedOwner(legacyOwnerId());
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }

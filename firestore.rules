@@ -12,9 +12,9 @@ rules_version = '2';
 //   * a user can never change their own role
 //   * a participant can never write their own score
 //
-// Note on cost: helper functions below use get() to read the caller's profile.
-// Each get() counts as a document read and Firestore allows 10 per single-doc
-// request. The helpers are written so a request needs at most two.
+// Note on cost: helper functions below read the caller's profile, company and
+// ban record. Firestore caches repeated access calls in one evaluation; the
+// rules stay below the 10-call limit for a single-document request.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -25,6 +25,20 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // A trusted account-deletion function creates this short-lived lock before
+    // enumerating data. Existing sessions may retain valid ID tokens until Auth
+    // is deleted, so every client write must fail while the lock exists.
+    function accountActive() {
+      return signedIn()
+        && !exists(
+          /databases/$(database)/documents/accountDeletionLocks/$(uid())
+        );
+    }
+
+    function emailVerified() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
     function uid() {
       return request.auth.uid;
     }
@@ -33,26 +47,98 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid())).data;
     }
 
-    // A banned member is signed in and has a profile, and is still refused
-    // everything that goes through here — reading the company's surveys,
-    // answering one, voting on a meeting. The one thing left open is their own
-    // user document, so the app can tell them why nothing works.
-    //
-    // Written as an `in` test rather than `profile().banned != true` because
-    // reading a field that was never written is an error in rules, and every
-    // account created before this existed has no such field.
-    function notBanned() {
-      return !('banned' in profile()) || profile().banned != true;
-    }
-
     function hasProfile() {
-      return signedIn()
-        && exists(/databases/$(database)/documents/users/$(uid()))
-        && notBanned();
+      return emailVerified()
+        && exists(/databases/$(database)/documents/users/$(uid()));
     }
 
     function myCompanyId() {
       return profile().companyId;
+    }
+
+    function belongsToCompany(companyId) {
+      return hasProfile() && myCompanyId() == companyId;
+    }
+
+    function canonicalProfileImagePath(userId) {
+      return 'profile_images/' + userId + '/avatar.jpg';
+    }
+
+    function validMemberProjection(data) {
+        return data.keys().hasOnly([
+          'fullName', 'profileImage', 'profileImageRevision', 'companyId',
+          'role', 'membership'
+        ])
+        && data.keys().hasAll([
+          'fullName', 'companyId', 'role', 'membership'
+        ])
+        && data.fullName is string
+        && data.fullName.size() > 0
+        && data.fullName.size() <= 120
+        && data.companyId is string
+        && data.companyId.size() > 0
+        && data.role in ['user', 'admin', 'moderator', 'superadmin']
+        && data.membership in ['active', 'pending']
+        && (!('profileImage' in data) || data.profileImage is string)
+        && (
+          !('profileImageRevision' in data)
+          || (
+            data.profileImageRevision is int
+            && data.profileImageRevision >= 0
+            && data.profileImageRevision <= 2147483647
+          )
+        );
+    }
+
+    function memberProjectionEquals(directoryData, userData) {
+      return directoryData.fullName == userData.fullName
+        && directoryData.companyId == userData.companyId
+        && directoryData.role == userData.role
+        && directoryData.membership == membershipOf(userData)
+        && (
+          (
+            !('profileImage' in directoryData)
+            && !('profileImage' in userData)
+          )
+          || (
+            'profileImage' in directoryData
+            && 'profileImage' in userData
+            && directoryData.profileImage == userData.profileImage
+          )
+        )
+        && (
+          (
+            !('profileImageRevision' in directoryData)
+            && !('profileImageRevision' in userData)
+          )
+          || (
+            'profileImageRevision' in directoryData
+            && 'profileImageRevision' in userData
+            && directoryData.profileImageRevision
+                 == userData.profileImageRevision
+          )
+        );
+    }
+
+    function memberProjectionSyncedAfter(userId, userData) {
+      return userData.companyId == ''
+        ? !existsAfter(
+            /databases/$(database)/documents/memberDirectory/$(userId)
+          )
+        : (
+          existsAfter(
+            /databases/$(database)/documents/memberDirectory/$(userId)
+          )
+          && validMemberProjection(getAfter(
+            /databases/$(database)/documents/memberDirectory/$(userId)
+          ).data)
+          && memberProjectionEquals(
+            getAfter(
+              /databases/$(database)/documents/memberDirectory/$(userId)
+            ).data,
+            userData
+          )
+        );
     }
 
     // Two levels of privilege, deliberately separate.
@@ -100,13 +186,41 @@ service cloud.firestore {
     // my own company" is told apart from "I am joining someone else's".
     function createdCompany(companyId) {
       return companyId != null
-        && exists(/databases/$(database)/documents/companies/$(companyId))
-        && get(/databases/$(database)/documents/companies/$(companyId))
+        && existsAfter(/databases/$(database)/documents/companies/$(companyId))
+        && getAfter(/databases/$(database)/documents/companies/$(companyId))
              .data.createdBy == uid();
     }
 
     function fieldUnchanged(field) {
       return request.resource.data[field] == resource.data[field];
+    }
+
+    function companyExists(companyId) {
+      return companyId != null
+        && companyId != ''
+        && exists(/databases/$(database)/documents/companies/$(companyId));
+    }
+
+    // Once a company's grace period expires, only the Admin SDK purge may
+    // touch its content. This closes the window where clients could create new
+    // children while the scheduled purge was enumerating old ones.
+    function companyAcceptsContent(companyId) {
+      return companyExists(companyId)
+        && (
+          !('deletionScheduledFor' in get(
+            /databases/$(database)/documents/companies/$(companyId)
+          ).data)
+          || request.time < get(
+            /databases/$(database)/documents/companies/$(companyId)
+          ).data.deletionScheduledFor
+        );
+    }
+
+    function companyAcceptsJoins(companyId) {
+      return companyExists(companyId)
+        && !('deletionScheduledFor' in get(
+          /databases/$(database)/documents/companies/$(companyId)
+        ).data);
     }
 
     // ---------- membership ----------
@@ -152,70 +266,146 @@ service cloud.firestore {
     // Full access to a company's content: a member, approved, not banned.
     function activeIn(companyId) {
       return hasProfile()
-        && companyId != null
-        && companyId != ''
+        && companyAcceptsContent(companyId)
         && myCompanyId() == companyId
         && membershipOf(profile()) == 'active'
         && !bannedFrom(companyId);
     }
 
+    // ---------- public company directory ----------
+
+    // Only this deliberately minimal projection is public; the authoritative
+    // company document (owner UID, deletion lifecycle and timestamps) is not.
+    match /companyDirectory/{companyId} {
+      function validDirectory(data) {
+        return data.keys().hasOnly(['name', 'joinPolicy'])
+          && data.keys().hasAll(['name', 'joinPolicy'])
+          && data.name is string
+          && data.name.size() > 0
+          && data.name.size() <= 120
+          && data.joinPolicy in ['open', 'approval'];
+      }
+
+      function matchesCompanyAfter() {
+        return existsAfter(
+          /databases/$(database)/documents/companies/$(companyId)
+        )
+        && request.resource.data.name == getAfter(
+          /databases/$(database)/documents/companies/$(companyId)
+        ).data.name
+        && request.resource.data.joinPolicy == getAfter(
+          /databases/$(database)/documents/companies/$(companyId)
+        ).data.joinPolicy;
+      }
+
+      allow read: if true;
+
+      // The verified-onboarding callable creates this with the Admin SDK. A
+      // client cannot create a public company projection directly.
+      allow create: if false;
+
+      allow update: if accountActive()
+        && companyAdminOf(companyId)
+        && validDirectory(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['name', 'joinPolicy'])
+        && matchesCompanyAfter();
+
+      allow delete: if false;
+    }
+
     // ---------- companies ----------
 
     match /companies/{companyId} {
-      // Deliberately readable without signing in.
-      //
-      // The "join an existing company" step lists companies so the user can
-      // pick one, and it runs before the account is created — requiring auth
-      // here silently returns an empty list and makes that path impossible.
-      //
-      // This is a real tradeoff, not an oversight: anyone can enumerate company
-      // names. They are not secrets, and nothing else about a company is stored
-      // here. The proper fix is to create the auth account at the *start* of
-      // registration rather than the end, after which this can require auth
-      // again. Tracked with the registration rework.
-      allow read: if true;
+      function validCompanyDocument(data) {
+        return data.keys().hasOnly([
+            'name',
+            'createdBy',
+            'createdAt',
+            'joinPolicy',
+            'deletionScheduledFor',
+            'deletionRequestedBy'
+          ])
+          && data.keys().hasAll(['name', 'createdBy'])
+          && data.name is string
+          && data.name.size() > 0
+          && data.name.size() <= 120
+          && data.createdBy is string
+          && (!('createdAt' in data) || data.createdAt is timestamp)
+          && (
+            !('joinPolicy' in data)
+            || data.joinPolicy in ['open', 'approval']
+          );
+      }
 
-      allow create: if signedIn()
-        && request.resource.data.createdBy == uid()
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0;
+      function validDeletionLifecycle() {
+        return (
+          !('deletionScheduledFor' in request.resource.data)
+          && !('deletionRequestedBy' in request.resource.data)
+        ) || (
+          request.resource.data.deletionScheduledFor is timestamp
+          && request.resource.data.deletionRequestedBy == uid()
+          // Client time is used to schedule the date, so tolerate one hour of
+          // clock skew/network delay while still enforcing essentially a week.
+          && request.resource.data.deletionScheduledFor
+               >= request.time + duration.value(167, 'h')
+        );
+      }
 
-      // Renaming a company is a superadmin action and must never reassign
-      // ownership.
+      allow get: if belongsToCompany(companyId);
+      allow list: if false;
+
+      // Creation is server-only so the canonical name lock cannot be omitted
+      // or forged. The callable also requires Auth email verification and App
+      // Check before it performs the atomic company/onboarding transaction.
+      allow create: if false;
+
       // The join policy is people-work, not content-work, so a moderator may
-      // not flip a company open.
+      // not flip a company open. Renaming is server-only until a trusted
+      // transaction can atomically release the old canonical name lock and
+      // reserve the new one; a client-only rename would bypass uniqueness.
       //
       // Scheduling or calling off the company's own destruction is narrower
       // still: only the person who created it. An admin runs the place; ending
       // it is the owner's alone.
-      allow update: if companyAdminOf(companyId)
+      allow update: if accountActive()
+        && companyAdminOf(companyId)
+        && validCompanyDocument(request.resource.data)
         && fieldUnchanged('createdBy')
         && (
-          !('joinPolicy' in request.resource.data)
-          || request.resource.data.joinPolicy in ['open', 'approval']
-        )
-        && (
-          ('deletionScheduledFor' in request.resource.data)
-            == ('deletionScheduledFor' in resource.data)
-          || resource.data.createdBy == uid()
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['joinPolicy'])
+          && getAfter(
+            /databases/$(database)/documents/companyDirectory/$(companyId)
+          ).data.joinPolicy == request.resource.data.joinPolicy
+          || (
+            resource.data.createdBy == uid()
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['deletionScheduledFor', 'deletionRequestedBy'])
+            && validDeletionLifecycle()
+          )
         );
 
-      // A company can only be destroyed by its owner, only after being
-      // scheduled, and only once the week has actually run out.
-      //
-      // The waiting period is enforced here rather than left to a countdown in
-      // the app. A grace period that exists only in the client is a grace
-      // period until somebody sends the request themselves — and this one
-      // deletes everybody's work, not just the owner's.
-      allow delete: if companyAdminOf(companyId)
-        && resource.data.createdBy == uid()
-        && 'deletionScheduledFor' in resource.data
-        && request.time >= resource.data.deletionScheduledFor;
+      // Destruction is server-only. A client cannot prove it also removed every
+      // child, membership and name lock, while the scheduled purge can.
+      allow delete: if false;
 
       // ---------- bans ----------
       //
       // One document per banned person, under the company that banned them.
       match /bans/{bannedUserId} {
+        function targetUserAfter() {
+          return getAfter(
+            /databases/$(database)/documents/users/$(bannedUserId)
+          ).data;
+        }
+
+        function targetMemberAfter() {
+          return getAfter(
+            /databases/$(database)/documents/memberDirectory/$(bannedUserId)
+          ).data;
+        }
+
         // The person themselves can read their own ban, which is how the app
         // can say "you are banned from Acme" instead of failing silently and
         // looking broken. Staff can read the whole list — that is the list an
@@ -225,8 +415,74 @@ service cloud.firestore {
 
         // Writing one is admin-only, and a ban may not be aimed at yourself:
         // an admin who bans themselves locks their own company.
-        allow create, delete: if companyAdminOf(companyId)
-          && bannedUserId != uid();
+        allow create: if accountActive()
+          && companyAdminOf(companyId)
+          && bannedUserId != uid()
+          && exists(/databases/$(database)/documents/users/$(bannedUserId))
+          && get(/databases/$(database)/documents/users/$(bannedUserId))
+               .data.companyId == companyId
+          && get(/databases/$(database)/documents/users/$(bannedUserId))
+               .data.role != 'superadmin'
+          && request.resource.data.keys()
+               .hasOnly([
+                 'name', 'bannedAt', 'bannedBy', 'previousMembership'
+               ])
+          && request.resource.data.keys()
+               .hasAll([
+                 'name', 'bannedAt', 'bannedBy', 'previousMembership'
+               ])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 120
+          && request.resource.data.bannedAt == request.time
+          && request.resource.data.bannedBy == uid()
+          && request.resource.data.previousMembership in ['active', 'pending']
+          && request.resource.data.previousMembership
+               == membershipOf(
+                 get(
+                   /databases/$(database)/documents/users/$(bannedUserId)
+                 ).data
+               )
+          // Storage rules can inspect only two Firestore documents. Mirror a
+          // ban as non-active membership in both existing projections so a
+          // banned viewer fails that two-document authorization check.
+          && existsAfter(
+            /databases/$(database)/documents/users/$(bannedUserId)
+          )
+          && existsAfter(
+            /databases/$(database)/documents/memberDirectory/$(bannedUserId)
+          )
+          && targetUserAfter().membership == 'pending'
+          && targetMemberAfter().membership == 'pending';
+
+        allow delete: if accountActive()
+          && companyAdminOf(companyId)
+          && (
+            (
+              existsAfter(
+                /databases/$(database)/documents/users/$(bannedUserId)
+              )
+              && existsAfter(
+                /databases/$(database)/documents/memberDirectory/$(bannedUserId)
+              )
+              && targetUserAfter().companyId == companyId
+              && targetMemberAfter().companyId == companyId
+              && targetUserAfter().membership
+                   == resource.data.previousMembership
+              && targetMemberAfter().membership
+                   == resource.data.previousMembership
+            )
+            // Erasing/removing the member may delete the directory first. In
+            // that case lifting the now-orphaned ban requires the private
+            // profile to have left the company in the same atomic transition.
+            || (
+              !existsAfter(
+                /databases/$(database)/documents/memberDirectory/$(bannedUserId)
+              )
+              && getAfter(
+                /databases/$(database)/documents/users/$(bannedUserId)
+              ).data.companyId == ''
+            )
+          );
 
         // Nothing to amend. Lifting a ban is a delete.
         allow update: if false;
@@ -242,13 +498,13 @@ service cloud.firestore {
     // register the same name at the same instant.
 
     match /companyNames/{slug} {
-      // Readable for the same reason as companies: the client checks
-      // availability before the account exists, to give a useful message.
-      allow read: if true;
+      // Uniqueness is enforced by create-only document IDs. The client does
+      // not need to enumerate or inspect owner UID/name-lock metadata.
+      allow read: if false;
 
-      allow create: if signedIn()
-        && request.resource.data.createdBy == uid()
-        && request.resource.data.companyId is string;
+      // Canonicalization happens in the verified-onboarding callable. Letting
+      // a client choose this document id would let it omit or forge the lock.
+      allow create: if false;
 
       // Never reassign a name — that is the whole constraint.
       allow update: if false;
@@ -256,47 +512,181 @@ service cloud.firestore {
       // Released only by whoever reserved it, and only as part of closing that
       // company down. Without this the name would stay locked for ever against
       // a company that no longer exists.
-      allow delete: if signedIn() && resource.data.createdBy == uid();
+      allow delete: if accountActive()
+        && resource.data.createdBy == uid()
+        && !exists(
+          /databases/$(database)/documents/companies/$(resource.data.companyId)
+        );
     }
 
-    // ---------- users ----------
+    // ---------- company member directory ----------
+
+    // Company screens read only this projection. The private users collection
+    // below contains email, birth date and notification tokens and is owner-only.
+    match /memberDirectory/{userId} {
+      function matchesPrivateProfileAfter() {
+        return existsAfter(
+          /databases/$(database)/documents/users/$(userId)
+        )
+        && validMemberProjection(request.resource.data)
+        && memberProjectionEquals(
+          request.resource.data,
+          getAfter(/databases/$(database)/documents/users/$(userId)).data
+        );
+      }
+
+      allow read: if sameCompany(resource.data.companyId);
+
+      // A verified existing profile may join later. Initial onboarding uses
+      // the trusted callable, which bypasses rules only after verifying Auth.
+      allow create: if accountActive()
+        && emailVerified()
+        && userId == uid()
+        && matchesPrivateProfileAfter()
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId))
+             .data.companyId == '';
+
+      // A member may synchronize their own name/avatar. Company admins may
+      // synchronize role and approval changes. In both cases the private
+      // profile must change to the exact same projection in the atomic write.
+      allow update: if accountActive()
+        && request.resource.data.companyId == resource.data.companyId
+        && matchesPrivateProfileAfter()
+        && (
+          userId == uid()
+          || companyAdminOf(resource.data.companyId)
+        );
+
+      // Leaving/removal/account deletion clears or removes the private source
+      // in the same atomic write. The Admin SDK bypasses these client rules.
+      allow delete: if accountActive()
+        && (
+          userId == uid()
+          || companyAdminOf(resource.data.companyId)
+        )
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && (
+          !existsAfter(/databases/$(database)/documents/users/$(userId))
+          || getAfter(/databases/$(database)/documents/users/$(userId))
+               .data.companyId == ''
+        );
+    }
+
+    // ---------- private user profiles ----------
 
     match /users/{userId} {
-      // Your own profile, or a colleague's — the app shows participant names
-      // and avatars, and user management lists the company's members.
-      allow read: if signedIn()
-        && (userId == uid() || sameCompany(resource.data.companyId));
-
-      // Sign-up writes this document. 'superadmin' is only accepted when the
-      // companyId names a company this same user just created; joining an
-      // existing company forces 'user'. Without this, anyone could pick any
-      // company at sign-up and hand themselves admin over it.
-      //
-      // A new member's `membership` is dictated by the company's join policy,
-      // not chosen by the client — otherwise "approval required" would be a
-      // suggestion that anyone could decline by editing one field of their own
-      // sign-up payload. Someone already banned from a company cannot register
-      // straight back into it either.
-      allow create: if signedIn()
-        && userId == uid()
-        && (
-          (
-            request.resource.data.role == 'user'
-            && (
-              request.resource.data.companyId == ''
-              || (
-                !bannedFrom(request.resource.data.companyId)
-                && membershipOf(request.resource.data)
-                     == requiredJoinStatus(request.resource.data.companyId)
-              )
+      function validUserDocument(data) {
+        return data.keys().hasOnly([
+            'membership',
+            'fullName',
+            'birthdate',
+            'email',
+            'role',
+            'createdAt',
+            'companyName',
+            'companyId',
+            'profileImage',
+            'profileImageRevision',
+            'fcmTokens',
+            'notificationLocale',
+            'pendingOnboardingType',
+            'pendingCompanyName',
+            'pendingCompanyId'
+          ])
+          && data.keys().hasAll([
+            'membership', 'fullName', 'birthdate', 'email', 'role', 'createdAt',
+            'companyId'
+          ])
+          && data.membership in ['active', 'pending']
+          && data.fullName is string
+          && data.fullName.size() > 0
+          && data.fullName.size() <= 120
+          && data.birthdate is string
+          && data.birthdate.size() <= 50
+          && data.email is string
+          && data.email.size() <= 320
+          && data.role in ['user', 'admin', 'moderator', 'superadmin']
+          && data.createdAt is timestamp
+          && data.companyId is string
+          && (!('companyName' in data) || data.companyName is string)
+          && (!('profileImage' in data) || data.profileImage is string)
+          && (
+            !('profileImageRevision' in data)
+            || (
+              data.profileImageRevision is int
+              && data.profileImageRevision >= 0
+              && data.profileImageRevision <= 2147483647
             )
           )
-          || (
-            request.resource.data.role == 'superadmin'
-            && createdCompany(request.resource.data.companyId)
-            && membershipOf(request.resource.data) == 'active'
+          && (
+            !('fcmTokens' in data)
+            || (data.fcmTokens is list && data.fcmTokens.size() <= 10)
           )
-        );
+          && (
+            !('notificationLocale' in data)
+            || data.notificationLocale in ['en', 'de', 'sq']
+          )
+          && (
+            !('pendingOnboardingType' in data)
+            || data.pendingOnboardingType in ['createCompany', 'joinCompany']
+          )
+          && (
+            !('pendingCompanyName' in data)
+            || (
+              data.pendingCompanyName is string
+              && data.pendingCompanyName.size() > 0
+              && data.pendingCompanyName.size() <= 120
+            )
+          )
+          && (
+            !('pendingCompanyId' in data)
+            || (
+              data.pendingCompanyId is string
+              && data.pendingCompanyId.size() > 0
+              && data.pendingCompanyId.size() <= 128
+            )
+          );
+      }
+
+      function validPendingRegistration(data) {
+        return validUserDocument(data)
+          && data.keys().hasOnly([
+            'membership', 'fullName', 'birthdate', 'email', 'role',
+            'createdAt', 'companyId', 'notificationLocale',
+            'pendingOnboardingType', 'pendingCompanyName', 'pendingCompanyId'
+          ])
+          && data.companyId == ''
+          && data.role == 'user'
+          && data.membership == 'active'
+          && 'pendingOnboardingType' in data
+          && (
+            (
+              data.pendingOnboardingType == 'createCompany'
+              && 'pendingCompanyName' in data
+              && !('pendingCompanyId' in data)
+            )
+            || (
+              data.pendingOnboardingType == 'joinCompany'
+              && 'pendingCompanyId' in data
+              && !('pendingCompanyName' in data)
+            )
+          );
+      }
+
+      // Private account data is owner-only. Company screens use the minimal
+      // memberDirectory projection instead.
+      allow read: if signedIn() && userId == uid();
+
+      // Registration is deliberately private and inert. Before verification a
+      // user may persist only this base profile plus one pending intent. It has
+      // no tenant id, elevated role, member projection or public name lock.
+      allow create: if accountActive()
+        && userId == uid()
+        && validPendingRegistration(request.resource.data)
+        && memberProjectionSyncedAfter(userId, request.resource.data)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.email == request.auth.token.email;
 
       // You may edit your own profile but never your own role or company.
       // An admin may change a *colleague's* role, but not their company, and
@@ -312,14 +702,45 @@ service cloud.firestore {
       // Restricting the assignable set closes the other half: superadmin means
       // "created this company", which is established at sign-up by
       // createdCompany() and must not be grantable afterwards by anyone.
-      allow update: if signedIn() && (
-        // -- your own profile: name, birthday, avatar
+      allow update: if accountActive() && emailVerified() && (
+        // -- your own profile: name, birthday and notification preferences.
+        // Avatar path/revision writes are server-only so a replacement and its
+        // monotonic refresh signal cannot be separated or forged.
         (
           userId == uid()
-          && fieldUnchanged('role')
-          && fieldUnchanged('companyId')
-          // Approving yourself would make "approval required" meaningless.
-          && membershipOf(request.resource.data) == membershipOf(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'fullName', 'birthdate', 'fcmTokens', 'notificationLocale'
+          ])
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['fullName'])
+            || (
+              request.resource.data.fullName is string
+              && request.resource.data.fullName.size() > 0
+              && request.resource.data.fullName.size() <= 120
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['birthdate'])
+            || (
+              request.resource.data.birthdate is string
+              && request.resource.data.birthdate.size() <= 50
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['fcmTokens'])
+            || (
+              request.resource.data.fcmTokens is list
+              && request.resource.data.fcmTokens.size() <= 10
+            )
+          )
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['notificationLocale'])
+            || request.resource.data.notificationLocale in ['en', 'de', 'sq']
+          )
         )
 
         // -- joining a company
@@ -332,10 +753,16 @@ service cloud.firestore {
           userId == uid()
           && resource.data.companyId == ''
           && request.resource.data.companyId != ''
+          && !exists(
+            /databases/$(database)/documents/memberDirectory/$(userId)
+          )
           && request.resource.data.role == 'user'
+          && companyAcceptsJoins(request.resource.data.companyId)
           && !bannedFrom(request.resource.data.companyId)
           && membershipOf(request.resource.data)
                == requiredJoinStatus(request.resource.data.companyId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['companyId', 'role', 'membership'])
         )
 
         // -- leaving a company
@@ -348,6 +775,9 @@ service cloud.firestore {
           && resource.data.role != 'superadmin'
           && request.resource.data.companyId == ''
           && request.resource.data.role == 'user'
+          && membershipOf(request.resource.data) == 'active'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['companyId', 'role', 'membership'])
         )
 
         // -- an admin managing a colleague
@@ -358,9 +788,18 @@ service cloud.firestore {
         || (
           userId != uid()
           && companyAdminOf(resource.data.companyId)
+          && resource.data.role != 'superadmin'
           && fieldUnchanged('companyId')
           && request.resource.data.role in ['admin', 'moderator', 'user']
           && membershipOf(request.resource.data) in ['active', 'pending']
+          && (
+            membershipOf(request.resource.data) != 'active'
+            || !existsAfter(
+              /databases/$(database)/documents/companies/$(resource.data.companyId)/bans/$(userId)
+            )
+          )
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['role', 'membership'])
         )
 
         // -- an admin removing a colleague
@@ -371,17 +810,37 @@ service cloud.firestore {
         || (
           userId != uid()
           && companyAdminOf(resource.data.companyId)
+          && resource.data.role != 'superadmin'
           && request.resource.data.companyId == ''
           && request.resource.data.role == 'user'
+          && membershipOf(request.resource.data) == 'active'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['companyId', 'role', 'membership'])
         )
+      ) && (
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'fullName', 'profileImage', 'profileImageRevision', 'companyId',
+          'role', 'membership'
+        ])
+        || memberProjectionSyncedAfter(userId, request.resource.data)
       );
 
-      // Account deletion, from AccountDeletionService.
-      allow delete: if signedIn() && userId == uid();
+      // Account deletion is trusted and server-only. A client cannot prove it
+      // also removed notes, votes, images, bans and Auth.
+      allow delete: if false;
 
       // Rich-text note bodies. Strictly private.
       match /notes/{noteId} {
-        allow read, write: if signedIn() && userId == uid();
+        allow read: if signedIn() && userId == uid();
+        allow create, update: if accountActive() && userId == uid();
+        // The list row and rich body are one logical note. Requiring the other
+        // half to disappear in the same atomic request prevents old clients or
+        // interrupted cleanup from creating a new orphan.
+        allow delete: if accountActive()
+          && userId == uid()
+          && !existsAfter(
+            /databases/$(database)/documents/notes/$(userId)/userNotes/$(noteId)
+          );
       }
     }
 
@@ -389,23 +848,93 @@ service cloud.firestore {
     // Note titles and completion state. Also strictly private.
 
     match /notes/{userId} {
-      allow read, write: if signedIn() && userId == uid();
+      allow read: if signedIn() && userId == uid();
+      allow write: if accountActive() && userId == uid();
 
       match /userNotes/{noteId} {
-        allow read, write: if signedIn() && userId == uid();
+        allow read: if signedIn() && userId == uid();
+        allow create, update: if accountActive() && userId == uid();
+        allow delete: if accountActive()
+          && userId == uid()
+          && !existsAfter(
+            /databases/$(database)/documents/users/$(userId)/notes/$(noteId)
+          );
       }
     }
 
     // ---------- surveys ----------
 
     match /surveys/{surveyId} {
+      function validSurveyDocument(data) {
+        return data.keys().hasOnly([
+            'surveyName',
+            'surveyDescription',
+            'timeCreated',
+            'questions',
+            'id',
+            'participants',
+            'deadline',
+            'timeLimitPerQuestion',
+            'surveyType',
+            'companyId',
+            'createdBy'
+          ])
+          && data.keys().hasAll([
+            'surveyName', 'surveyDescription', 'timeCreated', 'questions', 'id',
+            'participants', 'deadline', 'timeLimitPerQuestion', 'surveyType',
+            'companyId', 'createdBy'
+          ])
+          && data.surveyName is string
+          && data.surveyName.size() > 0
+          && data.surveyName.size() <= 160
+          && data.surveyDescription is string
+          && data.surveyDescription.size() <= 5000
+          && data.timeCreated is timestamp
+          && data.questions is list
+          && data.questions.size() > 0
+          && data.questions.size() <= 100
+          && data.id == surveyId
+          && data.participants is list
+          && data.participants.size() == 0
+          && data.deadline is timestamp
+          && data.timeLimitPerQuestion is int
+          && data.timeLimitPerQuestion >= 0
+          && data.timeLimitPerQuestion <= 86400
+          && data.surveyType in [0, 1]
+          && data.companyId is string
+          && data.createdBy == uid();
+      }
+
       allow read: if sameCompany(resource.data.companyId);
 
       // Only admins author surveys, and only inside their own company.
-      allow create: if adminOf(request.resource.data.companyId);
-      allow update: if adminOf(resource.data.companyId)
-        && fieldUnchanged('companyId');
-      allow delete: if adminOf(resource.data.companyId);
+      allow create: if accountActive()
+        && adminOf(request.resource.data.companyId)
+        && validSurveyDocument(request.resource.data)
+        && existsAfter(
+          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
+        )
+        && getAfter(
+          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
+        ).data.companyId == request.resource.data.companyId
+        && request.resource.data.timeCreated <= request.time
+        && request.resource.data.timeCreated
+             >= request.time - duration.value(1, 'd')
+        && request.resource.data.deadline > request.time;
+      allow update: if accountActive()
+        && adminOf(resource.data.companyId)
+        && fieldUnchanged('companyId')
+        // Questions and grading semantics are immutable once published. With no
+        // count query in rules, this is the only fail-closed way to guarantee a
+        // response is always graded against the questions it answered.
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'surveyName', 'surveyDescription', 'deadline', 'timeLimitPerQuestion'
+        ]);
+      allow delete: if accountActive()
+        && adminOf(resource.data.companyId)
+        && !existsAfter(
+          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
+        );
 
       // One submission per participant, keyed by uid.
       match /participants/{participantId} {
@@ -414,55 +943,260 @@ service cloud.firestore {
                    .data.companyId;
         }
 
+        function surveyOpen() {
+          return get(/databases/$(database)/documents/surveys/$(surveyId))
+                   .data.deadline is timestamp
+            && request.time <= get(
+              /databases/$(database)/documents/surveys/$(surveyId)
+            ).data.deadline;
+        }
+
+        function validSubmission(data) {
+          return data.keys().hasOnly([
+              'userId',
+              'name',
+              'answers',
+              'score',
+              'submittedAt',
+              'participantSubmitted',
+              'imageProfile',
+              'profileImageRevision',
+              'textAnswersReviewed',
+              'totalCorrectAnswers',
+              'gradedQuestionCount',
+              'gradingStatus'
+            ])
+            && data.keys().hasAll([
+              'userId', 'name', 'answers', 'score', 'submittedAt',
+              'participantSubmitted', 'imageProfile', 'textAnswersReviewed',
+              'profileImageRevision', 'totalCorrectAnswers',
+              'gradedQuestionCount', 'gradingStatus'
+            ])
+            && data.userId == uid()
+            && data.name is string
+            && data.name.size() <= 120
+            && data.answers is map
+            && data.answers.size() <= 100
+            // Only the server-side grading trigger may replace these sentinels.
+            && data.score == 0
+            && data.submittedAt == request.time
+            && data.participantSubmitted == true
+            // A response may snapshot only the caller's canonical Storage
+            // path, never a bearer-token URL or an arbitrary remote image.
+            && data.imageProfile in [
+              '', canonicalProfileImagePath(uid())
+            ]
+            && data.profileImageRevision is int
+            && data.profileImageRevision >= 0
+            && data.profileImageRevision <= 2147483647
+            && data.textAnswersReviewed is map
+            && data.textAnswersReviewed.size() == 0
+            && data.totalCorrectAnswers == 0
+            && data.gradedQuestionCount == 0
+            && data.gradingStatus == 'processing';
+        }
+
         // Participants see their own result; admins see everyone's.
         allow read: if signedIn()
-          && (participantId == uid() || adminOf(surveyCompanyId()));
+          && (
+            (participantId == uid() && sameCompany(surveyCompanyId()))
+            || adminOf(surveyCompanyId())
+          );
 
         // You submit your own answers, under your own id, once.
-        allow create: if signedIn()
+        allow create: if accountActive()
           && participantId == uid()
-          && request.resource.data.userId == uid()
-          && sameCompany(surveyCompanyId());
+          && validSubmission(request.resource.data)
+          && sameCompany(surveyCompanyId())
+          && exists(
+            /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
+          )
+          && surveyOpen();
 
-        // Grading is an admin action. A participant must never be able to
-        // rewrite their own score or correct-answer count after submitting —
-        // that is the whole point of scoring server-side of the client.
-        allow update: if adminOf(surveyCompanyId());
+        // Staff supplies only free-text verdicts. A trusted update trigger
+        // derives the complete score and correct-answer total atomically.
+        // No client, including an admin client, may author those totals.
+        allow update: if accountActive()
+          && adminOf(surveyCompanyId())
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'textAnswersReviewed'
+          ])
+          && request.resource.data.textAnswersReviewed is map
+          && request.resource.data.textAnswersReviewed.size() <= 100;
 
-        allow delete: if signedIn()
-          && (participantId == uid() || adminOf(surveyCompanyId()));
+        allow delete: if accountActive()
+          && (
+            (participantId == uid() && sameCompany(surveyCompanyId()))
+            || adminOf(surveyCompanyId())
+          );
       }
+    }
+
+    // Grading material is write-only at survey creation and immutable after
+    // publication. Cloud Functions use the Admin SDK and are not subject to
+    // these client rules. Even an administrator client cannot retrieve a key.
+    match /surveyAnswerKeys/{surveyId} {
+      function validAnswerKey(data) {
+        return data.keys().hasOnly([
+            'schemaVersion', 'surveyId', 'companyId', 'questionKeys'
+          ])
+          && data.keys().hasAll([
+            'schemaVersion', 'surveyId', 'companyId', 'questionKeys'
+          ])
+          && data.schemaVersion == 1
+          && data.surveyId == surveyId
+          && data.companyId is string
+          && data.questionKeys is list
+          && data.questionKeys.size() > 0
+          && data.questionKeys.size() <= 100;
+      }
+
+      allow read: if false;
+
+      allow create: if accountActive()
+        && adminOf(request.resource.data.companyId)
+        && validAnswerKey(request.resource.data)
+        && existsAfter(
+          /databases/$(database)/documents/surveys/$(surveyId)
+        )
+        && getAfter(
+          /databases/$(database)/documents/surveys/$(surveyId)
+        ).data.companyId == request.resource.data.companyId
+        && getAfter(
+          /databases/$(database)/documents/surveys/$(surveyId)
+        ).data.questions.size() == request.resource.data.questionKeys.size();
+
+      allow update: if false;
+
+      allow delete: if accountActive()
+        && adminOf(resource.data.companyId)
+        && !existsAfter(
+          /databases/$(database)/documents/surveys/$(surveyId)
+        );
     }
 
     // ---------- appointments ----------
 
     match /appointments/{appointmentId} {
+      function validAppointmentDocument(data) {
+        return data.keys().hasOnly([
+            'companyId',
+            'title',
+            'description',
+            'availableDates',
+            'participants',
+            'availableTimeSlots',
+            'appointmentId',
+            'expirationDate',
+            'expirationAt',
+            'confirmedTimeSlots',
+            'participantUserIds',
+            'creationDate',
+            'createdBy'
+          ])
+          && data.keys().hasAll([
+            'companyId', 'title', 'description', 'availableDates',
+            'participants', 'availableTimeSlots', 'appointmentId',
+            'expirationDate', 'confirmedTimeSlots', 'creationDate'
+          ])
+          && data.companyId is string
+          && data.title is string
+          && data.title.size() > 0
+          && data.title.size() <= 160
+          && data.description is string
+          && data.description.size() <= 5000
+          && data.availableDates is list
+          && data.participants is list
+          && data.availableTimeSlots is list
+          && data.availableTimeSlots.size() > 0
+          && data.availableTimeSlots.size() <= 100
+          && data.appointmentId == appointmentId
+          // The ISO string remains for existing clients. New writes also carry
+          // expirationAt, the Timestamp used for enforceable deadlines.
+          && data.expirationDate is string
+          && (!('expirationAt' in data) || data.expirationAt is timestamp)
+          && data.confirmedTimeSlots is list
+          // Legacy appointments predate the server-derived voter cache. Keep
+          // those parents editable/confirmable without letting any client add
+          // or alter the field; trusted vote triggers and the backfill own it.
+          && (!('participantUserIds' in data)
+              || data.participantUserIds is list)
+          && data.creationDate is timestamp
+          // Appointments created before the notification trigger had no
+          // creator field. New documents require it below, while update rules
+          // exclude it from affectedKeys so a legacy document cannot invent
+          // or reassign an owner later.
+          && (!('createdBy' in data) || data.createdBy is string);
+      }
+
+      function validConfirmationTransition() {
+        return request.resource.data.confirmedTimeSlots.size() <= 1
+          && (
+            request.resource.data.confirmedTimeSlots.size() == 0
+            || request.resource.data.confirmedTimeSlots[0]
+                 in request.resource.data.availableTimeSlots
+          )
+          && (
+            resource.data.confirmedTimeSlots.size() == 0
+            || request.resource.data.confirmedTimeSlots.size() == 0
+            || request.resource.data.confirmedTimeSlots
+                 == resource.data.confirmedTimeSlots
+          );
+      }
+
+      function appointmentAcceptsVotes() {
+        return 'expirationAt' in resource.data
+          && resource.data.expirationAt is timestamp
+          && request.time < resource.data.expirationAt;
+      }
+
       allow read: if sameCompany(resource.data.companyId);
 
-      allow create: if adminOf(request.resource.data.companyId);
-      allow delete: if adminOf(resource.data.companyId);
+      allow create: if accountActive()
+        && adminOf(request.resource.data.companyId)
+        && validAppointmentDocument(request.resource.data)
+        && 'createdBy' in request.resource.data
+        && 'expirationAt' in request.resource.data
+        && request.resource.data.createdBy == uid()
+        && request.resource.data.expirationAt > request.time
+        && request.resource.data.creationDate <= request.time
+        && request.resource.data.participants.size() == 0
+        && request.resource.data.confirmedTimeSlots.size() == 0
+        && 'participantUserIds' in request.resource.data
+        && request.resource.data.participantUserIds.size() == 0;
+      allow delete: if accountActive() && adminOf(resource.data.companyId);
 
-      // Editing the appointment itself stays with admins. Voting, though, has
-      // to write to this document — the set of people who have answered lives
-      // here — so a colleague may make exactly one change: adding their own uid
-      // to participantUserIds.
-      //
-      // Everything is pinned down: no other field may change, nobody may be
-      // removed, and the only id that may appear is the caller's own. Without
-      // the admin-only rule being relaxed like this, a non-admin's vote was
-      // rejected outright.
-      allow update: if (
-        adminOf(resource.data.companyId) && fieldUnchanged('companyId')
-      ) || (
-        sameCompany(resource.data.companyId)
-        && request.resource.data.diff(resource.data)
-             .affectedKeys().hasOnly(['participantUserIds'])
-        && request.resource.data.participantUserIds
-             .hasAll(resource.data.participantUserIds)
-        && request.resource.data.participantUserIds.toSet()
-             .difference(resource.data.participantUserIds.toSet())
-             .hasOnly([uid()])
-      );
+      // Appointment content stays with staff. participantUserIds is a compact
+      // cache derived by trusted vote create/delete triggers; no client,
+      // including an admin client, may author it directly.
+      allow update: if accountActive()
+        && adminOf(resource.data.companyId)
+        && fieldUnchanged('companyId')
+        && validAppointmentDocument(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'title', 'description', 'availableDates', 'participants',
+          'availableTimeSlots', 'expirationDate', 'expirationAt',
+          'confirmedTimeSlots'
+        ])
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+            'expirationDate', 'expirationAt'
+          ])
+          || request.resource.data.diff(resource.data).affectedKeys().hasAll([
+            'expirationDate', 'expirationAt'
+          ])
+          || (
+            !('expirationAt' in resource.data)
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['expirationAt'])
+          )
+        )
+        && (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['expirationAt'])
+          || request.resource.data.expirationAt > request.time
+        )
+        && validConfirmationTransition();
 
       // Participant ids here are '<uid>-<slotStart>-<slotEnd>', so ownership is
       // asserted through the userId field rather than the document id.
@@ -472,16 +1206,70 @@ service cloud.firestore {
                    .data.companyId;
         }
 
+        function appointmentOpen() {
+          return get(
+            /databases/$(database)/documents/appointments/$(appointmentId)
+          ).data.confirmedTimeSlots.size() == 0
+            && get(
+              /databases/$(database)/documents/appointments/$(appointmentId)
+            ).data.expirationAt is timestamp
+            && request.time < get(
+              /databases/$(database)/documents/appointments/$(appointmentId)
+            ).data.expirationAt;
+        }
+
+        function validVote(data) {
+          return data.keys().hasOnly([
+              'userName', 'date', 'timeSlot', 'status', 'userId', 'participated'
+            ])
+            && data.keys().hasAll([
+              'userName', 'date', 'timeSlot', 'status', 'userId', 'participated'
+            ])
+            && data.userName is string
+            && data.userName.size() <= 120
+            && data.date is string
+            && data.timeSlot is map
+            && data.timeSlot.keys().hasOnly([
+              'start', 'end', 'expirationDate', 'isConfirmed'
+            ])
+            && data.timeSlot.keys().hasAll([
+              'start', 'end', 'expirationDate', 'isConfirmed'
+            ])
+            && data.timeSlot.start is string
+            && data.timeSlot.end is string
+            && data.timeSlot.expirationDate is string
+            && data.timeSlot.isConfirmed is bool
+            && data.date == data.timeSlot.start
+            && data.timeSlot in get(
+              /databases/$(database)/documents/appointments/$(appointmentId)
+            ).data.availableTimeSlots
+            && data.status in ['joined', 'maybe', 'declined']
+            && data.userId == uid()
+            && data.participated == true
+            && participantId
+                 == uid() + '-' + data.timeSlot.start + '-' + data.timeSlot.end;
+        }
+
         // Everyone in the company can see who is coming to a meeting.
         allow read: if sameCompany(appointmentCompanyId());
 
-        allow create, update: if signedIn()
-          && request.resource.data.userId == uid()
-          && sameCompany(appointmentCompanyId());
+        allow create: if accountActive()
+          && validVote(request.resource.data)
+          && sameCompany(appointmentCompanyId())
+          && appointmentOpen();
 
-        allow delete: if signedIn()
+        allow update: if accountActive()
+          && resource.data.userId == uid()
+          && validVote(request.resource.data)
+          && sameCompany(appointmentCompanyId())
+          && appointmentOpen();
+
+        allow delete: if accountActive()
           && (
-            resource.data.userId == uid()
+            (
+              resource.data.userId == uid()
+              && sameCompany(appointmentCompanyId())
+            )
             || adminOf(appointmentCompanyId())
           );
       }

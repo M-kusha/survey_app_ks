@@ -3,21 +3,32 @@
   "description": "Server-side notifications and scheduled cleanup for EchoMeet.",
   "private": true,
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "lib/index.js",
   "scripts": {
+    "backfill:appointment-expiration": "node scripts/backfill_appointment_expiration.js",
+    "backfill:appointment-participants": "node scripts/backfill_appointment_participants.js",
+    "backfill:company-directory": "node scripts/backfill_company_directory.js",
+    "migrate:avatar-privacy": "node scripts/migrate_avatar_privacy.js",
+    "migrate:survey-answer-keys": "node scripts/migrate_survey_answer_keys.js",
+    "backfill:member-directory": "node scripts/backfill_member_directory.js",
     "build": "tsc",
+    "test": "npm run build && node --test test/*.test.js",
     "watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
-    "deploy": "npm run build && firebase deploy --only functions",
-    "logs": "firebase functions:log"
+    "deploy": "npm run build && firebase deploy --only functions --project echomeet-app",
+    "logs": "firebase functions:log --project echomeet-app"
   },
   "dependencies": {
-    "firebase-admin": "^12.6.0",
-    "firebase-functions": "^6.1.0"
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2",
+    "sharp": "0.35.3"
   },
   "devDependencies": {
     "typescript": "^5.6.3"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

@@ -1,11 +1,43 @@
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { logger } from 'firebase-functions';
-import { onDocumentCreated, onDocumentUpdated } from 'firebase-functions/v2/firestore';
+import {
+  onDocumentCreated,
+  onDocumentDeleted,
+  onDocumentUpdated,
+} from 'firebase-functions/v2/firestore';
+import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
+import { isDeepStrictEqual } from 'node:util';
 
+import {
+  CompanyOwnerDeletionError,
+  deleteUserAccount,
+  hasRecentAuthentication,
+  purgeExpiredAccountDeletionLocks,
+} from './account_deletion';
+import {
+  registerAppointmentParticipant,
+  unregisterAppointmentParticipant,
+} from './appointment_participants';
 import { activeMemberIds, companyAdminIds, notify } from './messaging';
+import {
+  appointmentConfirmedCopy,
+  appointmentCreatedCopy,
+  appointmentReminderCopy,
+  joinRequestCopy,
+  surveyCreatedCopy,
+  surveyReminderCopy,
+} from './notification_copy';
 import { purgeCompany } from './purge';
+import { scoreTrustedSurvey } from './trusted_scoring';
+import { finalizePendingOnboarding } from './onboarding';
+import { joinRequestCompanyId } from './join_requests';
+import {
+  InvalidProfileImageError,
+  ProfileImageStateError,
+  uploadOwnProfileImage,
+} from './profile_images';
 
 initializeApp();
 
@@ -24,6 +56,151 @@ initializeApp();
 // Everything is kept here rather than only the triggers. Two regions for six
 // functions buys nothing and makes the next person wonder why.
 const region = 'europe-west4';
+
+/**
+ * Converts a verified user's private registration intent into tenant state.
+ * App Check and Firebase Auth are both required; the transaction independently
+ * re-checks the Auth record before creating any public/company documents.
+ */
+export const completeOnboarding = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    const data =
+      request.data && typeof request.data === 'object'
+        ? (request.data as Record<string, unknown>)
+        : {};
+    return finalizePendingOnboarding(request.auth.uid, {
+      companyName: data.companyName,
+      companyId: data.companyId,
+    });
+  },
+);
+
+/**
+ * Re-encodes and stores the signed-in user's avatar without a bearer token.
+ * The callable derives the Storage path from Auth; the client never supplies a
+ * uid, object path, MIME type, or Firestore reference.
+ */
+export const uploadProfileImage = onCall(
+  {
+    region,
+    timeoutSeconds: 60,
+    memory: '512MiB',
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    const data =
+      request.data != null && typeof request.data === 'object'
+        ? (request.data as Record<string, unknown>)
+        : null;
+    if (
+      data == null ||
+      Object.keys(data).length !== 1 ||
+      !Object.prototype.hasOwnProperty.call(data, 'jpegBase64')
+    ) {
+      throw new HttpsError('invalid-argument', 'invalid-profile-image');
+    }
+
+    try {
+      return await uploadOwnProfileImage(request.auth.uid, data.jpegBase64);
+    } catch (error) {
+      if (error instanceof InvalidProfileImageError) {
+        throw new HttpsError('invalid-argument', 'invalid-profile-image');
+      }
+      if (error instanceof ProfileImageStateError) {
+        throw new HttpsError('failed-precondition', error.message);
+      }
+
+      logger.error('profile image upload failed closed', {
+        uid: request.auth.uid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new HttpsError('internal', 'profile-image-upload-incomplete');
+    }
+  },
+);
+
+/**
+ * Completes account erasure at the trusted boundary after a recent sign-in.
+ * Cleanup is retryable; Auth is deleted only after every data store succeeds.
+ */
+export const deleteMyAccount = onCall(
+  {
+    region,
+    timeoutSeconds: 540,
+    memory: '512MiB',
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (!hasRecentAuthentication(request.auth.token.auth_time)) {
+      throw new HttpsError('failed-precondition', 'recent-login-required');
+    }
+
+    try {
+      const deleteOwnedCompany =
+        request.data != null &&
+        typeof request.data === 'object' &&
+        request.data.deleteOwnedCompany === true;
+      await deleteUserAccount(request.auth.uid, { deleteOwnedCompany });
+      return { deleted: true };
+    } catch (error) {
+      if (error instanceof CompanyOwnerDeletionError) {
+        throw new HttpsError('failed-precondition', 'company-owner');
+      }
+
+      logger.error('account deletion did not complete; Auth retained', {
+        uid: request.auth.uid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new HttpsError('internal', 'account-deletion-incomplete');
+    }
+  },
+);
+
+async function notifyJoinRequest(
+  userId: string,
+  profile: Record<string, unknown>,
+): Promise<void> {
+  const companyId = joinRequestCompanyId(profile, false);
+  if (!companyId) return;
+
+  // A ban mirrors membership to pending for Storage authorization. It is not a
+  // new join request, and its atomic ban document is visible by the time this
+  // trigger runs. Check it before notifying admins.
+  const ban = await getFirestore()
+    .collection('companies')
+    .doc(companyId)
+    .collection('bans')
+    .doc(userId)
+    .get();
+  if (!joinRequestCompanyId(profile, ban.exists)) return;
+
+  const admins = await companyAdminIds(companyId);
+  await notify(
+    { userIds: admins },
+    (locale) => ({
+      ...joinRequestCopy(locale, profile.fullName),
+      data: { type: 'approval', userId },
+    }),
+  );
+}
 
 /**
  * A new survey or test, announced to the company.
@@ -46,12 +223,144 @@ export const onSurveyCreated = onDocumentCreated(
 
     await notify(
       { userIds: audience },
-      {
-        title: isTest ? 'New test' : 'New survey',
-        body: `${survey.surveyName ?? ''} is open for responses.`,
+      (locale) => ({
+        ...surveyCreatedCopy(locale, survey.surveyName, isTest),
         data: { type: 'survey', surveyId: event.params.surveyId },
-      },
+      }),
     );
+  },
+);
+
+/**
+ * Scores an initial response at the trusted boundary.
+ *
+ * Rules require client-written score fields to be zero sentinels, so a forged
+ * first write cannot become an authoritative result. The calculation is
+ * deterministic and idempotent if the event is delivered more than once.
+ */
+export const onSurveyResponseCreated = onDocumentCreated(
+  { document: 'surveys/{surveyId}/participants/{participantId}', region },
+  async (event) => {
+    const responseRef = event.data?.ref;
+    const surveyRef = responseRef?.parent.parent;
+    if (!responseRef || !surveyRef) return;
+
+    const answerKeyRef = getFirestore()
+      .collection('surveyAnswerKeys')
+      .doc(event.params.surveyId);
+
+    await getFirestore().runTransaction(async (transaction) => {
+      const [current, survey, answerKey] = await Promise.all([
+        transaction.get(responseRef),
+        transaction.get(surveyRef),
+        transaction.get(answerKeyRef),
+      ]);
+      if (!current.exists || current.get('serverScoredAt')) return;
+
+      if (!survey.exists) {
+        transaction.update(responseRef, {
+          gradingStatus: 'error',
+          serverScoredAt: FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      try {
+        const grade = scoreTrustedSurvey({
+          surveyId: event.params.surveyId,
+          survey: survey.data() ?? {},
+          answerKey: answerKey.data(),
+          response: current.data() ?? {},
+        });
+
+        transaction.update(responseRef, {
+          score: grade.score,
+          totalCorrectAnswers: grade.correctCount,
+          gradedQuestionCount: grade.gradedCount,
+          gradingStatus: grade.gradingStatus,
+          serverScoredAt: FieldValue.serverTimestamp(),
+        });
+      } catch (error) {
+        logger.error('trusted survey scoring failed closed', {
+          error,
+          participantId: event.params.participantId,
+          surveyId: event.params.surveyId,
+        });
+        transaction.update(responseRef, {
+          gradingStatus: 'error',
+          serverScoredAt: FieldValue.serverTimestamp(),
+        });
+      }
+    });
+  },
+);
+
+/**
+ * Recomputes the complete grade after a staff member reviews free text.
+ *
+ * The client may change only the review map. Score and correct-answer totals
+ * are written here from the immutable questions and submitted answers, in one
+ * transaction. A stale out-of-order event is discarded rather than replacing
+ * a newer review's grade.
+ */
+export const onSurveyResponseUpdated = onDocumentUpdated(
+  { document: 'surveys/{surveyId}/participants/{participantId}', region },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    const responseRef = event.data?.after.ref;
+    if (!before || !after || !responseRef) return;
+
+    const beforeReviews = before.textAnswersReviewed ?? {};
+    const afterReviews = after.textAnswersReviewed ?? {};
+    if (isDeepStrictEqual(beforeReviews, afterReviews)) return;
+
+    const surveyRef = responseRef.parent.parent;
+    if (!surveyRef) return;
+    const answerKeyRef = getFirestore()
+      .collection('surveyAnswerKeys')
+      .doc(event.params.surveyId);
+
+    await getFirestore().runTransaction(async (transaction) => {
+      const [current, survey, answerKey] = await Promise.all([
+        transaction.get(responseRef),
+        transaction.get(surveyRef),
+        transaction.get(answerKeyRef),
+      ]);
+      if (!current.exists || !survey.exists) return;
+
+      const currentReviews = current.get('textAnswersReviewed') ?? {};
+      // Another review won the race. Its own event will calculate the current
+      // grade, so this older invocation must not write stale totals.
+      if (!isDeepStrictEqual(currentReviews, afterReviews)) return;
+
+      try {
+        const grade = scoreTrustedSurvey({
+          surveyId: event.params.surveyId,
+          survey: survey.data() ?? {},
+          answerKey: answerKey.data(),
+          response: current.data() ?? {},
+        });
+
+        transaction.update(responseRef, {
+          score: grade.score,
+          totalCorrectAnswers: grade.correctCount,
+          gradedQuestionCount: grade.gradedCount,
+          gradingStatus: grade.gradingStatus,
+          serverScoredAt: FieldValue.serverTimestamp(),
+        });
+      } catch (error) {
+        logger.error('survey review scoring failed closed', {
+          error,
+          participantId: event.params.participantId,
+          surveyId: event.params.surveyId,
+        });
+        transaction.update(responseRef, {
+          gradingStatus: 'error',
+          serverScoredAt: FieldValue.serverTimestamp(),
+        });
+      }
+    });
   },
 );
 
@@ -69,11 +378,38 @@ export const onAppointmentCreated = onDocumentCreated(
 
     await notify(
       { userIds: members.filter((id) => id !== appointment.createdBy) },
-      {
-        title: 'New meeting to vote on',
-        body: `${appointment.title ?? ''} needs your availability.`,
+      (locale) => ({
+        ...appointmentCreatedCopy(locale, appointment.title),
         data: { type: 'appointment', appointmentId: event.params.appointmentId },
-      },
+      }),
+    );
+  },
+);
+
+/** A vote document is the source of truth for the compact parent voter index. */
+export const onAppointmentVoteCreated = onDocumentCreated(
+  {
+    document: 'appointments/{appointmentId}/participants/{participantId}',
+    region,
+  },
+  async (event) => {
+    await registerAppointmentParticipant(
+      event.params.appointmentId,
+      event.data?.get('userId'),
+    );
+  },
+);
+
+/** Remove a voter from the parent only after their final slot vote is gone. */
+export const onAppointmentVoteDeleted = onDocumentDeleted(
+  {
+    document: 'appointments/{appointmentId}/participants/{participantId}',
+    region,
+  },
+  async (event) => {
+    await unregisterAppointmentParticipant(
+      event.params.appointmentId,
+      event.data?.get('userId'),
     );
   },
 );
@@ -101,25 +437,26 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
 
     const slot = (after.confirmedTimeSlots ?? [])[nowConfirmed - 1] ?? {};
     const start = typeof slot.start === 'string' ? new Date(slot.start) : null;
+    const startUtc =
+      start != null && !Number.isNaN(start.getTime())
+        ? start.toUTCString()
+        : undefined;
 
-    // Everyone who voted, plus everyone who was asked. Somebody who never
-    // answered still needs to know when to turn up.
+    // Every member still entitled to this company. Raw voter ids are not an
+    // authorization source: they may be stale after a removal or ban.
     const companyId = after.companyId as string | undefined;
-    const voters = (after.participantUserIds ?? []) as string[];
-    const members = companyId ? await activeMemberIds(companyId) : voters;
+    if (!companyId) return;
+    const members = await activeMemberIds(companyId);
 
     await notify(
-      { userIds: [...new Set([...voters, ...members])] },
-      {
-        title: 'Meeting time confirmed',
-        body: start
-          ? `${after.title ?? 'Your meeting'} — ${start.toUTCString()}`
-          : `${after.title ?? 'Your meeting'} has a confirmed time.`,
+      { userIds: members },
+      (locale) => ({
+        ...appointmentConfirmedCopy(locale, after.title, startUtc),
         data: {
           type: 'appointment',
           appointmentId: event.params.appointmentId,
         },
-      },
+      }),
     );
   },
 );
@@ -143,19 +480,17 @@ export const onJoinRequested = onDocumentUpdated(
 
     if (!becamePending) return;
 
-    const companyId = after.companyId as string | undefined;
-    if (!companyId) return;
+    await notifyJoinRequest(event.params.userId, after);
+  },
+);
 
-    const admins = await companyAdminIds(companyId);
-
-    await notify(
-      { userIds: admins },
-      {
-        title: 'Someone wants to join',
-        body: `${after.fullName ?? 'A new member'} is waiting for approval.`,
-        data: { type: 'approval', userId: event.params.userId },
-      },
-    );
+/** Registration creates a pending profile rather than updating an old one. */
+export const onJoinRequestedAtRegistration = onDocumentCreated(
+  { document: 'users/{userId}', region },
+  async (event) => {
+    const profile = event.data?.data();
+    if (!profile) return;
+    await notifyJoinRequest(event.params.userId, profile);
   },
 );
 
@@ -194,18 +529,17 @@ export const remindExpiring = onSchedule(
 
       await notify(
         { userIds: outstanding },
-        {
-          title: 'Closing tomorrow',
-          body: `${survey.get('surveyName') ?? 'A survey'} closes in less than a day.`,
+        (locale) => ({
+          ...surveyReminderCopy(locale, survey.get('surveyName')),
           data: { type: 'survey', surveyId: survey.id },
-        },
+        }),
       );
     }
 
     const appointments = await db
       .collection('appointments')
-      .where('expirationDate', '>', Timestamp.fromDate(now))
-      .where('expirationDate', '<=', Timestamp.fromDate(cutoff))
+      .where('expirationAt', '>', Timestamp.fromDate(now))
+      .where('expirationAt', '<=', Timestamp.fromDate(cutoff))
       .get();
 
     for (const appointment of appointments.docs) {
@@ -218,20 +552,27 @@ export const remindExpiring = onSchedule(
       }[];
       if (slots.some((slot) => slot.isConfirmed)) continue;
 
-      const members = await activeMemberIds(companyId);
+      // Vote documents are authoritative. The parent index is updated by an
+      // at-least-once trigger and can lag for a few seconds, which is not a
+      // sound basis for deciding who receives a reminder.
+      const [members, votes] = await Promise.all([
+        activeMemberIds(companyId),
+        appointment.ref.collection('participants').get(),
+      ]);
       const voted = new Set(
-        (appointment.get('participantUserIds') ?? []) as string[],
+        votes.docs
+          .map((vote) => vote.get('userId'))
+          .filter((userId): userId is string => typeof userId === 'string'),
       );
       const outstanding = members.filter((id) => !voted.has(id));
       if (outstanding.length === 0) continue;
 
       await notify(
         { userIds: outstanding },
-        {
-          title: 'Voting closes tomorrow',
-          body: `${appointment.get('title') ?? 'A meeting'} still needs your availability.`,
+        (locale) => ({
+          ...appointmentReminderCopy(locale, appointment.get('title')),
           data: { type: 'appointment', appointmentId: appointment.id },
-        },
+        }),
       );
     }
 
@@ -268,5 +609,14 @@ export const purgeScheduledCompanies = onSchedule(
         logger.error('purge failed', { companyId: company.id, error });
       }
     }
+  },
+);
+
+/** Remove account-deletion write locks after all pre-deletion ID tokens expire. */
+export const purgeAccountDeletionLocks = onSchedule(
+  { schedule: '15 * * * *', timeZone: 'UTC', region },
+  async () => {
+    const deleted = await purgeExpiredAccountDeletionLocks();
+    logger.info('expired account deletion locks purged', { deleted });
   },
 );

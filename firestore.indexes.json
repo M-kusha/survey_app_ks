@@ -20,7 +20,7 @@
     },
     {
       "//": "CompanyAdminService.pendingCount, which drives the approvals banner.",
-      "collectionGroup": "users",
+      "collectionGroup": "memberDirectory",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "companyId", "order": "ASCENDING" },
@@ -30,7 +30,7 @@
   ],
   "fieldOverrides": [
     {
-      "//": "AccountDeletionService sweeps every survey and appointment a user took part in with a collectionGroup query. Firestore auto-indexes single fields at COLLECTION scope only, so the COLLECTION_GROUP scope has to be opted into here — a single-field index cannot be declared in the composite 'indexes' array above.",
+      "//": "The trusted deleteMyAccount function sweeps every survey answer and appointment vote for one uid with a collectionGroup query. Firestore auto-indexes single fields at COLLECTION scope only, so the COLLECTION_GROUP scope has to be opted into here — a single-field index cannot be declared in the composite 'indexes' array above.",
       "collectionGroup": "participants",
       "fieldPath": "userId",
       "indexes": [

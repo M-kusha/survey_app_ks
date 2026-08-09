@@ -1,6 +1,7 @@
 import { getFirestore, Query } from 'firebase-admin/firestore';
 
 import { activeMemberIds, notify } from './messaging';
+import { companyClosedCopy } from './notification_copy';
 
 /**
  * Destroys a company and everything that belonged to it.
@@ -24,23 +25,35 @@ import { activeMemberIds, notify } from './messaging';
 export async function purgeCompany(companyId: string): Promise<void> {
   const db = getFirestore();
 
+  const [company, nameLocks] = await Promise.all([
+    db.collection('companies').doc(companyId).get(),
+    db.collection('companyNames').where('companyId', '==', companyId).get(),
+  ]);
+  if (nameLocks.size + 2 > 450) {
+    // Keep the uniqueness locks, public directory and company parent in one
+    // final atomic batch. Malformed legacy state must fail before the first
+    // destructive write rather than release names in a partial purge.
+    throw new Error(
+      `Company ${companyId} has too many name locks for an atomic final purge.`,
+    );
+  }
+
   // Told before it happens, not after. This is the last moment these people are
   // reachable as a group.
-  const members = await activeMemberIds(companyId);
-  const company = await db.collection('companies').doc(companyId).get();
+  const members = await activeMemberIds(companyId, { includeClosing: true });
 
   await notify(
     { userIds: members },
-    {
-      title: 'Company closed',
-      body: `${company.get('name') ?? 'Your company'} has been deleted. Your account and notes are unaffected — you can join another company.`,
+    (locale) => ({
+      ...companyClosedCopy(locale, company.get('name')),
       data: { type: 'company_closed' },
-    },
+    }),
   ).catch(() => undefined);
 
   await purgeWithChildren(
     db.collection('surveys').where('companyId', '==', companyId),
     'participants',
+    'surveyAnswerKeys',
   );
   await purgeWithChildren(
     db.collection('appointments').where('companyId', '==', companyId),
@@ -48,9 +61,6 @@ export async function purgeCompany(companyId: string): Promise<void> {
   );
 
   await deleteAll(db.collection('companies').doc(companyId).collection('bans'));
-  await deleteAll(
-    db.collection('companyNames').where('companyId', '==', companyId),
-  );
 
   // Released, not deleted.
   const users = await db
@@ -58,7 +68,10 @@ export async function purgeCompany(companyId: string): Promise<void> {
     .where('companyId', '==', companyId)
     .get();
 
-  for (const chunk of chunked(users.docs)) {
+  // Each release updates the private profile and removes its company-visible
+  // projection in the same batch. Two writes per member means 200 members keep
+  // the batch safely below Firestore's 500-write limit.
+  for (const chunk of chunked(users.docs, 200)) {
     const batch = db.batch();
     for (const user of chunk) {
       batch.update(user.ref, {
@@ -66,23 +79,44 @@ export async function purgeCompany(companyId: string): Promise<void> {
         role: 'user',
         membership: 'active',
       });
+      batch.delete(db.collection('memberDirectory').doc(user.id));
     }
     await batch.commit();
   }
 
-  await db.collection('companies').doc(companyId).delete();
+  // Also remove any orphaned legacy projection that had no private source
+  // profile and therefore was not covered by the user loop above.
+  await deleteAll(
+    db.collection('memberDirectory').where('companyId', '==', companyId),
+  );
+
+  // Release the canonical name only when every child and member cleanup has
+  // succeeded. These final deletes commit atomically, so a retry can never see
+  // a live company whose uniqueness lock was already released.
+  const finalBatch = db.batch();
+  for (const nameLock of nameLocks.docs) finalBatch.delete(nameLock.ref);
+  finalBatch.delete(db.collection('companyDirectory').doc(companyId));
+  finalBatch.delete(db.collection('companies').doc(companyId));
+  await finalBatch.commit();
 }
 
 /** Deletes each parent's subcollection, then the parent. */
 async function purgeWithChildren(
   parents: Query,
   childCollection: string,
+  pairedRootCollection?: string,
 ): Promise<void> {
+  const db = getFirestore();
   const snapshot = await parents.get();
 
   for (const parent of snapshot.docs) {
     await deleteAll(parent.ref.collection(childCollection));
-    await parent.ref.delete();
+    const batch = db.batch();
+    if (pairedRootCollection) {
+      batch.delete(db.collection(pairedRootCollection).doc(parent.id));
+    }
+    batch.delete(parent.ref);
+    await batch.commit();
   }
 }
 
