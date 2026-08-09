@@ -1,15 +1,21 @@
+import 'dart:async';
+
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/notifications/push_service.dart';
+import 'package:echomeet/core/notifications/notification_navigation.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/core/widgets/auth_shell.dart';
 import 'package:echomeet/core/widgets/glass_panel.dart';
 import 'package:echomeet/core/widgets/product_showcase.dart';
 import 'package:echomeet/login/biometrics.dart';
 import 'package:echomeet/login/login_logics.dart';
+import 'package:echomeet/login/session_access.dart';
 import 'package:echomeet/login/user_preferences.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class LoginPage extends StatefulWidget {
   final AdaptiveThemeMode? savedThemeMode;
@@ -71,6 +77,13 @@ class LoginPageState extends State<LoginPage> {
           _buildCard(),
           const SizedBox(height: Spacing.lg),
           _buildRegisterLink(),
+          Center(
+            child: TextButton(
+              onPressed: () =>
+                  Navigator.pushNamed(context, '/account-deletion'),
+              child: Text('account_deletion_info_link'.tr()),
+            ),
+          ),
         ],
       ),
     );
@@ -315,13 +328,22 @@ class LoginPageState extends State<LoginPage> {
     }
 
     setState(() {
-      _errorMessage = 'login_failed'.tr();
+      _errorMessage = switch (_authManager.lastFailure) {
+        SignInFailure.emailNotVerified => 'email_not_verified'.tr(),
+        SignInFailure.sessionCleanupFailed => 'error_occurred'.tr(),
+        _ => 'login_failed'.tr(),
+      };
       _isSigningIn = false;
     });
   }
 
   void _navigateToHome() {
     if (!mounted) return;
+    context.read<SessionAccess>().unlock();
+    unawaited(PushService().startIfEnabled());
     Navigator.pushReplacementNamed(context, '/home');
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => NotificationNavigation.appReady(),
+    );
   }
 }

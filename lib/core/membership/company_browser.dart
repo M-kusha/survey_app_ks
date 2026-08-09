@@ -20,7 +20,7 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
   List<CompanySummary> _companies = [];
   Set<String> _banned = {};
   bool _loading = true;
-  String? _error;
+  bool _hasError = false;
   String? _joining;
 
   @override
@@ -39,7 +39,7 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _hasError = false;
     });
 
     try {
@@ -55,10 +55,10 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
         _banned = banned;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _hasError = true;
         _loading = false;
       });
     }
@@ -126,11 +126,10 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
-    if (_error case final error?) {
+    if (_hasError) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
         action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }

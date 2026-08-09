@@ -1,13 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/membership/member_directory.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 @immutable
 class BannedMember {
-  const BannedMember({required this.userId, required this.name, this.bannedAt});
+  const BannedMember({
+    required this.userId,
+    required this.name,
+    required this.previousMembership,
+    this.bannedAt,
+  });
 
   final String userId;
   final String name;
+  final String previousMembership;
   final DateTime? bannedAt;
 }
 
@@ -26,19 +33,58 @@ class CompanyAdminService {
     required String companyId,
     required String userId,
     required String name,
+    required String previousMembership,
   }) async {
-    await _bans(companyId).doc(userId).set({
+    final previous = previousMembership == 'pending' ? 'pending' : 'active';
+    final batch = _db.batch();
+    batch.set(_bans(companyId).doc(userId), {
       'name': name,
       'bannedAt': FieldValue.serverTimestamp(),
       'bannedBy': _auth.currentUser?.uid,
+      'previousMembership': previous,
     });
+    // Storage Rules have a hard two-Firestore-read ceiling. Mirroring the
+    // revocation into the existing member projection lets those rules verify
+    // both people and reject banned viewers without a third ban-document read.
+    batch.update(_db.collection('users').doc(userId), {
+      'membership': 'pending',
+    });
+    batch.update(MemberDirectory.reference(_db, userId), {
+      'membership': 'pending',
+    });
+    await batch.commit();
   }
 
   Future<void> unban({
     required String companyId,
     required String userId,
   }) async {
-    await _bans(companyId).doc(userId).delete();
+    final ban = _bans(companyId).doc(userId);
+    final member = MemberDirectory.reference(_db, userId);
+
+    await _db.runTransaction((transaction) async {
+      final snapshots = await Future.wait([
+        transaction.get(ban),
+        transaction.get(member),
+      ]);
+      final banSnapshot = snapshots[0];
+      if (!banSnapshot.exists) return;
+
+      final previous = banSnapshot.data()?['previousMembership'] == 'pending'
+          ? 'pending'
+          : 'active';
+      transaction.delete(ban);
+
+      final memberSnapshot = snapshots[1];
+      if (!memberSnapshot.exists ||
+          memberSnapshot.data()?['companyId'] != companyId) {
+        return;
+      }
+      transaction.update(_db.collection('users').doc(userId), {
+        'membership': previous,
+      });
+      transaction.update(member, {'membership': previous});
+    });
   }
 
   Future<List<BannedMember>> bannedMembers(String companyId) async {
@@ -49,6 +95,9 @@ class CompanyAdminService {
           (doc) => BannedMember(
             userId: doc.id,
             name: (doc.data()['name'] as String? ?? '').trim(),
+            previousMembership: doc.data()['previousMembership'] == 'pending'
+                ? 'pending'
+                : 'active',
             bannedAt: (doc.data()['bannedAt'] as Timestamp?)?.toDate(),
           ),
         )
@@ -61,24 +110,27 @@ class CompanyAdminService {
   }
 
   Future<void> approve(String userId) async {
-    await _db.collection('users').doc(userId).update({'membership': 'active'});
+    await MemberDirectory.updateMember(
+      firestore: _db,
+      userId: userId,
+      fields: {'membership': 'active'},
+    );
   }
 
   Future<void> erase({
     required String companyId,
     required String userId,
   }) async {
+    final participantReferences = <DocumentReference<Map<String, dynamic>>>[];
     final surveys = await _db
         .collection('surveys')
         .where('companyId', isEqualTo: companyId)
         .get();
 
     for (final survey in surveys.docs) {
-      await survey.reference
-          .collection('participants')
-          .doc(userId)
-          .delete()
-          .catchError((_) {});
+      participantReferences.add(
+        survey.reference.collection('participants').doc(userId),
+      );
     }
 
     final appointments = await _db
@@ -93,23 +145,40 @@ class CompanyAdminService {
           .get();
 
       for (final vote in votes.docs) {
-        await vote.reference.delete().catchError((_) {});
+        participantReferences.add(vote.reference);
       }
 
-      await appointment.reference
-          .update({
-            'participantUserIds': FieldValue.arrayRemove([userId]),
-          })
-          .catchError((_) {});
+      // Trusted vote-delete triggers remove the uid from participantUserIds
+      // after the member's final child vote has gone.
     }
 
-    await _db.collection('users').doc(userId).update({
+    // Resolve every query before mutating anything, then let any failed delete
+    // abort the operation. The caller must never report a successful erasure
+    // while participant data is still present.
+    await _deleteDocuments(participantReferences);
+
+    // Release the profile, remove its public projection and discard any ban in
+    // one final write. Separate remove/unban calls can strand an orphan ban on
+    // a transient failure, or briefly restore access before removal finishes.
+    final release = _db.batch();
+    release.update(_db.collection('users').doc(userId), {
       'companyId': '',
       'role': 'user',
       'membership': 'active',
     });
+    release.delete(MemberDirectory.reference(_db, userId));
+    release.delete(_bans(companyId).doc(userId));
+    await release.commit();
+  }
 
-    await unban(companyId: companyId, userId: userId);
+  Future<void> _deleteDocuments(
+    List<DocumentReference<Map<String, dynamic>>> references,
+  ) async {
+    // Keep these as individual requests. Participant delete rules perform
+    // document lookups, whose per-request ceiling is lower for batched writes.
+    for (final reference in references) {
+      await reference.delete();
+    }
   }
 
   static const gracePeriod = Duration(days: 7);
@@ -132,83 +201,9 @@ class CompanyAdminService {
     });
   }
 
-  Future<void> purgeCompany(String companyId) async {
-    final me = _auth.currentUser?.uid;
-
-    Future<void> purgeChildren(
-      Query<Map<String, dynamic>> parents,
-      String childCollection,
-    ) async {
-      for (final parent in (await parents.get()).docs) {
-        final children = await parent.reference
-            .collection(childCollection)
-            .get();
-        for (final chunk in _chunked(children.docs)) {
-          final batch = _db.batch();
-          for (final child in chunk) {
-            batch.delete(child.reference);
-          }
-          await batch.commit();
-        }
-
-        await parent.reference.delete();
-      }
-    }
-
-    await purgeChildren(
-      _db.collection('surveys').where('companyId', isEqualTo: companyId),
-      'participants',
-    );
-    await purgeChildren(
-      _db.collection('appointments').where('companyId', isEqualTo: companyId),
-      'participants',
-    );
-
-    final bans = await _bans(companyId).get();
-    for (final ban in bans.docs) {
-      await ban.reference.delete().catchError((_) {});
-    }
-
-    final members = await _db
-        .collection('users')
-        .where('companyId', isEqualTo: companyId)
-        .get();
-
-    for (final member in members.docs) {
-      if (member.id == me) continue;
-      await member.reference
-          .update({'companyId': '', 'role': 'user', 'membership': 'active'})
-          .catchError((_) {});
-    }
-
-    final names = await _db
-        .collection('companyNames')
-        .where('companyId', isEqualTo: companyId)
-        .get();
-    for (final name in names.docs) {
-      await name.reference.delete().catchError((_) {});
-    }
-
-    await _db.collection('companies').doc(companyId).delete();
-
-    if (me != null) {
-      await _db.collection('users').doc(me).update({
-        'companyId': '',
-        'role': 'user',
-        'membership': 'active',
-      });
-    }
-  }
-
-  static Iterable<List<T>> _chunked<T>(List<T> items, [int size = 400]) sync* {
-    for (var start = 0; start < items.length; start += size) {
-      yield items.sublist(start, (start + size).clamp(0, items.length));
-    }
-  }
-
   Future<int> pendingCount(String companyId) async {
     final snapshot = await _db
-        .collection('users')
+        .collection('memberDirectory')
         .where('companyId', isEqualTo: companyId)
         .where('membership', isEqualTo: 'pending')
         .get();
@@ -220,9 +215,15 @@ class CompanyAdminService {
     required String companyId,
     required bool open,
   }) async {
-    await _db.collection('companies').doc(companyId).update({
-      'joinPolicy': open ? 'open' : 'approval',
+    final policy = open ? 'open' : 'approval';
+    final batch = _db.batch();
+    batch.update(_db.collection('companies').doc(companyId), {
+      'joinPolicy': policy,
     });
+    batch.update(_db.collection('companyDirectory').doc(companyId), {
+      'joinPolicy': policy,
+    });
+    await batch.commit();
   }
 
   Future<bool> isOpenToJoin(String companyId) async {

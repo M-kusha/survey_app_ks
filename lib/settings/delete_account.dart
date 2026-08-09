@@ -18,7 +18,7 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
 
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.isSuperadmin || _isDeleting;
+    final disabled = _isDeleting;
     return SizedBox(
       width: 200,
       height: 50,
@@ -48,7 +48,10 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
     setState(() => _isDeleting = true);
 
     try {
-      await AccountDeletionService().deleteAccount(password: password);
+      await AccountDeletionService().deleteAccount(
+        password: password,
+        deleteOwnedCompany: widget.isSuperadmin,
+      );
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -58,6 +61,16 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
       if (!mounted) return;
       setState(() => _isDeleting = false);
       UIUtils.showSnackBar(context, 'invalid_old_password'.tr());
+    } on OwnerAccountDeletionBlocked {
+      if (!mounted) return;
+      setState(() => _isDeleting = false);
+      UIUtils.showSnackBar(context, 'delete_account_blocked'.tr());
+    } on AccountDeletionIncomplete {
+      if (!mounted) return;
+      setState(() => _isDeleting = false);
+      // The server keeps Auth intact whenever cleanup is incomplete, so this
+      // screen remains available and the user can safely retry.
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
     } catch (_) {
       if (!mounted) return;
       setState(() => _isDeleting = false);
@@ -75,7 +88,12 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('delete_account_warning'.tr()),
+            Text(
+              (widget.isSuperadmin
+                      ? 'delete_owner_account_warning'
+                      : 'delete_account_warning')
+                  .tr(),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: controller,

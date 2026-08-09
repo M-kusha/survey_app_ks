@@ -1,7 +1,6 @@
-import 'dart:io';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:echomeet/login/login_logics.dart';
 import 'package:flutter/material.dart';
 
 enum ProfileType { user, company }
@@ -39,16 +38,15 @@ class RegisterLogic {
   final TextEditingController companyNameController = TextEditingController();
 
   String? selectedCompanyName;
-  File? profileImage;
-
-  void setProfileImage(File? image) {
-    profileImage = image;
-  }
-
   Future<void> registerUser({
     required ProfileType profileType,
     String? existingCompanyId,
   }) async {
+    // createUserWithEmailAndPassword replaces Firebase's current account.
+    // Cleanup and sign out first so a push token cannot remain on that profile.
+    if (_auth.currentUser != null && !await AuthManager().signOut()) {
+      throw StateError('The existing session could not be closed safely.');
+    }
     final UserCredential userCredential;
     try {
       userCredential = await _auth.createUserWithEmailAndPassword(
@@ -64,103 +62,66 @@ class RegisterLogic {
     }
 
     final user = userCredential.user!;
-    final registeringCompany = profileType == ProfileType.company;
-
+    var profilePersisted = false;
     try {
-      final companyId = registeringCompany
-          ? await _createCompany(user.uid)
-          : existingCompanyId;
+      await user.sendEmailVerification();
 
-      final membership = registeringCompany || companyId == null
-          ? 'active'
-          : await _joinStatusFor(companyId);
-
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-        'membership': membership,
+      final languageCode =
+          WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+      final notificationLocale = const {'en', 'de', 'sq'}.contains(languageCode)
+          ? languageCode
+          : 'en';
+      final profile = <String, dynamic>{
         'fullName': fullnameController.text.trim(),
         'birthdate': birthdateController.text.trim(),
-        'email': emailController.text.trim(),
-
-        'role': registeringCompany ? 'superadmin' : 'user',
+        'email': user.email ?? emailController.text.trim(),
         'createdAt': FieldValue.serverTimestamp(),
-        if (registeringCompany && selectedCompanyName != null)
-          'companyName': selectedCompanyName,
-        'companyId': ?companyId,
-      });
-    } catch (_) {
-      await user.delete().catchError((_) {});
-      rethrow;
-    }
+        'companyId': '',
+        'role': 'user',
+        'membership': 'active',
+        'notificationLocale': notificationLocale,
+      };
 
-    await _attachProfileImage(user.uid);
-  }
-
-  Future<String> _joinStatusFor(String companyId) async {
-    final company = await FirebaseFirestore.instance
-        .collection('companies')
-        .doc(companyId)
-        .get();
-
-    final policy = company.data()?['joinPolicy'] as String? ?? 'open';
-    return policy == 'approval' ? 'pending' : 'active';
-  }
-
-  Future<void> _attachProfileImage(String uid) async {
-    if (profileImage == null) return;
-    try {
-      final imageUrl = await _uploadProfileImage(uid);
-      await FirebaseFirestore.instance.collection('users').doc(uid).update({
-        'profileImage': imageUrl,
-      });
-    } catch (_) {}
-  }
-
-  static String companyNameSlug(String name) => name
-      .trim()
-      .toLowerCase()
-      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-      .replaceAll(RegExp(r'^-+|-+$'), '');
-
-  Future<String> _createCompany(String uid) async {
-    final firestore = FirebaseFirestore.instance;
-    final name = companyNameController.text.trim();
-    final slug = companyNameSlug(name);
-
-    if (slug.isEmpty) {
-      throw const CompanyNameInvalidException();
-    }
-
-    final lockRef = firestore.collection('companyNames').doc(slug);
-    if ((await lockRef.get()).exists) {
-      throw const CompanyNameTakenException();
-    }
-
-    final companyDoc = firestore.collection('companies').doc();
-
-    final batch = firestore.batch();
-    batch.set(lockRef, {'companyId': companyDoc.id, 'createdBy': uid});
-    batch.set(companyDoc, {
-      'joinPolicy': 'open',
-      'name': name,
-      'createdBy': uid,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-
-    try {
-      await batch.commit();
-    } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') {
-        throw const CompanyNameTakenException();
+      if (profileType == ProfileType.company) {
+        profile.addAll({
+          'pendingOnboardingType': 'createCompany',
+          'pendingCompanyName': companyNameController.text.trim(),
+        });
+      } else {
+        final companyId = (existingCompanyId ?? '').trim();
+        if (companyId.isEmpty) {
+          throw StateError('A company must be selected.');
+        }
+        profile.addAll({
+          'pendingOnboardingType': 'joinCompany',
+          'pendingCompanyId': companyId,
+        });
       }
+
+      // This is the only Firestore state an unverified registration creates.
+      // Tenant documents, name locks and memberDirectory projections are
+      // deferred to the verified callable and committed there atomically.
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .set(profile);
+      profilePersisted = true;
+    } catch (_) {
+      if (!profilePersisted) await user.delete().catchError((_) {});
       rethrow;
     }
 
-    return companyDoc.id;
+    // Force the next sign-in to mint a fresh token containing the verified
+    // email claim. The profile screen offers avatar upload after verification;
+    // registration itself creates no Storage or public directory state.
+    try {
+      await _auth.signOut();
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> searchCompanies(String query) async {
     final querySnapshot = await FirebaseFirestore.instance
-        .collection('companies')
+        .collection('companyDirectory')
         .get();
     return querySnapshot.docs
         .map((doc) => {'id': doc.id, 'name': doc.data()['name'] as String})
@@ -170,15 +131,6 @@ class RegisterLogic {
           ),
         )
         .toList();
-  }
-
-  Future<String> _uploadProfileImage(String uid) async {
-    final storageRef = FirebaseStorage.instance.ref().child(
-      'profile_images/$uid.jpg',
-    );
-    final uploadTask = storageRef.putFile(profileImage!);
-    final snapshot = await uploadTask.whenComplete(() => null);
-    return await snapshot.ref.getDownloadURL();
   }
 
   void dispose() {

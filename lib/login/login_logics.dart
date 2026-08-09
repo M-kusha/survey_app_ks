@@ -1,38 +1,75 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/login/user_preferences.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
-import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+
+enum SignInFailure {
+  invalidCredentials,
+  emailNotVerified,
+  sessionCleanupFailed,
+}
 
 class AuthManager {
-  AuthManager({FirebaseAuth? auth, FirebaseFirestore? firestore})
-    : _authOverride = auth,
-      _firestoreOverride = firestore;
+  AuthManager({
+    FirebaseAuth? auth,
+    FirebaseFirestore? firestore,
+    PushService? pushService,
+  }) : _authOverride = auth,
+       _firestoreOverride = firestore,
+       _pushOverride = pushService;
 
   final FirebaseAuth? _authOverride;
   final FirebaseFirestore? _firestoreOverride;
+  final PushService? _pushOverride;
 
   late final FirebaseAuth _auth = _authOverride ?? FirebaseAuth.instance;
   late final FirebaseFirestore _firestore =
       _firestoreOverride ?? FirebaseFirestore.instance;
+  late final PushService _push = _pushOverride ?? PushService();
+
+  SignInFailure? lastFailure;
 
   Future<bool> signInWithEmailAndPassword(
     String email,
     String password, {
     required bool rememberMe,
   }) async {
+    lastFailure = null;
     try {
+      // Never let Firebase switch accounts while this installation's token is
+      // still registered on the current profile.
+      if (_auth.currentUser != null && !await signOut()) {
+        lastFailure = SignInFailure.sessionCleanupFailed;
+        return false;
+      }
+      if (kIsWeb) {
+        await _auth.setPersistence(
+          rememberMe ? Persistence.LOCAL : Persistence.SESSION,
+        );
+      }
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      final user = credential.user;
+      if (user != null && !user.emailVerified) {
+        try {
+          await user.sendEmailVerification();
+        } on FirebaseAuthException {
+          // A previous verification link remains valid. Authentication still
+          // fails closed until Firebase confirms the address.
+        }
+        lastFailure = SignInFailure.emailNotVerified;
+        await _auth.signOut();
+        return false;
+      }
       await _rememberSession(credential.user, email, rememberMe: rememberMe);
 
-      unawaited(PushService().start());
       return true;
     } on FirebaseAuthException {
+      lastFailure = SignInFailure.invalidCredentials;
       return false;
     }
   }
@@ -57,10 +94,27 @@ class AuthManager {
     await UserPreferences.setRememberMe(true);
   }
 
-  Future<void> signOut() async {
-    await PushService().stop();
-    await _auth.signOut();
-    await UserPreferences.clearSession();
-    FirebaseServices.invalidateCache();
+  Future<bool> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    try {
+      await _push.stop(ownerUid: uid);
+    } catch (_) {
+      return false;
+    }
+    try {
+      await _auth.signOut();
+      await UserPreferences.clearSession();
+      FirebaseServices.invalidateCache();
+      return true;
+    } catch (_) {
+      // Auth still owns the same profile, so restore the saved notification
+      // preference after token cleanup rather than silently leaving it off.
+      if (_auth.currentUser?.uid == uid) {
+        try {
+          await _push.startIfEnabled(expectedUid: uid);
+        } catch (_) {}
+      }
+      return false;
+    }
   }
 }

@@ -1,8 +1,9 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
+import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/settings/settings_kit.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NotificationsOptions extends StatefulWidget {
@@ -21,6 +22,7 @@ class NotificationsOptions extends StatefulWidget {
 
 class _NotificationsOptionsState extends State<NotificationsOptions> {
   bool _notificationsEnabled = false;
+  bool _updating = false;
 
   @override
   void initState() {
@@ -29,68 +31,86 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
   }
 
   Future<void> _loadNotificationSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _notificationsEnabled = prefs.getBool('notificationsEnabled') ?? false;
-    });
+    try {
+      final enabled = await PushService().reconcilePersistedPreference();
+      if (mounted) setState(() => _notificationsEnabled = enabled);
+    } catch (_) {
+      final prefs = await SharedPreferences.getInstance();
+      final registered = PushService().isRegisteredForCurrentUser;
+      if (mounted) {
+        setState(() {
+          _notificationsEnabled =
+              prefs.getBool(PushService.notificationsPreferenceKey) == true &&
+              registered;
+        });
+      }
+    }
   }
-
-  final _notifications = FlutterLocalNotificationsPlugin();
 
   Future<void> _updateNotificationSetting(bool value) async {
-    final prefs = await SharedPreferences.getInstance();
+    if (_updating) return;
+    setState(() => _updating = true);
 
-    if (!value) {
-      await _notifications.cancelAll();
-      await prefs.setBool('notificationsEnabled', false);
-      if (mounted) setState(() => _notificationsEnabled = false);
-      return;
-    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final pushService = PushService();
+      if (!value) {
+        await pushService.stop();
+        if (!await PushService.persistDisabledPreference(prefs)) {
+          // Cleanup succeeded but the durable preference still says enabled.
+          // Restore registration to that persisted truth and keep retrying.
+          final reconciled = await pushService.reconcilePersistedPreference();
+          if (mounted) setState(() => _notificationsEnabled = reconciled);
+          throw StateError('Notification preference could not be saved.');
+        }
+        if (mounted) setState(() => _notificationsEnabled = false);
+        return;
+      }
 
-    await _initialiseNotifications();
-    final granted = await _requestPermission();
-
-    await prefs.setBool('notificationsEnabled', granted);
-    if (mounted) setState(() => _notificationsEnabled = granted);
-  }
-
-  Future<void> _initialiseNotifications() => _notifications.initialize(
-    settings: const InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      iOS: DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
-      ),
-    ),
-  );
-
-  Future<bool> _requestPermission() async {
-    if (kIsWeb) return true;
-
-    switch (defaultTargetPlatform) {
-      case TargetPlatform.android:
-        final android = _notifications
-            .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin
-            >();
-        return await android?.requestNotificationsPermission() ?? false;
-      case TargetPlatform.iOS:
-      case TargetPlatform.macOS:
-        final darwin = _notifications
-            .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin
-            >();
-        return await darwin?.requestPermissions(
-              alert: true,
-              badge: true,
-              sound: true,
-            ) ??
-            false;
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
-        return true;
+      // Persist intent before registering a server token. If the process stops
+      // between these steps, startup retries registration; it never leaves a
+      // background token active behind a locally disabled switch.
+      if (!await prefs.setBool(PushService.notificationsPreferenceKey, true) ||
+          prefs.getBool(PushService.notificationsPreferenceKey) != true) {
+        throw StateError('Notification preference could not be saved.');
+      }
+      final result = await pushService.start();
+      final registered =
+          result == PushStartResult.registered &&
+          pushService.isRegisteredForCurrentUser;
+      if (!registered) {
+        // Only unavailable proves that setup rollback was confirmed. A
+        // disabled result can mean Auth changed mid-action, so retain intent.
+        if (result == PushStartResult.unavailable) {
+          if (!await PushService.persistDisabledPreference(prefs)) {
+            unawaited(pushService.reconcilePersistedPreference());
+            throw StateError('Notification preference could not be saved.');
+          }
+        }
+        throw StateError('Push notifications could not be enabled.');
+      }
+      if (mounted) setState(() => _notificationsEnabled = true);
+    } catch (_) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final registered = PushService().isRegisteredForCurrentUser;
+        if (mounted) {
+          setState(() {
+            _notificationsEnabled =
+                prefs.getBool(PushService.notificationsPreferenceKey) == true &&
+                registered;
+          });
+        }
+      } catch (_) {
+        if (mounted) setState(() => _notificationsEnabled = false);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+      }
+    } finally {
+      if (mounted) setState(() => _updating = false);
     }
   }
 
@@ -102,7 +122,7 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
 
       subtitle: _notificationsEnabled ? null : 'notifications_hint'.tr(),
       value: _notificationsEnabled,
-      onChanged: _updateNotificationSetting,
+      onChanged: _updating ? null : _updateNotificationSetting,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'package:adaptive_theme/adaptive_theme.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 class ThemeToggleButton extends StatelessWidget {
@@ -12,7 +13,7 @@ class ThemeToggleButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Tooltip(
-      message: tooltip ?? (isDark ? 'Light mode' : 'Dark mode'),
+      message: tooltip ?? (isDark ? 'theme_light'.tr() : 'theme_dark'.tr()),
       child: Material(
         color: scheme.surfaceContainerHigh.withValues(alpha: 0.55),
         shape: const CircleBorder(),

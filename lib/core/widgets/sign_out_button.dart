@@ -25,8 +25,14 @@ Future<void> confirmSignOut(BuildContext context) async {
 
   if (confirmed != true || !context.mounted) return;
 
-  await AuthManager().signOut();
+  final signedOut = await AuthManager().signOut();
   if (!context.mounted) return;
+  if (!signedOut) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+    return;
+  }
 
   Navigator.of(context).pushAndRemoveUntil(
     MaterialPageRoute(builder: (context) => const LoginPage()),

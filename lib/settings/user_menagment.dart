@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/membership/company_admin_service.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
@@ -27,7 +28,7 @@ class UserManagementPageState extends State<UserManagementPage> {
 
   List<UserModel> _users = [];
   bool _loading = true;
-  String? _error;
+  String? _errorKey;
 
   bool _canManagePeople = false;
 
@@ -47,7 +48,7 @@ class UserManagementPageState extends State<UserManagementPage> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _errorKey = null;
     });
 
     try {
@@ -56,7 +57,7 @@ class UserManagementPageState extends State<UserManagementPage> {
 
       if (companyId == null) {
         setState(() {
-          _error = 'no_company_on_profile'.tr();
+          _errorKey = 'no_company_on_profile';
           _loading = false;
         });
         return;
@@ -88,10 +89,10 @@ class UserManagementPageState extends State<UserManagementPage> {
               });
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _errorKey = 'error_occurred';
         _loading = false;
       });
     }
@@ -157,6 +158,7 @@ class UserManagementPageState extends State<UserManagementPage> {
         companyId: user.companyId,
         userId: user.id,
         name: user.name,
+        previousMembership: user.membership,
       );
     } catch (_) {
       if (!mounted) return;
@@ -246,11 +248,11 @@ class UserManagementPageState extends State<UserManagementPage> {
       return const Center(child: CustomLoadingWidget(loadingText: 'loading'));
     }
 
-    if (_error case final error?) {
+    if (_errorKey case final errorKey?) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
+        body: errorKey == 'no_company_on_profile' ? errorKey.tr() : null,
         action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }
@@ -527,28 +529,32 @@ class _Avatar extends StatelessWidget {
     final source = user.name.trim();
     final initial = source.isEmpty ? '?' : source[0].toUpperCase();
 
-    return Container(
-      height: 38,
-      width: 38,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: scheme.primaryContainer,
-        image: user.profileImage.isEmpty
-            ? null
-            : DecorationImage(
-                image: NetworkImage(user.profileImage),
-                fit: BoxFit.cover,
+    return ClipOval(
+      child: SizedBox(
+        height: 38,
+        width: 38,
+        child: ColoredBox(
+          color: scheme.primaryContainer,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: Text(
+                  initial,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: scheme.onPrimaryContainer,
+                  ),
+                ),
               ),
+              AuthenticatedProfileImage(
+                storedReference: user.profileImage,
+                refreshKey: user.profileImageRevision,
+                userId: user.id,
+              ),
+            ],
+          ),
+        ),
       ),
-      alignment: Alignment.center,
-      child: user.profileImage.isEmpty
-          ? Text(
-              initial,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: scheme.onPrimaryContainer,
-              ),
-            )
-          : null,
     );
   }
 }

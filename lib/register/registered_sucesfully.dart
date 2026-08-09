@@ -91,6 +91,14 @@ class RegistrationSuccessPageState extends State<RegistrationSuccessPage> {
                   ),
                   const SizedBox(height: Spacing.sm),
                   Text(
+                    'verification_email_sent'.tr(),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: Spacing.sm),
+                  Text(
                     '${'you_will_be_redirected'.tr()} $_remaining '
                     '${'registration_seconds'.tr()}.',
                     textAlign: TextAlign.center,

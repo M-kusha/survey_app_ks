@@ -6,9 +6,10 @@ import 'package:echomeet/core/membership/company_admin_service.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/settings/user_menagment.dart';
-import 'package:echomeet/utilities/firebase_services.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class AppBanner extends StatefulWidget {
   const AppBanner({super.key});
@@ -20,18 +21,39 @@ class AppBanner extends StatefulWidget {
 class _AppBannerState extends State<AppBanner> {
   final _service = CompanyAdminService();
 
-  Membership? _membership;
   int _pending = 0;
-  bool _canManagePeople = false;
-  bool _closing = false;
   Timer? _tick;
+  int _pendingGeneration = 0;
+  String? _inputsKey;
+  bool _refreshScheduled = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _tick = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _refreshPending(),
+    );
+  }
 
-    _tick = Timer.periodic(const Duration(minutes: 2), (_) => _load());
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final membershipState = context.watch<MembershipProvider>();
+    final user = context.watch<UserDataProvider>().currentUser;
+    final membership = membershipState.membership;
+    final inputsKey = [
+      membershipState.loading,
+      membership?.companyId,
+      membership?.state,
+      membership?.deletionAt,
+      user?.id,
+      user?.role,
+    ].join('|');
+
+    if (_inputsKey == inputsKey) return;
+    _inputsKey = inputsKey;
+    _schedulePendingRefresh();
   }
 
   @override
@@ -40,56 +62,48 @@ class _AppBannerState extends State<AppBanner> {
     super.dispose();
   }
 
-  Future<void> _load() async {
-    if (FirebaseAuth.instance.currentUser == null) return;
-
-    try {
-      final membership = await MembershipService().resolve();
-      final canManagePeople = await FirebaseServices().canManagePeople();
-
-      final pending = canManagePeople && membership.companyId.isNotEmpty
-          ? await _service.pendingCount(membership.companyId)
-          : 0;
-
-      if (!mounted) return;
-      setState(() {
-        _membership = membership;
-        _canManagePeople = canManagePeople;
-        _pending = pending;
-      });
-
-      await _runClosureIfDue(membership, canManagePeople);
-    } catch (_) {}
+  void _schedulePendingRefresh() {
+    if (_refreshScheduled) return;
+    _refreshScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshScheduled = false;
+      if (mounted) _refreshPending();
+    });
   }
 
-  Future<void> _runClosureIfDue(Membership membership, bool canManage) async {
-    final at = membership.deletionAt;
-    if (at == null || at.isAfter(DateTime.now())) return;
-    if (_closing) return;
+  Future<void> _refreshPending() async {
+    if (!mounted) return;
+    final generation = ++_pendingGeneration;
+    final membership = context.read<MembershipProvider>().membership;
+    final role = context.read<UserDataProvider>().currentUser?.role;
+    final canManagePeople = role == 'admin' || role == 'superadmin';
 
-    _closing = true;
+    var pending = 0;
     try {
-      if (canManage) {
-        await _service.purgeCompany(membership.companyId);
-      } else {
-        await MembershipService().leaveCompany();
+      if (canManagePeople &&
+          membership != null &&
+          membership.companyId.isNotEmpty &&
+          (membership.deletionAt?.isAfter(DateTime.now()) ?? true)) {
+        pending = await _service.pendingCount(membership.companyId);
       }
-      if (!mounted) return;
-      setState(() => _membership = null);
-      await _load();
     } catch (_) {
-    } finally {
-      _closing = false;
+      return;
     }
+
+    if (!mounted || generation != _pendingGeneration || pending == _pending) {
+      return;
+    }
+    setState(() => _pending = pending);
   }
 
   Future<void> _cancelClosure() async {
-    final companyId = _membership?.companyId ?? '';
+    final companyId =
+        context.read<MembershipProvider>().membership?.companyId ?? '';
     if (companyId.isEmpty) return;
 
     try {
       await _service.cancelDeletion(companyId);
-      await _load();
+      await _refreshPending();
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(
@@ -100,7 +114,10 @@ class _AppBannerState extends State<AppBanner> {
 
   @override
   Widget build(BuildContext context) {
-    final membership = _membership;
+    final membership = context.watch<MembershipProvider>().membership;
+    final role = context.watch<UserDataProvider>().currentUser?.role;
+    final canManagePeople = role == 'admin' || role == 'superadmin';
+    final canCancelClosure = role == 'superadmin';
 
     if (membership != null && membership.isClosing) {
       final days = membership.deletionAt!.difference(DateTime.now()).inDays;
@@ -114,12 +131,12 @@ class _AppBannerState extends State<AppBanner> {
             'days': '${days < 0 ? 0 : days}',
           },
         ),
-        actionLabel: _canManagePeople ? 'cancel_deletion'.tr() : null,
-        onAction: _canManagePeople ? _cancelClosure : null,
+        actionLabel: canCancelClosure ? 'cancel_deletion'.tr() : null,
+        onAction: canCancelClosure ? _cancelClosure : null,
       );
     }
 
-    if (_pending > 0) {
+    if (canManagePeople && _pending > 0) {
       return _Strip(
         icon: Icons.person_add_alt_1_rounded,
         tone: context.appColors.warning,
@@ -135,7 +152,7 @@ class _AppBannerState extends State<AppBanner> {
               ),
             ),
           );
-          await _load();
+          await _refreshPending();
         },
       );
     }

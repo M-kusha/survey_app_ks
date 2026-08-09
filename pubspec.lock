@@ -65,14 +65,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.2"
-  carousel_slider:
-    dependency: "direct main"
-    description:
-      name: carousel_slider
-      sha256: febf4b0163e0242adc13d7a863b04965351f59e7dfea56675c7c2caa7bcd7476
-      url: "https://pub.dev"
-    source: hosted
-    version: "5.1.2"
   characters:
     dependency: transitive
     description:
@@ -137,6 +129,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.7.2"
+  cloud_functions:
+    dependency: "direct main"
+    description:
+      name: cloud_functions
+      sha256: "82fa5811d184c4135d2177174507cc03744f032a085cd3be95246c0f1b006e53"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.3.6"
+  cloud_functions_platform_interface:
+    dependency: transitive
+    description:
+      name: cloud_functions_platform_interface
+      sha256: "86842d91cd4e83b71aa2dff874fd3554e237aa6e222d8e6e54bb7692fb1bd779"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.6"
+  cloud_functions_web:
+    dependency: transitive
+    description:
+      name: cloud_functions_web
+      sha256: aeca9c8f24838630f28bd75622668725a85044211be83de9f0a2fe07c4c8b643
+      url: "https://pub.dev"
+    source: hosted
+    version: "5.1.12"
   collection:
     dependency: transitive
     description:
@@ -281,6 +297,30 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.9.3+5"
+  firebase_app_check:
+    dependency: "direct main"
+    description:
+      name: firebase_app_check
+      sha256: d422642d973b0c636e0582127a47319d8ac9140195e7330c71965d3b6b263095
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.6"
+  firebase_app_check_platform_interface:
+    dependency: transitive
+    description:
+      name: firebase_app_check_platform_interface
+      sha256: "645ff25c18160a2c6e6b487d3466b247619e0bf09e2b1f641d476b2a72f92106"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.4.2"
+  firebase_app_check_web:
+    dependency: transitive
+    description:
+      name: firebase_app_check_web
+      sha256: "66c938d522c8c325515d222aa55560921b063d06791cf95aa7c405183a3a454f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.6"
   firebase_auth:
     dependency: "direct main"
     description:
@@ -558,7 +598,7 @@ packages:
     source: hosted
     version: "4.1.2"
   image:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: image
       sha256: "6300175e00616bbc832e2fc91bfa4d776af5402c81c7151bee6905bb08473c52"
@@ -1074,14 +1114,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.11"
-  timeago:
-    dependency: "direct main"
-    description:
-      name: timeago
-      sha256: b05159406a97e1cbb2b9ee4faa9fb096fe0e2dfcd8b08fcd2a00553450d3422e
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.7.1"
   timezone:
     dependency: transitive
     description:
@@ -1099,7 +1131,7 @@ packages:
     source: hosted
     version: "1.4.0"
   url_launcher:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: url_launcher
       sha256: f6a7e5c4835bb4e3026a04793a4199ca2d14c739ec378fdfe23fc8075d0439f8

@@ -1,6 +1,6 @@
 name: echomeet
 
-description: A new Flutter project.
+description: EchoMeet helps organizations coordinate appointments, surveys, and shared notes.
 publish_to: 'none' # Ensures package is not accidentally published to pub.dev.
 
 version: 1.0.0+1
@@ -20,17 +20,17 @@ dependencies:
   shared_preferences: ^2.0.17
   firebase_storage: ^13.4.6
   cloud_firestore: ^6.8.0
+  cloud_functions: ^6.3.5
   firebase_core: ^4.13.0
+  firebase_app_check: ^0.4.6
   firebase_auth: ^6.5.7
   flutter_local_notifications: ^22.3.0
-  timeago: ^3.6.0
   adaptive_theme: ^3.4.1
+  image: ^4.9.1
   image_picker: ^1.0.4
   pdf: ^3.10.7
   password_strength: ^0.2.0
-  url_launcher: ^6.2.5
   firebase_messaging: ^16.5.0
-  carousel_slider: ^5.1.2
   local_auth: ^3.0.2
   local_auth_android: ^2.0.9
   flutter_quill: ^11.5.1

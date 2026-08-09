@@ -53,6 +53,20 @@ Deadline deadlineFor(
   );
 }
 
+/// Returns the first future boundary that can change a deadline-derived view.
+/// Past and exact-now values have already crossed and need no timer.
+DateTime? nearestFutureDeadline(
+  Iterable<DateTime> deadlines, {
+  required DateTime now,
+}) {
+  DateTime? nearest;
+  for (final deadline in deadlines) {
+    if (!deadline.isAfter(now)) continue;
+    if (nearest == null || deadline.isBefore(nearest)) nearest = deadline;
+  }
+  return nearest;
+}
+
 int _calendarDaysBetween(DateTime from, DateTime to) {
   final start = DateTime(from.year, from.month, from.day);
   final end = DateTime(to.year, to.month, to.day);

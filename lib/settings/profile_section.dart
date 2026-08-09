@@ -1,9 +1,14 @@
+import 'dart:convert';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:easy_localization/easy_localization.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
+import 'package:echomeet/core/profile/profile_image_sanitizer.dart';
+import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -18,6 +23,7 @@ class ProfileSection extends StatefulWidget {
 
 class _ProfileSectionState extends State<ProfileSection> {
   bool _uploading = false;
+  int _avatarRevision = 0;
 
   Stream<DocumentSnapshot> get _user => FirebaseFirestore.instance
       .collection('users')
@@ -25,28 +31,31 @@ class _ProfileSectionState extends State<ProfileSection> {
       .snapshots();
 
   Future<void> _pickAndUpload() async {
-    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (image == null || !mounted) return;
+    final picked = await ImagePicker().pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 90,
+    );
+    if (picked == null || !mounted) return;
 
     setState(() => _uploading = true);
 
     try {
-      final path = 'profile_images/${widget.userId}.jpg';
-      final ref = FirebaseStorage.instance.ref(path);
-
-      await ref.putData(
-        await image.readAsBytes(),
-        SettableMetadata(contentType: image.mimeType ?? 'image/jpeg'),
-      );
-
-      final url = await ref.getDownloadURL();
-
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.userId)
-          .update({'profileImage': url});
+      final bytes = await sanitizeProfileImage(picked);
+      final result = await FirebaseFunctions.instanceFor(region: 'europe-west4')
+          .httpsCallable('uploadProfileImage')
+          .call<Map<String, dynamic>>({'jpegBase64': base64Encode(bytes)});
+      if (result.data['path'] != profileImagePathFor(widget.userId)) {
+        throw StateError('Unexpected profile image path.');
+      }
+      final revision = result.data['revision'];
+      if (revision is! int || revision < 1) {
+        throw StateError('Unexpected profile image revision.');
+      }
 
       if (!mounted) return;
+      setState(() => _avatarRevision = revision);
       UIUtils.showSnackBar(context, 'profile_image_uploaded'.tr());
     } catch (_) {
       if (!mounted) return;
@@ -70,6 +79,9 @@ class _ProfileSectionState extends State<ProfileSection> {
 
         final stored = (data?['profileImage'] as String?)?.trim();
         final image = (stored == null || stored.isEmpty) ? null : stored;
+        final profileImageRevision = readProfileImageRevision(
+          data?['profileImageRevision'],
+        );
         final role = data?['role'] as String?;
 
         return Container(
@@ -88,6 +100,9 @@ class _ProfileSectionState extends State<ProfileSection> {
                 uploading: _uploading,
                 initials: _initialsOf(name),
                 onTap: _pickAndUpload,
+                avatarRevision: _avatarRevision,
+                profileImageRevision: profileImageRevision,
+                userId: widget.userId,
               ),
               const SizedBox(width: Spacing.md),
               Expanded(
@@ -135,12 +150,18 @@ class _Avatar extends StatelessWidget {
     required this.uploading,
     required this.initials,
     required this.onTap,
+    required this.avatarRevision,
+    required this.profileImageRevision,
+    required this.userId,
   });
 
   final String? url;
   final bool uploading;
   final String initials;
   final VoidCallback onTap;
+  final int avatarRevision;
+  final int profileImageRevision;
+  final String userId;
 
   @override
   Widget build(BuildContext context) {
@@ -171,12 +192,11 @@ class _Avatar extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (url case final url?)
-                    Image.network(
-                      url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stack) =>
-                          const SizedBox.shrink(),
+                  if (url case final storedReference?)
+                    AuthenticatedProfileImage(
+                      storedReference: storedReference,
+                      refreshKey: (profileImageRevision, avatarRevision),
+                      userId: userId,
                     ),
                 ],
               ),

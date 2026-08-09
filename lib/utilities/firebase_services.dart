@@ -9,27 +9,16 @@ class FirebaseServices {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
 
-  static String? _cachedUid;
-  static Map<String, dynamic>? _cachedProfile;
-
-  static void invalidateCache() {
-    _cachedUid = null;
-    _cachedProfile = null;
-  }
+  // Kept for call-site compatibility. Profile authorization data is no longer
+  // held in process memory, so there is nothing to invalidate.
+  static void invalidateCache() {}
 
   Future<Map<String, dynamic>?> _currentProfile() async {
     final uid = _auth.currentUser?.uid;
     if (uid == null) return null;
 
-    if (_cachedUid == uid && _cachedProfile != null) return _cachedProfile;
-
     final snapshot = await _db.collection('users').doc(uid).get();
-    final data = snapshot.data();
-    if (data == null) return null;
-
-    _cachedUid = uid;
-    _cachedProfile = data;
-    return data;
+    return snapshot.data();
   }
 
   Future<bool> fetchAdminStatus() async {
@@ -52,13 +41,13 @@ class FirebaseServices {
 
   Future<String> fetchUserNameById(String userId) async {
     if (userId.isEmpty) return 'Unknown';
-    final snapshot = await _db.collection('users').doc(userId).get();
+    final snapshot = await _db.collection('memberDirectory').doc(userId).get();
     return snapshot.data()?['fullName'] as String? ?? 'Unknown';
   }
 
   Future<String> fetchProfileImage(String userId) async {
     if (userId.isEmpty) return '';
-    final snapshot = await _db.collection('users').doc(userId).get();
+    final snapshot = await _db.collection('memberDirectory').doc(userId).get();
     return snapshot.data()?['profileImage'] as String? ?? '';
   }
 }

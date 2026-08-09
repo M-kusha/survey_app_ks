@@ -23,6 +23,7 @@ class Register4stepState extends State<Register4step> {
   List<Map<String, dynamic>> _companies = [];
   String? _selectedId;
   bool _loading = true;
+  bool _hasError = false;
   bool _saving = false;
 
   @override
@@ -39,12 +40,29 @@ class Register4stepState extends State<Register4step> {
   }
 
   Future<void> _fetchCompanies() async {
-    final companies = await widget.registerLogic.searchCompanies('');
-    if (!mounted) return;
     setState(() {
-      _companies = companies;
-      _loading = false;
+      _loading = true;
+      _hasError = false;
     });
+
+    try {
+      final companies = await widget.registerLogic.searchCompanies('');
+      if (!mounted) return;
+      setState(() {
+        _companies = companies;
+        if (_selectedId != null &&
+            !companies.any((company) => company['id'] == _selectedId)) {
+          _selectedId = null;
+        }
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _hasError = true;
+        _loading = false;
+      });
+    }
   }
 
   List<Map<String, dynamic>> get _visible {
@@ -121,6 +139,10 @@ class Register4stepState extends State<Register4step> {
       );
     }
 
+    if (_hasError) {
+      return _CompanyLoadError(onRetry: _fetchCompanies);
+    }
+
     final companies = _visible;
     if (companies.isEmpty) {
       return _EmptyState(
@@ -147,6 +169,39 @@ class Register4stepState extends State<Register4step> {
             onTap: () => setState(() => _selectedId = id),
           );
         },
+      ),
+    );
+  }
+}
+
+class _CompanyLoadError extends StatelessWidget {
+  const _CompanyLoadError({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
+      child: Column(
+        children: [
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 28,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(
+            'error_occurred'.tr(),
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: Spacing.sm),
+          TextButton(onPressed: onRetry, child: Text('retry'.tr())),
+        ],
       ),
     );
   }

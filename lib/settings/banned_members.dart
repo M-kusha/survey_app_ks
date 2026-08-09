@@ -21,7 +21,7 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
 
   List<BannedMember> _members = [];
   bool _loading = true;
-  String? _error;
+  bool _hasError = false;
 
   @override
   void initState() {
@@ -32,7 +32,7 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
   Future<void> _load() async {
     setState(() {
       _loading = true;
-      _error = null;
+      _hasError = false;
     });
 
     try {
@@ -42,10 +42,10 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
         _members = members;
         _loading = false;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _hasError = true;
         _loading = false;
       });
     }
@@ -124,11 +124,10 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
   Widget _buildBody() {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
-    if (_error case final error?) {
+    if (_hasError) {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
-        body: error,
         action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }

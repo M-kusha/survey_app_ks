@@ -18,7 +18,7 @@ import 'package:echomeet/settings/password_change.dart';
 import 'package:echomeet/settings/profile_section.dart';
 import 'package:echomeet/settings/settings_kit.dart';
 import 'package:echomeet/settings/user_menagment.dart';
-import 'package:echomeet/utilities/firebase_services.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -34,43 +34,100 @@ class SettingsPageUI extends StatefulWidget {
 }
 
 class _SettingsPageUIState extends State<SettingsPageUI> {
-  late final FirebaseServices _services = FirebaseServices();
-
   String _userId = '';
-  bool _isSuperAdmin = false;
-  bool _canManagePeople = false;
   bool _loading = true;
-  Membership? _membership;
+  bool _hasError = false;
   bool _openToJoin = true;
+  String? _sessionKey;
+  bool _loadScheduled = false;
+  int _loadGeneration = 0;
 
   @override
-  void initState() {
-    super.initState();
-    _load();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final membershipState = context.watch<MembershipProvider>();
+    final users = context.watch<UserDataProvider>();
+    final user = users.currentUser;
+    final membership = membershipState.membership;
+    final sessionKey = [
+      membershipState.loading,
+      membershipState.error != null,
+      membership?.state,
+      membership?.companyId,
+      membership?.joinPolicy,
+      membership?.deletionAt,
+      user?.id,
+      user?.role,
+      user?.membership,
+      users.error != null,
+    ].join('|');
+
+    if (_sessionKey == sessionKey || _loadScheduled) return;
+    _sessionKey = sessionKey;
+    _loadScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadScheduled = false;
+      if (mounted) _load();
+    });
   }
 
   Future<void> _load() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+    final generation = ++_loadGeneration;
+    final users = context.read<UserDataProvider>();
+    final membershipState = context.read<MembershipProvider>();
+    if (membershipState.loading && membershipState.membership == null) return;
 
-    final isSuperAdmin = await _services.isSuperAdminUser();
-    final canManagePeople = await _services.canManagePeople();
-    final membership = await MembershipService().resolve();
+    try {
+      if (membershipState.error case final error?) throw error;
+      if (users.error case final error?) throw error;
 
-    final openToJoin = canManagePeople && membership.companyId.isNotEmpty
-        ? await CompanyAdminService().isOpenToJoin(membership.companyId)
-        : true;
+      final membership = membershipState.membership;
+      final user = users.currentUser;
+      final canManagePeople =
+          user?.role == 'admin' || user?.role == 'superadmin';
+      final openToJoin =
+          canManagePeople && membership?.companyId.isNotEmpty == true
+          ? membership!.isOpenToJoin
+          : true;
 
-    if (!mounted) return;
+      if (!mounted || generation != _loadGeneration) return;
 
-    setState(() {
-      _userId = userId;
-      _isSuperAdmin = isSuperAdmin;
-      _canManagePeople = canManagePeople;
-      _membership = membership;
-      _openToJoin = openToJoin;
-      _loading = false;
-    });
+      setState(() {
+        _userId = FirebaseAuth.instance.currentUser?.uid ?? '';
+        _openToJoin = openToJoin;
+        _hasError = false;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _loadGeneration) return;
+      setState(() {
+        _hasError = true;
+        _loading = false;
+      });
+    }
   }
+
+  Future<void> _retryLoad() async {
+    setState(() {
+      _loading = true;
+      _hasError = false;
+    });
+    _sessionKey = null;
+
+    await Future.wait<void>([
+      context.read<MembershipProvider>().refresh(),
+      context.read<UserDataProvider>().loadCurrentUser(),
+    ]);
+  }
+
+  Membership? get _membership => context.read<MembershipProvider>().membership;
+
+  UserModel? get _currentUser => context.read<UserDataProvider>().currentUser;
+
+  bool get _isSuperAdmin => _currentUser?.role == 'superadmin';
+
+  bool get _canManagePeople =>
+      _currentUser?.role == 'admin' || _currentUser?.role == 'superadmin';
 
   Future<void> _setJoinPolicy(bool open) async {
     final companyId = _membership?.companyId ?? '';
@@ -142,8 +199,12 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
     if (confirmed != true || !mounted) return;
 
-    await AuthManager().signOut();
+    final signedOut = await AuthManager().signOut();
     if (!mounted) return;
+    if (!signedOut) {
+      UIUtils.showSnackBar(context, 'error_occurred'.tr());
+      return;
+    }
     Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(builder: (context) => const LoginPage()),
       (route) => false,
@@ -159,6 +220,23 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     if (_loading) {
       return const Scaffold(
         body: Center(child: CustomLoadingWidget(loadingText: 'loading')),
+      );
+    }
+
+    if (_hasError) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: EmptyState(
+              icon: Icons.cloud_off_rounded,
+              title: 'error_occurred'.tr(),
+              action: TextButton(
+                onPressed: _retryLoad,
+                child: Text('retry'.tr()),
+              ),
+            ),
+          ),
+        ),
       );
     }
 
@@ -419,9 +497,6 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
     return SettingsGroup(
       title: 'danger_zone'.tr(),
-      // Says what to do instead, rather than leaving the owner wondering why
-      // everyone else has a control they do not.
-      footnote: _isSuperAdmin ? 'delete_account_blocked'.tr() : null,
       children: [
         SettingsTile(
           icon: Icons.logout_rounded,
@@ -431,25 +506,15 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
           onTap: _signOut,
         ),
 
-        // Not shown to the company's owner.
-        //
-        // An admin or a moderator is a role inside a company and nothing more:
-        // deleting their account takes nothing else with it. The owner is the
-        // company - their account is what `createdCompany` is checked against,
-        // and removing it would leave a company nobody can administer, close or
-        // join. They close the company first, which resets them to an ordinary
-        // account, and then this appears.
-        //
-        // It used to be shown to them and then refuse in the sheet, which is a
-        // dead end dressed up as an action.
-        if (!_isSuperAdmin)
-          SettingsTile(
-            icon: Icons.delete_outline_rounded,
-            title: 'delete_account'.tr(),
-            subtitle: 'delete_account_hint'.tr(),
-            tint: scheme.error,
-            onTap: _confirmDelete,
-          ),
+        SettingsTile(
+          icon: Icons.delete_outline_rounded,
+          title: 'delete_account'.tr(),
+          subtitle: _isSuperAdmin
+              ? 'delete_owner_account_hint'.tr()
+              : 'delete_account_hint'.tr(),
+          tint: scheme.error,
+          onTap: _confirmDelete,
+        ),
       ],
     );
   }
@@ -474,10 +539,11 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: Spacing.sm),
-            // No owner branch here any more: the row that opens this sheet is
-            // not shown to them at all.
             Text(
-              'delete_account_warning'.tr(),
+              (_isSuperAdmin
+                      ? 'delete_owner_account_warning'
+                      : 'delete_account_warning')
+                  .tr(),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
