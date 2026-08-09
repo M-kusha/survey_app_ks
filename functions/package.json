@@ -1,0 +1,23 @@
+{
+  "name": "echomeet-functions",
+  "description": "Server-side notifications and scheduled cleanup for EchoMeet.",
+  "private": true,
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "deploy": "npm run build && firebase deploy --only functions",
+    "logs": "firebase functions:log"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  }
+}
