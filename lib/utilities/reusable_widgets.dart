@@ -16,7 +16,7 @@ class UIUtils {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message.tr()),
+          content: Text(message),
           backgroundColor: isError ? scheme.errorContainer : null,
           showCloseIcon: true,
           duration: Duration(seconds: isError ? 5 : 3),
