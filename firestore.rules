@@ -877,7 +877,8 @@ service cloud.firestore {
             'timeLimitPerQuestion',
             'surveyType',
             'companyId',
-            'createdBy'
+            'createdBy',
+            'responsesRevision'
           ])
           && data.keys().hasAll([
             'surveyName', 'surveyDescription', 'timeCreated', 'questions', 'id',
@@ -902,6 +903,9 @@ service cloud.firestore {
           && data.timeLimitPerQuestion <= 86400
           && data.surveyType in [0, 1]
           && data.companyId is string
+          && (!('responsesRevision' in data)
+              || (data.responsesRevision is int
+                  && data.responsesRevision == 0))
           && data.createdBy == uid();
       }
 

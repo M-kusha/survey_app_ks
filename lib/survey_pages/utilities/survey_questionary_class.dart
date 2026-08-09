@@ -14,6 +14,7 @@ class Survey {
   int timeLimitPerQuestion;
   SurveyType surveyType;
   String companyId;
+  int responsesRevision;
 
   Survey({
     required this.surveyName,
@@ -26,6 +27,7 @@ class Survey {
     this.timeLimitPerQuestion = 0,
     this.surveyType = SurveyType.survey,
     required this.companyId,
+    this.responsesRevision = 0,
   });
 
   Map<String, dynamic> toFirestoreMap() {
@@ -42,6 +44,7 @@ class Survey {
       'timeLimitPerQuestion': timeLimitPerQuestion,
       'surveyType': surveyType.index,
       'companyId': companyId,
+      'responsesRevision': responsesRevision,
     };
   }
 
@@ -81,6 +84,10 @@ class Survey {
       timeLimitPerQuestion: data['timeLimitPerQuestion'] ?? 0,
       surveyType: surveyType,
       companyId: data['companyId'] ?? '',
+      responsesRevision:
+          data['responsesRevision'] is int && data['responsesRevision'] >= 0
+          ? data['responsesRevision'] as int
+          : 0,
     );
   }
 }

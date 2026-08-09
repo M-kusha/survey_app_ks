@@ -265,6 +265,13 @@ export const onSurveyResponseCreated = onDocumentCreated(
         return;
       }
 
+      // This backend-owned value is only an invalidation signal. Clients use
+      // the already-open survey query to refresh their own response status
+      // without maintaining one participant listener per survey.
+      transaction.update(surveyRef, {
+        responsesRevision: FieldValue.increment(1),
+      });
+
       try {
         const grade = scoreTrustedSurvey({
           surveyId: event.params.surveyId,
@@ -291,6 +298,23 @@ export const onSurveyResponseCreated = onDocumentCreated(
           serverScoredAt: FieldValue.serverTimestamp(),
         });
       }
+    });
+  },
+);
+
+/** Invalidates live participation state after a response is removed. */
+export const onSurveyResponseDeleted = onDocumentDeleted(
+  { document: 'surveys/{surveyId}/participants/{participantId}', region },
+  async (event) => {
+    const surveyRef = event.data?.ref.parent.parent;
+    if (!surveyRef) return;
+
+    await getFirestore().runTransaction(async (transaction) => {
+      const survey = await transaction.get(surveyRef);
+      if (!survey.exists) return;
+      transaction.update(surveyRef, {
+        responsesRevision: FieldValue.increment(1),
+      });
     });
   },
 );

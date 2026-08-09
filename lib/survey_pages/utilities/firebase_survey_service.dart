@@ -30,6 +30,7 @@ class FirebaseSurveyService {
       'timeLimitPerQuestion': survey.timeLimitPerQuestion,
       'surveyType': survey.surveyType.index,
       'companyId': survey.companyId,
+      'responsesRevision': 0,
 
       'createdBy': userId,
     };

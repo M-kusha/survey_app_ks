@@ -305,7 +305,7 @@ surfaces as an empty viewer in front of whoever needed the results.
 
 ## Notifications
 
-Notifications are one part of the 15 Functions exported from `functions/`:
+Notifications are one part of the 16 Functions exported from `functions/`:
 
 | Trigger | Who hears |
 | --- | --- |

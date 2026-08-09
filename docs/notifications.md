@@ -27,12 +27,12 @@ submission is not enough; wait until every index reports enabled.
 
 ### Deployed inventory
 
-The current `functions/src/index.ts` exports exactly 15 Functions:
+The current `functions/src/index.ts` exports exactly 16 Functions:
 
 | Kind | Exports |
 | --- | --- |
 | App Check callables | `completeOnboarding`, `uploadProfileImage`, `deleteMyAccount` |
-| Survey triggers | `onSurveyCreated`, `onSurveyResponseCreated`, `onSurveyResponseUpdated` |
+| Survey triggers | `onSurveyCreated`, `onSurveyResponseCreated`, `onSurveyResponseDeleted`, `onSurveyResponseUpdated` |
 | Appointment triggers | `onAppointmentCreated`, `onAppointmentVoteCreated`, `onAppointmentVoteDeleted`, `onTimeSlotConfirmed` |
 | Membership triggers | `onJoinRequested`, `onJoinRequestedAtRegistration` |
 | Scheduler jobs | `remindExpiring`, `purgeScheduledCompanies`, `purgeAccountDeletionLocks` |

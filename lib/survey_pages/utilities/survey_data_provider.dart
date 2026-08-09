@@ -36,6 +36,7 @@ class SurveyDataProvider extends ChangeNotifier {
   String? _participantsSurveyId;
   Set<String> _pendingParticipationSurveyIds = {};
   final Set<String> _locallySubmittedSurveyIds = {};
+  Map<String, int> _responsesRevisions = {};
   int _surveyLoadGeneration = 0;
   int _participationGeneration = 0;
   int _participantsGeneration = 0;
@@ -78,6 +79,7 @@ class SurveyDataProvider extends ChangeNotifier {
     userParticipationStatus = {};
     _pendingParticipationSurveyIds = {};
     _locallySubmittedSurveyIds.clear();
+    _responsesRevisions = {};
     _isLoading = true;
     _error = null;
     _notify();
@@ -103,9 +105,35 @@ class SurveyDataProvider extends ChangeNotifier {
               return;
             }
 
-            _surveys = snapshot.docs
+            final nextSurveys = snapshot.docs
                 .map((doc) => Survey.fromFirestore(doc.data()))
                 .toList();
+            final nextRevisions = {
+              for (final survey in nextSurveys)
+                survey.id: survey.responsesRevision,
+            };
+            final changedSurveyIds = nextRevisions.keys
+                .where(
+                  (surveyId) =>
+                      _responsesRevisions.containsKey(surveyId) &&
+                      _responsesRevisions[surveyId] != nextRevisions[surveyId],
+                )
+                .toSet();
+            _surveys = nextSurveys;
+            _responsesRevisions = nextRevisions;
+
+            if (changedSurveyIds.isNotEmpty &&
+                _participationUserId?.isNotEmpty == true) {
+              // Invalidate all in-flight reads. A response revision can arrive
+              // after a local submit, so an older pre-submit get must never
+              // overwrite the successful local state.
+              ++_participationGeneration;
+              _pendingParticipationSurveyIds.clear();
+              for (final surveyId in changedSurveyIds) {
+                userParticipationStatus.remove(surveyId);
+                _locallySubmittedSurveyIds.remove(surveyId);
+              }
+            }
             _isLoading = _pendingParticipationSurveyIds.isNotEmpty;
             _error = null;
             final participationHydration = _synchronizeParticipationStatus(
@@ -365,6 +393,7 @@ class SurveyDataProvider extends ChangeNotifier {
     _participantsSurveyId = null;
     _pendingParticipationSurveyIds = {};
     _locallySubmittedSurveyIds.clear();
+    _responsesRevisions = {};
     _currentSurvey = null;
     _participants = null;
     _surveys = [];

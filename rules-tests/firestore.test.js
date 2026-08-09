@@ -162,6 +162,7 @@ const surveyDocument = (id, overrides = {}) => ({
   surveyType: 1,
   companyId: ACME,
   createdBy: ALICE,
+  responsesRevision: 0,
   ...overrides,
 });
 
@@ -901,6 +902,14 @@ describe('survey authoring', () => {
         questions: [
           { type: 'Single', question: 'Changed', options: ['A'] },
         ],
+      }),
+    );
+  });
+
+  it('clients cannot forge the backend response revision', async () => {
+    await assertFails(
+      updateDoc(doc(as(ALICE), 'surveys', 'acme-survey'), {
+        responsesRevision: 1,
       }),
     );
   });

@@ -53,6 +53,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
 | `onSurveyCreated` | `surveys/{surveyId}` create notification |
 | `onSurveyResponseCreated` | trusted initial grading from `surveyAnswerKeys` |
+| `onSurveyResponseDeleted` | invalidates live participation state after response deletion |
 | `onSurveyResponseUpdated` | trusted regrading after review changes |
 | `onAppointmentCreated` | appointment create notification |
 | `onAppointmentVoteCreated` | maintains the parent `participantUserIds` cache |
