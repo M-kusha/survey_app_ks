@@ -39,7 +39,7 @@ Future<void> _pump(
             for (final label in ['notes', 'meetings', 'surveys', 'settings'])
               ColoredBox(
                 color: theme.colorScheme.surface,
-                child: Center(child: Text(label)),
+                child: Center(child: Text('page:$label')),
               ),
           ],
         ),
@@ -82,11 +82,22 @@ void main() {
     );
   });
 
-  testWidgets('the selected tab keeps its page', (tester) async {
+  testWidgets('tabs mount on first visit and then stay alive', (tester) async {
     await _pump(tester, AppTheme.light, size: const Size(393, 700));
 
-    // IndexedStack keeps every page alive, so all four are in the tree; only
-    // the selected one is painted.
-    expect(find.text('meetings'), findsOneWidget);
+    Finder page(String label) => find.text('page:$label', skipOffstage: false);
+
+    expect(page('meetings'), findsOneWidget);
+    expect(page('notes'), findsNothing);
+    expect(page('surveys'), findsNothing);
+    expect(page('settings'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.edit_note_rounded));
+    await tester.pumpAndSettle();
+
+    expect(page('notes'), findsOneWidget);
+    expect(page('meetings'), findsOneWidget);
+    expect(page('surveys'), findsNothing);
+    expect(page('settings'), findsNothing);
   });
 }

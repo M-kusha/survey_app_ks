@@ -9,10 +9,12 @@ import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:echomeet/survey_pages/user_survey/step3_participate_survey.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class SurveyAnswerPage extends StatefulWidget {
   const SurveyAnswerPage({
@@ -140,6 +142,10 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
         imageProfile: widget.imageProfile,
       );
       if (!mounted) return;
+      context.read<SurveyDataProvider>().markParticipationSubmitted(
+        surveyId: widget.survey.id,
+        userId: widget.participant.userId,
+      );
 
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(

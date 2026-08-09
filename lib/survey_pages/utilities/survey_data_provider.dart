@@ -29,14 +29,13 @@ class SurveyDataProvider extends ChangeNotifier {
   _participantsSubscription;
   Completer<void>? _firstSurveys;
   Completer<void>? _firstParticipants;
-  final Map<String, StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>
-  _participationSubscriptions = {};
 
   String? _authUserId;
   String? _companyId;
   String? _participationUserId;
   String? _participantsSurveyId;
   Set<String> _pendingParticipationSurveyIds = {};
+  final Set<String> _locallySubmittedSurveyIds = {};
   int _surveyLoadGeneration = 0;
   int _participationGeneration = 0;
   int _participantsGeneration = 0;
@@ -67,8 +66,6 @@ class SurveyDataProvider extends ChangeNotifier {
     ++_participantsGeneration;
     final previousSubscription = _surveysSubscription;
     final previousParticipantsSubscription = _participantsSubscription;
-    final previousParticipationSubscriptions =
-        _takeParticipationSubscriptions();
     _surveysSubscription = null;
     _participantsSubscription = null;
     _completeFirstSurveys();
@@ -80,6 +77,7 @@ class SurveyDataProvider extends ChangeNotifier {
     _surveys = [];
     userParticipationStatus = {};
     _pendingParticipationSurveyIds = {};
+    _locallySubmittedSurveyIds.clear();
     _isLoading = true;
     _error = null;
     _notify();
@@ -88,9 +86,6 @@ class SurveyDataProvider extends ChangeNotifier {
       if (previousSubscription != null) previousSubscription.cancel(),
       if (previousParticipantsSubscription != null)
         previousParticipantsSubscription.cancel(),
-      ...previousParticipationSubscriptions.map(
-        (subscription) => subscription.cancel(),
-      ),
     ]);
     if (_disposed || generation != _surveyLoadGeneration) return;
 
@@ -111,12 +106,13 @@ class SurveyDataProvider extends ChangeNotifier {
             _surveys = snapshot.docs
                 .map((doc) => Survey.fromFirestore(doc.data()))
                 .toList();
-            _isLoading = false;
+            _isLoading = _pendingParticipationSurveyIds.isNotEmpty;
             _error = null;
-            unawaited(
-              _synchronizeParticipationSubscriptions(_participationGeneration),
+            final participationHydration = _synchronizeParticipationStatus(
+              _participationGeneration,
             );
             _notify();
+            unawaited(participationHydration);
 
             if (!firstSnapshot.isCompleted) firstSnapshot.complete();
             if (identical(_firstSurveys, firstSnapshot)) {
@@ -210,110 +206,148 @@ class SurveyDataProvider extends ChangeNotifier {
   }
 
   Future<void> checkParticipationForCurrentUser(String userId) async {
-    if (_participationUserId == userId &&
-        _participationSubscriptions.length == _surveys.length &&
-        _error == null) {
-      return;
-    }
-
     final generation = ++_participationGeneration;
-    final previousSubscriptions = _takeParticipationSubscriptions();
+    if (_participationUserId != userId) {
+      _locallySubmittedSurveyIds.clear();
+    }
     _participationUserId = userId;
     userParticipationStatus = {};
-    _pendingParticipationSurveyIds = {for (final survey in _surveys) survey.id};
+    _pendingParticipationSurveyIds = {};
     _isLoading = true;
     _error = null;
     _notify();
 
-    await Future.wait([
-      for (final subscription in previousSubscriptions) subscription.cancel(),
-    ]);
-    if (_disposed || generation != _participationGeneration) return;
-
     if (userId.isEmpty) {
-      _pendingParticipationSurveyIds = {};
       _isLoading = false;
       _notify();
       return;
     }
-    await _synchronizeParticipationSubscriptions(generation);
-    if (_disposed || generation != _participationGeneration) return;
+    await _synchronizeParticipationStatus(generation);
+  }
 
+  void markParticipationSubmitted({
+    required String surveyId,
+    required String userId,
+  }) {
+    if (_disposed ||
+        userId.isEmpty ||
+        _auth.currentUser?.uid != userId ||
+        _participationUserId != userId) {
+      return;
+    }
+
+    final changed = userParticipationStatus[surveyId] != true;
+    _locallySubmittedSurveyIds.add(surveyId);
+    userParticipationStatus[surveyId] = true;
+    final wasPending = _pendingParticipationSurveyIds.remove(surveyId);
     if (_pendingParticipationSurveyIds.isEmpty) _isLoading = false;
+    if (changed || wasPending) _notify();
+  }
+
+  Future<void> _synchronizeParticipationStatus(int generation) {
+    if (_disposed || generation != _participationGeneration) {
+      return Future.value();
+    }
+    final userId = _participationUserId;
+    if (userId == null || userId.isEmpty) return Future.value();
+
+    final surveyIds = _surveys.map((survey) => survey.id).toSet();
+    userParticipationStatus.removeWhere(
+      (surveyId, _) => !surveyIds.contains(surveyId),
+    );
+    _pendingParticipationSurveyIds.removeWhere(
+      (surveyId) => !surveyIds.contains(surveyId),
+    );
+    _locallySubmittedSurveyIds.removeWhere(
+      (surveyId) => !surveyIds.contains(surveyId),
+    );
+
+    final missingSurveyIds = surveyIds
+        .where(
+          (surveyId) =>
+              !userParticipationStatus.containsKey(surveyId) &&
+              !_pendingParticipationSurveyIds.contains(surveyId),
+        )
+        .toList();
+    if (missingSurveyIds.isEmpty) {
+      final wasLoading = _isLoading;
+      _isLoading = _pendingParticipationSurveyIds.isNotEmpty;
+      if (wasLoading != _isLoading) _notify();
+      return Future.value();
+    }
+
+    _pendingParticipationSurveyIds.addAll(missingSurveyIds);
+    _isLoading = true;
+    return _hydrateParticipationStatus(
+      generation: generation,
+      userId: userId,
+      surveyIds: missingSurveyIds,
+    );
+  }
+
+  Future<void> _hydrateParticipationStatus({
+    required int generation,
+    required String userId,
+    required List<String> surveyIds,
+  }) async {
+    Object? firstError;
+
+    const batchSize = 8;
+    for (var offset = 0; offset < surveyIds.length; offset += batchSize) {
+      final end = offset + batchSize < surveyIds.length
+          ? offset + batchSize
+          : surveyIds.length;
+      final batch = surveyIds.sublist(offset, end);
+      final results = await Future.wait([
+        for (final surveyId in batch)
+          _readParticipationStatus(surveyId: surveyId, userId: userId),
+      ]);
+      if (_disposed ||
+          generation != _participationGeneration ||
+          _participationUserId != userId) {
+        return;
+      }
+
+      final currentSurveyIds = _surveys.map((survey) => survey.id).toSet();
+      for (final result in results) {
+        _pendingParticipationSurveyIds.remove(result.surveyId);
+        if (!currentSurveyIds.contains(result.surveyId)) continue;
+        if (result.error case final error?) {
+          firstError ??= error;
+        } else {
+          userParticipationStatus[result.surveyId] =
+              _locallySubmittedSurveyIds.contains(result.surveyId) ||
+              result.participated!;
+        }
+      }
+    }
+
+    _isLoading = _pendingParticipationSurveyIds.isNotEmpty;
+    if (firstError != null) _error = firstError;
     _notify();
   }
 
-  Future<void> _synchronizeParticipationSubscriptions(int generation) async {
-    if (_disposed || generation != _participationGeneration) return;
-    final userId = _participationUserId;
-    if (userId == null || userId.isEmpty) return;
-
-    final surveyIds = _surveys.map((survey) => survey.id).toSet();
-    final removed = _participationSubscriptions.keys
-        .where((surveyId) => !surveyIds.contains(surveyId))
-        .toList();
-    final removedSubscriptions =
-        <StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>[];
-    for (final surveyId in removed) {
-      final subscription = _participationSubscriptions.remove(surveyId);
-      if (subscription != null) removedSubscriptions.add(subscription);
-      userParticipationStatus.remove(surveyId);
-      _pendingParticipationSurveyIds.remove(surveyId);
-    }
-    await Future.wait([
-      for (final subscription in removedSubscriptions) subscription.cancel(),
-    ]);
-    if (_disposed || generation != _participationGeneration) return;
-    if (_pendingParticipationSurveyIds.isEmpty) _isLoading = false;
-
-    for (final surveyId in surveyIds) {
-      if (_disposed || generation != _participationGeneration) return;
-      if (_participationSubscriptions.containsKey(surveyId)) continue;
-
-      final subscription = _firestore
+  Future<({String surveyId, bool? participated, Object? error})>
+  _readParticipationStatus({
+    required String surveyId,
+    required String userId,
+  }) async {
+    try {
+      final document = await _firestore
           .collection('surveys')
           .doc(surveyId)
           .collection('participants')
           .doc(userId)
-          .snapshots()
-          .listen(
-            (document) {
-              if (_disposed ||
-                  generation != _participationGeneration ||
-                  _participationUserId != userId ||
-                  !_surveys.any((survey) => survey.id == surveyId)) {
-                return;
-              }
-
-              userParticipationStatus[surveyId] =
-                  document.exists &&
-                  document.data()?['participantSubmitted'] == true;
-              _pendingParticipationSurveyIds.remove(surveyId);
-              if (_pendingParticipationSurveyIds.isEmpty) _isLoading = false;
-              _error = null;
-              _notify();
-            },
-            onError: (Object error) {
-              if (_disposed ||
-                  generation != _participationGeneration ||
-                  _participationUserId != userId) {
-                return;
-              }
-              _pendingParticipationSurveyIds.remove(surveyId);
-              if (_pendingParticipationSurveyIds.isEmpty) _isLoading = false;
-              _error = error;
-              _notify();
-            },
-          );
-      _participationSubscriptions[surveyId] = subscription;
+          .get();
+      return (
+        surveyId: surveyId,
+        participated:
+            document.exists && document.data()?['participantSubmitted'] == true,
+        error: null,
+      );
+    } catch (error) {
+      return (surveyId: surveyId, participated: null, error: error);
     }
-  }
-
-  List<StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>>
-  _takeParticipationSubscriptions() {
-    final subscriptions = _participationSubscriptions.values.toList();
-    _participationSubscriptions.clear();
-    return subscriptions;
   }
 
   Future<void> clear() async {
@@ -322,7 +356,6 @@ class SurveyDataProvider extends ChangeNotifier {
     ++_participantsGeneration;
     final surveysSubscription = _surveysSubscription;
     final participantsSubscription = _participantsSubscription;
-    final participationSubscriptions = _takeParticipationSubscriptions();
     _surveysSubscription = null;
     _participantsSubscription = null;
     _completeFirstSurveys();
@@ -331,6 +364,7 @@ class SurveyDataProvider extends ChangeNotifier {
     _participationUserId = null;
     _participantsSurveyId = null;
     _pendingParticipationSurveyIds = {};
+    _locallySubmittedSurveyIds.clear();
     _currentSurvey = null;
     _participants = null;
     _surveys = [];
@@ -341,9 +375,6 @@ class SurveyDataProvider extends ChangeNotifier {
     await Future.wait([
       if (surveysSubscription != null) surveysSubscription.cancel(),
       if (participantsSubscription != null) participantsSubscription.cancel(),
-      ...participationSubscriptions.map(
-        (subscription) => subscription.cancel(),
-      ),
     ]);
   }
 
@@ -378,9 +409,6 @@ class SurveyDataProvider extends ChangeNotifier {
     unawaited(_authSubscription?.cancel());
     unawaited(_surveysSubscription?.cancel());
     unawaited(_participantsSubscription?.cancel());
-    for (final subscription in _takeParticipationSubscriptions()) {
-      unawaited(subscription.cancel());
-    }
     super.dispose();
   }
 }

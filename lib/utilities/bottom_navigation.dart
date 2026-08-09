@@ -47,31 +47,46 @@ class BottomNavigation extends StatefulWidget {
 
 class _BottomNavigationState extends State<BottomNavigation> {
   late int _currentIndex = widget.initialIndex;
+  late final Set<int> _visitedIndices = {_currentIndex};
 
-  List<Widget> _defaultPages(Locale _) => [
-    TodoList(),
-    AppointmentPageUI(),
-    QuestionarySurveyPageUI(),
-    SettingsPageUI(),
-  ];
+  Widget _defaultPage(int index) => switch (index) {
+    0 => TodoList(),
+    1 => AppointmentPageUI(),
+    2 => QuestionarySurveyPageUI(),
+    3 => SettingsPageUI(),
+    _ => const SizedBox.shrink(),
+  };
 
-  List<Widget> _pages(Locale locale) => widget.pages ?? _defaultPages(locale);
+  List<Widget> _pages() {
+    final pageCount = widget.pages?.length ?? _destinations.length;
+    return [
+      for (var index = 0; index < pageCount; index++)
+        if (_visitedIndices.contains(index))
+          HeroMode(
+            enabled: index == _currentIndex,
+            child: widget.pages?[index] ?? _defaultPage(index),
+          )
+        else
+          const SizedBox.shrink(),
+    ];
+  }
 
   void _onDestinationSelected(int index) {
-    setState(() => _currentIndex = index);
+    setState(() {
+      _currentIndex = index;
+      _visitedIndices.add(index);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final windowSize = context.windowSize;
 
-    final locale = Localizations.localeOf(context);
-
     final body = Column(
       children: [
         if (widget.pages == null) const AppBanner(),
         Expanded(
-          child: IndexedStack(index: _currentIndex, children: _pages(locale)),
+          child: IndexedStack(index: _currentIndex, children: _pages()),
         ),
       ],
     );
