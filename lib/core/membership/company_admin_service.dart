@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:echomeet/appointments/appointment_data.dart';
-import 'package:echomeet/core/membership/member_directory.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+
+typedef AdministerCompanyCallable =
+    Future<Map<String, dynamic>> Function(Map<String, dynamic> payload);
 
 @immutable
 class BannedMember {
@@ -43,82 +45,77 @@ Future<void> reauthenticateForCompanyDeletion({
 }
 
 class CompanyAdminService {
-  CompanyAdminService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _db = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  CompanyAdminService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    FirebaseFunctions? functions,
+    AdministerCompanyCallable? administerCompanyCallable,
+  }) : _providedFirestore = firestore,
+       _providedAuth = auth,
+       _administerCompany =
+           administerCompanyCallable ??
+           ((payload) => _firebaseAdministerCompany(functions, payload));
 
-  final FirebaseFirestore _db;
-  final FirebaseAuth _auth;
+  final FirebaseFirestore? _providedFirestore;
+  final FirebaseAuth? _providedAuth;
+  final AdministerCompanyCallable _administerCompany;
+
+  FirebaseFirestore get _db => _providedFirestore ?? FirebaseFirestore.instance;
+  FirebaseAuth get _auth => _providedAuth ?? FirebaseAuth.instance;
+
+  static Future<Map<String, dynamic>> _firebaseAdministerCompany(
+    FirebaseFunctions? functions,
+    Map<String, dynamic> payload,
+  ) async {
+    final result =
+        await (functions ??
+                FirebaseFunctions.instanceFor(region: 'europe-west4'))
+            .httpsCallable(
+              'administerCompany',
+              options: HttpsCallableOptions(
+                timeout: const Duration(minutes: 2),
+              ),
+            )
+            .call<Map<String, dynamic>>(payload);
+    return result.data;
+  }
 
   CollectionReference<Map<String, dynamic>> _bans(String companyId) =>
       _db.collection('companies').doc(companyId).collection('bans');
 
-  Future<void> ban({
-    required String companyId,
-    required String userId,
-    required String name,
-    required String previousMembership,
-  }) async {
-    final previous = previousMembership == 'pending' ? 'pending' : 'active';
-    final batch = _db.batch();
-    batch.set(_bans(companyId).doc(userId), {
-      'name': name,
-      'bannedAt': FieldValue.serverTimestamp(),
-      'bannedBy': _auth.currentUser?.uid,
-      'previousMembership': previous,
-    });
-    // Storage Rules have a hard two-Firestore-read ceiling. Mirroring the
-    // revocation into the existing member projection lets those rules verify
-    // both people and reject banned viewers without a third ban-document read.
-    batch.update(_db.collection('users').doc(userId), {
-      'membership': 'pending',
-    });
-    batch.update(MemberDirectory.reference(_db, userId), {
-      'membership': 'pending',
-    });
-    await batch.commit();
+  Future<void> ban(String userId) async {
+    await _targetAction(
+      'banMember',
+      userId,
+      expected: {'membership': 'pending'},
+    );
   }
 
-  Future<void> unban({
-    required String companyId,
-    required String userId,
-  }) async {
-    final ban = _bans(companyId).doc(userId);
-    final member = MemberDirectory.reference(_db, userId);
-
-    await _db.runTransaction((transaction) async {
-      final snapshots = await Future.wait([
-        transaction.get(ban),
-        transaction.get(member),
-      ]);
-      final banSnapshot = snapshots[0];
-      if (!banSnapshot.exists) return;
-
-      final previous = banSnapshot.data()?['previousMembership'] == 'pending'
-          ? 'pending'
-          : 'active';
-      transaction.delete(ban);
-
-      final memberSnapshot = snapshots[1];
-      if (!memberSnapshot.exists ||
-          memberSnapshot.data()?['companyId'] != companyId) {
-        return;
-      }
-      transaction.update(_db.collection('users').doc(userId), {
-        'membership': previous,
-      });
-      transaction.update(member, {'membership': previous});
-    });
+  Future<void> unban(String userId) async {
+    await _targetAction('unbanMember', userId);
   }
 
   Future<List<BannedMember>> bannedMembers(String companyId) async {
-    final snapshot = await _bans(companyId).get();
+    final snapshots = await Future.wait([
+      _bans(companyId).get(),
+      _db
+          .collection('memberDirectory')
+          .where('companyId', isEqualTo: companyId)
+          .get(),
+    ]);
+    final bans = snapshots[0];
+    final directory = snapshots[1];
+    final names = <String, String>{
+      for (final member in directory.docs)
+        if ((member.data()['fullName'] as String? ?? '').trim().isNotEmpty)
+          member.id: (member.data()['fullName'] as String).trim(),
+    };
 
-    final members = snapshot.docs
+    final members = bans.docs
         .map(
           (doc) => BannedMember(
             userId: doc.id,
-            name: (doc.data()['name'] as String? ?? '').trim(),
+            name: names[doc.id] ?? '',
             previousMembership: doc.data()['previousMembership'] == 'pending'
                 ? 'pending'
                 : 'active',
@@ -127,91 +124,49 @@ class CompanyAdminService {
         )
         .toList();
 
-    members.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-    );
+    members.sort((a, b) {
+      final aLabel = a.name.isEmpty ? a.userId : a.name;
+      final bLabel = b.name.isEmpty ? b.userId : b.name;
+      return aLabel.toLowerCase().compareTo(bLabel.toLowerCase());
+    });
     return members;
   }
 
   Future<void> approve(String userId) async {
-    await MemberDirectory.updateMember(
-      firestore: _db,
-      userId: userId,
-      fields: {'membership': 'active'},
+    await _targetAction(
+      'approveMember',
+      userId,
+      expected: {'membership': 'active'},
     );
   }
 
-  Future<void> erase({
-    required String companyId,
-    required String userId,
-  }) async {
-    final participantReferences = <DocumentReference<Map<String, dynamic>>>[];
-    final surveys = await _db
-        .collection('surveys')
-        .where('companyId', isEqualTo: companyId)
-        .get();
-
-    for (final survey in surveys.docs) {
-      participantReferences.add(
-        survey.reference.collection('participants').doc(userId),
-      );
+  Future<void> changeRole(String userId, String role) async {
+    if (!const {'user', 'moderator', 'admin'}.contains(role)) {
+      throw ArgumentError.value(role, 'role', 'Unsupported company role.');
     }
-
-    final appointments = await _db
-        .collection('appointments')
-        .where('companyId', isEqualTo: companyId)
-        .where('schemaVersion', isEqualTo: Appointment.schemaVersion)
-        .get();
-
-    for (final appointment in appointments.docs) {
-      final votes = await appointment.reference
-          .collection('participants')
-          .where('userId', isEqualTo: userId)
-          .get();
-
-      for (final vote in votes.docs) {
-        participantReferences.add(vote.reference);
-      }
-
-      // Trusted vote-delete triggers remove the uid from participantUserIds
-      // after the member's final child vote has gone.
-    }
-
-    // Resolve every query before mutating anything, then let any failed delete
-    // abort the operation. The caller must never report a successful erasure
-    // while participant data is still present.
-    await _deleteDocuments(participantReferences);
-
-    // Release the profile, remove its public projection and discard any ban in
-    // one final write. Separate remove/unban calls can strand an orphan ban on
-    // a transient failure, or briefly restore access before removal finishes.
-    final release = _db.batch();
-    release.update(_db.collection('users').doc(userId), {
-      'companyId': '',
-      'role': 'user',
-      'membership': 'active',
-    });
-    release.delete(MemberDirectory.reference(_db, userId));
-    release.delete(_bans(companyId).doc(userId));
-    await release.commit();
+    await _targetAction(
+      'changeMemberRole',
+      userId,
+      extra: {'role': role},
+      expected: {'role': role},
+    );
   }
 
-  Future<void> _deleteDocuments(
-    List<DocumentReference<Map<String, dynamic>>> references,
-  ) async {
-    // Keep these as individual requests. Participant delete rules perform
-    // document lookups, whose per-request ceiling is lower for batched writes.
-    for (final reference in references) {
-      await reference.delete();
-    }
+  Future<void> remove(String userId) async {
+    await _targetAction('removeMember', userId, expected: {'released': true});
+  }
+
+  Future<void> erase(String userId) async {
+    await _targetAction(
+      'eraseMemberCompanyData',
+      userId,
+      expected: {'released': true},
+    );
   }
 
   static const gracePeriod = Duration(days: 7);
 
-  Future<DateTime> scheduleDeletion({
-    required String companyId,
-    required String password,
-  }) async {
+  Future<DateTime> scheduleDeletion({required String password}) async {
     final user = _auth.currentUser;
     if (user == null || user.email == null) {
       throw StateError('No signed-in user can schedule company deletion.');
@@ -227,21 +182,18 @@ class CompanyAdminService {
       },
     );
 
-    final at = DateTime.now().add(gracePeriod);
-
-    await _db.collection('companies').doc(companyId).update({
-      'deletionScheduledFor': Timestamp.fromDate(at),
-      'deletionRequestedBy': user.uid,
-    });
-
-    return at;
+    final receipt = await _request('scheduleDeletion');
+    final millis = receipt['deletionScheduledForMillis'];
+    if (millis is! num) {
+      throw const FormatException(
+        'The company administration response was incomplete.',
+      );
+    }
+    return DateTime.fromMillisecondsSinceEpoch(millis.toInt());
   }
 
-  Future<void> cancelDeletion(String companyId) async {
-    await _db.collection('companies').doc(companyId).update({
-      'deletionScheduledFor': FieldValue.delete(),
-      'deletionRequestedBy': FieldValue.delete(),
-    });
+  Future<void> cancelDeletion() async {
+    await _request('cancelDeletion', expected: {'cancelled': true});
   }
 
   Future<int> pendingCount(String companyId) async {
@@ -254,23 +206,61 @@ class CompanyAdminService {
     return snapshot.docs.length;
   }
 
-  Future<void> setJoinPolicy({
-    required String companyId,
-    required bool open,
-  }) async {
+  Future<void> setJoinPolicy({required bool open}) async {
     final policy = open ? 'open' : 'approval';
-    final batch = _db.batch();
-    batch.update(_db.collection('companies').doc(companyId), {
-      'joinPolicy': policy,
-    });
-    batch.update(_db.collection('companyDirectory').doc(companyId), {
-      'joinPolicy': policy,
-    });
-    await batch.commit();
+    await _request(
+      'setJoinPolicy',
+      payload: {'joinPolicy': policy},
+      expected: {'joinPolicy': policy},
+    );
   }
 
   Future<bool> isOpenToJoin(String companyId) async {
     final company = await _db.collection('companies').doc(companyId).get();
     return (company.data()?['joinPolicy'] as String? ?? 'open') == 'open';
+  }
+
+  Future<void> _targetAction(
+    String action,
+    String targetUid, {
+    Map<String, dynamic> extra = const {},
+    Map<String, dynamic> expected = const {},
+  }) async {
+    final receipt = await _request(
+      action,
+      payload: {'targetUid': targetUid, ...extra},
+      expected: expected,
+    );
+    if (receipt['targetUid'] != targetUid) {
+      throw const FormatException(
+        'The company administration response was incomplete.',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> _request(
+    String action, {
+    Map<String, dynamic> payload = const {},
+    Map<String, dynamic> expected = const {},
+  }) async {
+    final receipt = await _administerCompany({'action': action, ...payload});
+    if (receipt['completed'] != true ||
+        receipt['action'] != action ||
+        (receipt['companyId'] is! String ||
+            (receipt['companyId'] as String).trim().isEmpty) ||
+        (receipt['activityId'] is! String ||
+            (receipt['activityId'] as String).trim().isEmpty)) {
+      throw const FormatException(
+        'The company administration response was incomplete.',
+      );
+    }
+    for (final entry in expected.entries) {
+      if (receipt[entry.key] != entry.value) {
+        throw const FormatException(
+          'The company administration response was incomplete.',
+        );
+      }
+    }
+    return receipt;
   }
 }

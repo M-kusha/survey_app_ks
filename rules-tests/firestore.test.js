@@ -13,12 +13,16 @@ import {
   deleteField,
   disableNetwork,
   doc,
+  documentId,
   enableNetwork,
   getDoc,
   getDocs,
+  limit,
+  orderBy,
   query,
   serverTimestamp,
   setDoc,
+  startAfter,
   updateDoc,
   where,
   writeBatch,
@@ -148,6 +152,18 @@ const eraseMember = (db, uid) => {
   batch.delete(doc(db, 'companies', ACME, 'bans', uid));
   return batch.commit();
 };
+
+const activityDocument = (overrides = {}) => ({
+  schemaVersion: 1,
+  companyId: ACME,
+  action: 'member.role_changed',
+  actorUid: ALICE,
+  targetUid: BOB,
+  occurredAt: new Date('2026-08-11T12:00:00.000Z'),
+  before: { role: 'user' },
+  after: { role: 'moderator' },
+  ...overrides,
+});
 
 const surveyDocument = (id, overrides = {}) => ({
   surveyName: 'Q1 review',
@@ -317,6 +333,10 @@ beforeEach(async () => {
       doc(db, 'appointments', 'acme-standup'),
       appointmentDocument('acme-standup'),
     );
+    await setDoc(
+      doc(db, 'companies', ACME, 'activity', 'base-event'),
+      activityDocument(),
+    );
   });
 });
 
@@ -424,6 +444,139 @@ describe('company isolation', () => {
   });
 });
 
+describe('administrative activity is immutable and company-scoped', () => {
+  const event = (db, eventId = 'base-event') =>
+    doc(db, 'companies', ACME, 'activity', eventId);
+  const events = (db) => collection(db, 'companies', ACME, 'activity');
+
+  it('lets only an active owner or admin read an event', async () => {
+    await assertSucceeds(getDoc(event(as(ALICE))));
+    await assertSucceeds(getDoc(event(as(ADA))));
+    await assertSucceeds(getDocs(query(events(as(ADA)), limit(25))));
+    await assertFails(getDoc(event(as(BOB))));
+    await assertFails(getDoc(event(as(MOLLY))));
+    await assertFails(getDoc(event(anon())));
+  });
+
+  it('denies a cross-company admin, pending admin and banned admin', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'users', CAROL), { role: 'admin' });
+      await updateDoc(doc(db, 'memberDirectory', CAROL), { role: 'admin' });
+    });
+    await assertFails(getDoc(event(as(CAROL))));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'users', ADA), { membership: 'pending' });
+      await updateDoc(doc(db, 'memberDirectory', ADA), {
+        membership: 'pending',
+      });
+    });
+    await assertFails(getDoc(event(as(ADA))));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(doc(db, 'users', ADA), { membership: 'active' });
+      await updateDoc(doc(db, 'memberDirectory', ADA), {
+        membership: 'active',
+      });
+      await setDoc(doc(db, 'companies', ACME, 'bans', ADA), {
+        name: 'Ada',
+        bannedAt: new Date(),
+        bannedBy: ALICE,
+        previousMembership: 'active',
+      });
+    });
+    await assertFails(getDoc(event(as(ADA))));
+  });
+
+  it('denies an owner whose account-deletion barrier is active', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'accountDeletionLocks', ALICE), {
+        startedAt: new Date(),
+      });
+    });
+    await assertFails(getDoc(event(as(ALICE))));
+  });
+
+  it('denies forged append, update and deletion even to owner/admin clients', async () => {
+    await assertFails(
+      setDoc(
+        event(as(ALICE), 'forged'),
+        activityDocument({ occurredAt: serverTimestamp() }),
+      ),
+    );
+    await assertFails(
+      updateDoc(event(as(ADA)), { action: 'company.ownership_transferred' }),
+    );
+    await assertFails(deleteDoc(event(as(ALICE))));
+  });
+
+  it('requires bounded queries and paginates newest-first with a document cursor', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      for (let index = 0; index < 30; index += 1) {
+        await setDoc(
+          event(db, `event-${String(index).padStart(2, '0')}`),
+          activityDocument({
+            // Two events deliberately share the page-boundary timestamp. The
+            // document-id order and snapshot cursor must keep both exactly once.
+            occurredAt: new Date(
+              Date.UTC(2030, 0, 1, 0, 0, index === 4 ? 5 : index),
+            ),
+          }),
+        );
+      }
+    });
+
+    const db = as(ALICE);
+    await assertFails(getDocs(events(db)));
+    await assertFails(
+      getDocs(
+        query(
+          events(db),
+          orderBy('occurredAt', 'desc'),
+          orderBy(documentId(), 'desc'),
+          limit(26),
+        ),
+      ),
+    );
+
+    const first = await assertSucceeds(
+      getDocs(
+        query(
+          events(db),
+          orderBy('occurredAt', 'desc'),
+          orderBy(documentId(), 'desc'),
+          limit(25),
+        ),
+      ),
+    );
+    strictEqual(first.size, 25);
+    strictEqual(first.docs.at(-1).id, 'event-05');
+
+    const second = await assertSucceeds(
+      getDocs(
+        query(
+          events(db),
+          orderBy('occurredAt', 'desc'),
+          orderBy(documentId(), 'desc'),
+          startAfter(first.docs.at(-1)),
+          limit(25),
+        ),
+      ),
+    );
+    strictEqual(second.size, 6);
+    strictEqual(second.docs[0].id, 'event-04');
+    strictEqual(
+      new Set([...first.docs, ...second.docs].map((snapshot) => snapshot.id))
+        .size,
+      31,
+    );
+  });
+});
+
 describe('private profiles and the member directory', () => {
   it('lets the owner read private data but denies company-wide profile queries', async () => {
     const db = as(BOB);
@@ -517,8 +670,8 @@ describe('roles cannot be self-awarded', () => {
     await assertFails(updateDoc(doc(as(BOB), 'users', BOB), { companyId: RIVAL }));
   });
 
-  it('an admin can change a colleague\'s role', async () => {
-    await assertSucceeds(
+  it('even the owner cannot change a colleague\'s role directly', async () => {
+    await assertFails(
       updateMember(as(ALICE), BOB, { role: 'moderator' }),
     );
   });
@@ -1616,15 +1769,15 @@ describe('moderators run content, not people', () => {
     );
   });
 
-  it('an admin may do all three', async () => {
-    await assertSucceeds(updateMember(as(ADA), BOB, { role: 'moderator' }));
-    await assertSucceeds(banMember(as(ADA), BOB));
-    await assertSucceeds(
+  it('an admin must use the trusted boundary for all three', async () => {
+    await assertFails(updateMember(as(ADA), BOB, { role: 'moderator' }));
+    await assertFails(banMember(as(ADA), BOB));
+    await assertFails(
       removeMember(as(ADA), BOB),
     );
   });
 
-  it('cannot create a ban after trusted account deletion starts', async () => {
+  it('a direct ban stays denied regardless of an account-deletion lock', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await setDoc(doc(ctx.firestore(), 'accountDeletionLocks', BOB), {
         startedAt: new Date(),
@@ -1637,7 +1790,7 @@ describe('moderators run content, not people', () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await deleteDoc(doc(ctx.firestore(), 'accountDeletionLocks', BOB));
     });
-    await assertSucceeds(banMember(as(ADA), BOB));
+    await assertFails(banMember(as(ADA), BOB));
   });
 
   it('an admin may not move a colleague into another company', async () => {
@@ -1715,11 +1868,11 @@ describe('a ban is the company\'s, not the account\'s', () => {
     );
   });
 
-  it('an admin can lift it, a moderator cannot', async () => {
+  it('an admin and moderator cannot lift it without the trusted boundary', async () => {
     await assertFails(unbanMember(as(MOLLY), BOB));
-    await assertSucceeds(unbanMember(as(ADA), BOB));
+    await assertFails(unbanMember(as(ADA), BOB));
     const restored = await getDoc(doc(as(BOB), 'users', BOB));
-    strictEqual(restored.data().membership, 'active');
+    strictEqual(restored.data().membership, 'pending');
   });
 
   it('cannot approve a banned projection without deleting the ban atomically', async () => {
@@ -1728,18 +1881,18 @@ describe('a ban is the company\'s, not the account\'s', () => {
     );
   });
 
-  it('an admin atomically erases a banned member without restoring access first', async () => {
-    await assertSucceeds(eraseMember(as(ADA), BOB));
+  it('an admin cannot directly erase a banned member', async () => {
+    await assertFails(eraseMember(as(ADA), BOB));
 
     const released = await getDoc(doc(as(BOB), 'users', BOB));
-    strictEqual(released.data().companyId, '');
+    strictEqual(released.data().companyId, ACME);
     strictEqual(released.data().role, 'user');
-    strictEqual(released.data().membership, 'active');
+    strictEqual(released.data().membership, 'pending');
 
     const oldBan = await getDoc(
       doc(as(ADA), 'companies', ACME, 'bans', BOB),
     );
-    strictEqual(oldBan.exists(), false);
+    strictEqual(oldBan.exists(), true);
   });
 
   it('an admin cannot ban themselves out of their own company', async () => {
@@ -1835,25 +1988,25 @@ describe('pending members are held out', () => {
     );
   });
 
-  it('an admin can approve them, a moderator cannot', async () => {
+  it('an admin and moderator cannot approve them directly', async () => {
     await assertFails(
       updateDoc(doc(as(MOLLY), 'users', BOB), { membership: 'active' }),
     );
-    await assertSucceeds(
+    await assertFails(
       updateMember(as(ADA), BOB, { membership: 'active' }),
     );
   });
 });
 
-describe('the join policy is admin-only', () => {
-  it('an admin may set it', async () => {
+describe('the join policy is trusted-only', () => {
+  it('an admin may not set it directly', async () => {
     const db = as(ADA);
     const batch = writeBatch(db);
     batch.update(doc(db, 'companies', ACME), { joinPolicy: 'approval' });
     batch.update(doc(db, 'companyDirectory', ACME), {
       joinPolicy: 'approval',
     });
-    await assertSucceeds(batch.commit());
+    await assertFails(batch.commit());
   });
 
   it('a moderator may not', async () => {
@@ -1967,17 +2120,15 @@ describe('closing a company', () => {
     });
   };
 
-  it('only the owner may schedule it', async () => {
+  it('owner and admin cannot schedule it directly', async () => {
     const freshAuthTime = Math.floor(Date.now() / 1000) - 60;
-    // Ada is an admin and still may not: running a company and ending it are
-    // different powers.
     await assertFails(
       updateDoc(doc(asAuthenticatedAt(ADA, freshAuthTime), 'companies', ACME), {
         deletionScheduledFor: future,
         deletionRequestedBy: ADA,
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(asAuthenticatedAt(ALICE, freshAuthTime), 'companies', ACME), {
         deletionScheduledFor: future,
         deletionRequestedBy: ALICE,
@@ -1985,37 +2136,9 @@ describe('closing a company', () => {
     );
   });
 
-  it('rejects stale or missing authentication when scheduling', async () => {
-    const now = Math.floor(Date.now() / 1000);
-    for (const authTime of [now - 301, now + 61, undefined]) {
-      await assertFails(
-        updateDoc(doc(asAuthenticatedAt(ALICE, authTime), 'companies', ACME), {
-          deletionScheduledFor: future,
-          deletionRequestedBy: ALICE,
-        }),
-      );
-    }
-  });
-
-  it('tolerates one minute of authentication-service clock skew', async () => {
-    await assertSucceeds(
-      updateDoc(
-        doc(
-          asAuthenticatedAt(ALICE, Math.floor(Date.now() / 1000) + 30),
-          'companies',
-          ACME,
-        ),
-        {
-          deletionScheduledFor: future,
-          deletionRequestedBy: ALICE,
-        },
-      ),
-    );
-  });
-
-  it('the owner may call it off', async () => {
+  it('the owner cannot cancel it directly', async () => {
     await schedule(future);
-    await assertSucceeds(
+    await assertFails(
       updateDoc(doc(as(ALICE), 'companies', ACME), {
         deletionScheduledFor: deleteField(),
         deletionRequestedBy: deleteField(),

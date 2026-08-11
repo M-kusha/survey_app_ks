@@ -17,6 +17,10 @@ import {
   purgeExpiredAccountDeletionLocks,
 } from './account_deletion';
 import {
+  CompanyAdministrationError,
+  administerCompanyForUser,
+} from './company_administration';
+import {
   registerAppointmentParticipant,
   unregisterAppointmentParticipant,
 } from './appointment_participants';
@@ -230,6 +234,45 @@ export const uploadProfileImage = onCall(
         error: error instanceof Error ? error.message : String(error),
       });
       throw new HttpsError('internal', 'profile-image-upload-incomplete');
+    }
+  },
+);
+
+/**
+ * App-Check-protected boundary for every company people/policy mutation.
+ * The function derives the tenant and all activity fields from trusted state;
+ * callers cannot supply a company, actor, prior value or log entry.
+ */
+export const administerCompany = onCall(
+  {
+    region,
+    timeoutSeconds: 540,
+    memory: '512MiB',
+    enforceAppCheck: true,
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await administerCompanyForUser(
+        request.auth.uid,
+        request.auth.token.auth_time,
+        request.data,
+      );
+    } catch (error) {
+      if (error instanceof CompanyAdministrationError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('company administration failed closed', {
+        uid: request.auth.uid,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'company-administration-incomplete');
     }
   },
 );
@@ -723,8 +766,9 @@ export const purgeScheduledCompanies = onSchedule(
 
     for (const company of due.docs) {
       try {
-        await purgeCompany(company.id);
-        logger.info('company purged', { companyId: company.id });
+        if (await purgeCompany(company.id)) {
+          logger.info('company purged', { companyId: company.id });
+        }
       } catch (error) {
         // One bad company must not stop the sweep for the rest.
         logger.error('purge failed', { companyId: company.id, error });

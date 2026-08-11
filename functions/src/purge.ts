@@ -1,4 +1,10 @@
-import { getFirestore, Query } from 'firebase-admin/firestore';
+import {
+  FieldValue,
+  Firestore,
+  Query,
+  Timestamp,
+  getFirestore,
+} from 'firebase-admin/firestore';
 
 import { activeMemberIds, notify } from './messaging';
 import { companyClosedCopy } from './notification_copy';
@@ -22,8 +28,41 @@ import { companyClosedCopy } from './notification_copy';
  * being a member while the deletes run, and nothing is stranded if whoever
  * requested it never opens the app again.
  */
-export async function purgeCompany(companyId: string): Promise<void> {
+/**
+ * Serializes the scheduled purge against owner cancellation on the same
+ * company document. Once claimed, cancellation fails closed and a retry may
+ * safely continue an interrupted purge.
+ */
+export async function claimCompanyPurge(
+  db: Pick<Firestore, 'collection' | 'runTransaction'>,
+  companyId: string,
+  nowMillis = Date.now(),
+): Promise<boolean> {
+  const companyRef = db.collection('companies').doc(companyId);
+  return db.runTransaction(async (transaction) => {
+    const company = await transaction.get(companyRef);
+    if (!company.exists) return false;
+    const data = company.data() ?? {};
+    const scheduled = data.deletionScheduledFor;
+    if (!(scheduled instanceof Timestamp) || scheduled.toMillis() > nowMillis) {
+      return false;
+    }
+    if ('purgeStartedAt' in data) {
+      if (!(data.purgeStartedAt instanceof Timestamp)) {
+        throw new Error('Company purge marker is malformed.');
+      }
+      return true;
+    }
+    transaction.update(companyRef, {
+      purgeStartedAt: FieldValue.serverTimestamp(),
+    });
+    return true;
+  });
+}
+
+export async function purgeCompany(companyId: string): Promise<boolean> {
   const db = getFirestore();
+  if (!(await claimCompanyPurge(db, companyId))) return false;
 
   const [company, nameLocks] = await Promise.all([
     db.collection('companies').doc(companyId).get(),
@@ -90,6 +129,13 @@ export async function purgeCompany(companyId: string): Promise<void> {
     db.collection('memberDirectory').where('companyId', '==', companyId),
   );
 
+  // Activity is retained until all content and membership cleanup succeeds.
+  // A claimed purge cannot be cancelled, so a failure after this point can
+  // only be resumed, never leave a live restored company without its history.
+  await deleteAll(
+    db.collection('companies').doc(companyId).collection('activity'),
+  );
+
   // Release the canonical name only when every child and member cleanup has
   // succeeded. These final deletes commit atomically, so a retry can never see
   // a live company whose uniqueness lock was already released.
@@ -98,6 +144,7 @@ export async function purgeCompany(companyId: string): Promise<void> {
   finalBatch.delete(db.collection('companyDirectory').doc(companyId));
   finalBatch.delete(db.collection('companies').doc(companyId));
   await finalBatch.commit();
+  return true;
 }
 
 /** Deletes each parent's subcollection, then the parent. */

@@ -53,7 +53,7 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
 
   Future<void> _unban(BannedMember member) async {
     try {
-      await _service.unban(companyId: widget.companyId, userId: member.userId);
+      await _service.unban(member.userId);
       if (!mounted) return;
       setState(() => _members.removeWhere((m) => m.userId == member.userId));
       ScaffoldMessenger.of(
@@ -97,7 +97,7 @@ class _BannedMembersPageState extends State<BannedMembersPage> {
     if (wentAhead != true || !mounted) return;
 
     try {
-      await _service.erase(companyId: widget.companyId, userId: member.userId);
+      await _service.erase(member.userId);
       if (!mounted) return;
       setState(() => _members.removeWhere((m) => m.userId == member.userId));
       ScaffoldMessenger.of(

@@ -27,6 +27,7 @@ class UserManagementPage extends StatefulWidget {
 
 class UserManagementPageState extends State<UserManagementPage> {
   final _service = FirebaseSurveyService();
+  final _adminService = CompanyAdminService();
   final _searchController = TextEditingController();
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _membersSubscription;
 
@@ -161,7 +162,7 @@ class UserManagementPageState extends State<UserManagementPage> {
     setState(() => user.role = role);
 
     try {
-      await _service.updateUserRole(user.id, role);
+      await _adminService.changeRole(user.id, role);
     } catch (_) {
       if (!mounted) return;
       setState(() => user.role = previous);
@@ -199,12 +200,7 @@ class UserManagementPageState extends State<UserManagementPage> {
     });
 
     try {
-      await CompanyAdminService().ban(
-        companyId: user.companyId,
-        userId: user.id,
-        name: user.name,
-        previousMembership: user.membership,
-      );
+      await _adminService.ban(user.id);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -221,7 +217,7 @@ class UserManagementPageState extends State<UserManagementPage> {
     setState(() => user.membership = 'active');
 
     try {
-      await CompanyAdminService().approve(user.id);
+      await _adminService.approve(user.id);
     } catch (_) {
       if (!mounted) return;
       setState(() => user.membership = 'pending');
@@ -256,7 +252,7 @@ class UserManagementPageState extends State<UserManagementPage> {
     if (confirmed != true || !mounted) return;
 
     try {
-      await _service.removeUserFromCompany(user.id);
+      await _adminService.remove(user.id);
       if (!mounted) return;
 
       setState(() => _users.removeWhere((entry) => entry.id == user.id));

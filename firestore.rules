@@ -25,19 +25,6 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Destructive scheduling needs credentials supplied within five minutes;
-    // the future allowance covers only small service clock differences.
-    function recentlyAuthenticated() {
-      return signedIn()
-        && 'auth_time' in request.auth.token
-        && request.auth.token.auth_time is int
-        && timestamp.value(request.auth.token.auth_time * 1000)
-             <= request.time + duration.value(1, 'm')
-        && request.time
-             <= timestamp.value(request.auth.token.auth_time * 1000)
-                  + duration.value(5, 'm');
-    }
-
     // A trusted account-deletion function creates this short-lived lock before
     // enumerating data. Existing sessions may retain valid ID tokens until Auth
     // is deleted, so every client write must fail while the lock exists.
@@ -195,19 +182,6 @@ service cloud.firestore {
       return isCompanyAdmin() && sameCompany(companyId);
     }
 
-    // True when the caller created this company, which is how "I am registering
-    // my own company" is told apart from "I am joining someone else's".
-    function createdCompany(companyId) {
-      return companyId != null
-        && existsAfter(/databases/$(database)/documents/companies/$(companyId))
-        && getAfter(/databases/$(database)/documents/companies/$(companyId))
-             .data.createdBy == uid();
-    }
-
-    function fieldUnchanged(field) {
-      return request.resource.data[field] == resource.data[field];
-    }
-
     function companyExists(companyId) {
       return companyId != null
         && companyId != ''
@@ -312,136 +286,28 @@ service cloud.firestore {
     // Only this deliberately minimal projection is public; the authoritative
     // company document (owner UID, deletion lifecycle and timestamps) is not.
     match /companyDirectory/{companyId} {
-      function validDirectory(data) {
-        return data.keys().hasOnly(['name', 'joinPolicy'])
-          && data.keys().hasAll(['name', 'joinPolicy'])
-          && data.name is string
-          && data.name.size() > 0
-          && data.name.size() <= 120
-          && data.joinPolicy in ['open', 'approval'];
-      }
-
-      function matchesCompanyAfter() {
-        return existsAfter(
-          /databases/$(database)/documents/companies/$(companyId)
-        )
-        && request.resource.data.name == getAfter(
-          /databases/$(database)/documents/companies/$(companyId)
-        ).data.name
-        && request.resource.data.joinPolicy == getAfter(
-          /databases/$(database)/documents/companies/$(companyId)
-        ).data.joinPolicy;
-      }
-
       allow read: if true;
 
-      // The verified-onboarding callable creates this with the Admin SDK. A
-      // client cannot create a public company projection directly.
-      allow create: if false;
-
-      allow update: if accountActive()
-        && companyAdminOf(companyId)
-        && validDirectory(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['name', 'joinPolicy'])
-        && matchesCompanyAfter();
-
-      allow delete: if false;
+      // Creation and every administrative change are trusted-only. In
+      // particular, a client cannot change the public join policy without the
+      // authoritative company mutation and immutable activity entry.
+      allow create, update, delete: if false;
     }
 
     // ---------- companies ----------
 
     match /companies/{companyId} {
-      function validCompanyDocument(data) {
-        return data.keys().hasOnly([
-            'name',
-            'createdBy',
-            'createdAt',
-            'joinPolicy',
-            'deletionScheduledFor',
-            'deletionRequestedBy'
-          ])
-          && data.keys().hasAll(['name', 'createdBy'])
-          && data.name is string
-          && data.name.size() > 0
-          && data.name.size() <= 120
-          && data.createdBy is string
-          && (!('createdAt' in data) || data.createdAt is timestamp)
-          && (
-            !('joinPolicy' in data)
-            || data.joinPolicy in ['open', 'approval']
-          );
-      }
-
-      function validDeletionLifecycle() {
-        return (
-          !('deletionScheduledFor' in request.resource.data)
-          && !('deletionRequestedBy' in request.resource.data)
-        ) || (
-          recentlyAuthenticated()
-          && request.resource.data.deletionScheduledFor is timestamp
-          && request.resource.data.deletionRequestedBy == uid()
-          // Client time is used to schedule the date, so tolerate one hour of
-          // clock skew/network delay while still enforcing essentially a week.
-          && request.resource.data.deletionScheduledFor
-               >= request.time + duration.value(167, 'h')
-        );
-      }
-
       allow get: if belongsToCompany(companyId);
       allow list: if false;
 
-      // Creation is server-only so the canonical name lock cannot be omitted
-      // or forged. The callable also requires Auth email verification and App
-      // Check before it performs the atomic company/onboarding transaction.
-      allow create: if false;
-
-      // The join policy is people-work, not content-work, so a moderator may
-      // not flip a company open. Renaming is server-only until a trusted
-      // transaction can atomically release the old canonical name lock and
-      // reserve the new one; a client-only rename would bypass uniqueness.
-      //
-      // Scheduling or calling off the company's own destruction is narrower
-      // still: only the person who created it. An admin runs the place; ending
-      // it is the owner's alone.
-      allow update: if accountActive()
-        && companyAdminOf(companyId)
-        && validCompanyDocument(request.resource.data)
-        && fieldUnchanged('createdBy')
-        && (
-          request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['joinPolicy'])
-          && getAfter(
-            /databases/$(database)/documents/companyDirectory/$(companyId)
-          ).data.joinPolicy == request.resource.data.joinPolicy
-          || (
-            resource.data.createdBy == uid()
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['deletionScheduledFor', 'deletionRequestedBy'])
-            && validDeletionLifecycle()
-          )
-        );
-
-      // Destruction is server-only. A client cannot prove it also removed every
-      // child, membership and name lock, while the scheduled purge can.
-      allow delete: if false;
+      // Creation, settings, ownership, closure and destruction all go through
+      // trusted functions so the state change and activity event cannot split.
+      allow create, update, delete: if false;
 
       // ---------- bans ----------
       //
       // One document per banned person, under the company that banned them.
       match /bans/{bannedUserId} {
-        function targetUserAfter() {
-          return getAfter(
-            /databases/$(database)/documents/users/$(bannedUserId)
-          ).data;
-        }
-
-        function targetMemberAfter() {
-          return getAfter(
-            /databases/$(database)/documents/memberDirectory/$(bannedUserId)
-          ).data;
-        }
-
         // The person themselves can read their own ban, which is how the app
         // can say "you are banned from Acme" instead of failing silently and
         // looking broken. Staff can read the whole list — that is the list an
@@ -449,82 +315,25 @@ service cloud.firestore {
         allow read: if signedIn()
           && (bannedUserId == uid() || adminOf(companyId));
 
-        // Writing one is admin-only, and a ban may not be aimed at yourself:
-        // an admin who bans themselves locks their own company.
-        allow create: if accountActive()
-          && companyAdminOf(companyId)
-          && bannedUserId != uid()
-          && !exists(
-            /databases/$(database)/documents/accountDeletionLocks/$(bannedUserId)
-          )
-          && exists(/databases/$(database)/documents/users/$(bannedUserId))
-          && get(/databases/$(database)/documents/users/$(bannedUserId))
-               .data.companyId == companyId
-          && get(/databases/$(database)/documents/users/$(bannedUserId))
-               .data.role != 'superadmin'
-          && request.resource.data.keys()
-               .hasOnly([
-                 'name', 'bannedAt', 'bannedBy', 'previousMembership'
-               ])
-          && request.resource.data.keys()
-               .hasAll([
-                 'name', 'bannedAt', 'bannedBy', 'previousMembership'
-               ])
-          && request.resource.data.name is string
-          && request.resource.data.name.size() <= 120
-          && request.resource.data.bannedAt == request.time
-          && request.resource.data.bannedBy == uid()
-          && request.resource.data.previousMembership in ['active', 'pending']
-          && request.resource.data.previousMembership
-               == membershipOf(
-                 get(
-                   /databases/$(database)/documents/users/$(bannedUserId)
-                 ).data
-               )
-          // Storage rules can inspect only two Firestore documents. Mirror a
-          // ban as non-active membership in both existing projections so a
-          // banned viewer fails that two-document authorization check.
-          && existsAfter(
-            /databases/$(database)/documents/users/$(bannedUserId)
-          )
-          && existsAfter(
-            /databases/$(database)/documents/memberDirectory/$(bannedUserId)
-          )
-          && targetUserAfter().membership == 'pending'
-          && targetMemberAfter().membership == 'pending';
+        // Ban, unban and erase are trusted operations. A direct client batch
+        // could otherwise perform the privilege change without its activity
+        // record.
+        allow create, update, delete: if false;
+      }
 
-        allow delete: if accountActive()
-          && companyAdminOf(companyId)
-          && (
-            (
-              existsAfter(
-                /databases/$(database)/documents/users/$(bannedUserId)
-              )
-              && existsAfter(
-                /databases/$(database)/documents/memberDirectory/$(bannedUserId)
-              )
-              && targetUserAfter().companyId == companyId
-              && targetMemberAfter().companyId == companyId
-              && targetUserAfter().membership
-                   == resource.data.previousMembership
-              && targetMemberAfter().membership
-                   == resource.data.previousMembership
-            )
-            // Erasing/removing the member may delete the directory first. In
-            // that case lifting the now-orphaned ban requires the private
-            // profile to have left the company in the same atomic transition.
-            || (
-              !existsAfter(
-                /databases/$(database)/documents/memberDirectory/$(bannedUserId)
-              )
-              && getAfter(
-                /databases/$(database)/documents/users/$(bannedUserId)
-              ).data.companyId == ''
-            )
-          );
+      // ---------- administrative activity ----------
 
-        // Nothing to amend. Lifting a ban is a delete.
-        allow update: if false;
+      match /activity/{eventId} {
+        // Passive reads do not require recent authentication, but the reader
+        // must still be an active, unbanned owner/admin of this exact company.
+        allow get: if accountActive() && companyAdminOf(companyId);
+        allow list: if accountActive()
+          && companyAdminOf(companyId)
+          && request.query.limit != null
+          && request.query.limit <= 25;
+
+        // Only the Admin SDK may append. Existing entries are immutable.
+        allow create, update, delete: if false;
       }
     }
 
@@ -586,24 +395,17 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(userId))
              .data.companyId == '';
 
-      // A member may synchronize their own name/avatar. Company admins may
-      // synchronize role and approval changes. In both cases the private
-      // profile must change to the exact same projection in the atomic write.
+      // A member may synchronize their own name. Administrative role and
+      // approval changes are server-only so they cannot bypass activity.
       allow update: if accountActive()
         && request.resource.data.companyId == resource.data.companyId
         && matchesPrivateProfileAfter()
-        && (
-          userId == uid()
-          || companyAdminOf(resource.data.companyId)
-        );
+        && userId == uid();
 
-      // Leaving/removal/account deletion clears or removes the private source
-      // in the same atomic write. The Admin SDK bypasses these client rules.
+      // A non-owner may still leave voluntarily. Administrative removal and
+      // account deletion use trusted functions which bypass client rules.
       allow delete: if accountActive()
-        && (
-          userId == uid()
-          || companyAdminOf(resource.data.companyId)
-        )
+        && userId == uid()
         && exists(/databases/$(database)/documents/users/$(userId))
         && (
           !existsAfter(/databases/$(database)/documents/users/$(userId))
@@ -727,20 +529,10 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.email == request.auth.token.email;
 
-      // You may edit your own profile but never your own role or company.
-      // An admin may change a *colleague's* role, but not their company, and
-      // may not grant superadmin.
-      //
-      // The `userId != uid()` on the second branch is load-bearing. Without it
-      // the two branches were an OR, so an admin editing their own document
-      // satisfied the admin branch — which carries no `fieldUnchanged('role')`
-      // — and could award themselves any role they liked. Since `isAdmin()`
-      // includes moderators, that was a path from the lowest elevated role
-      // straight to superadmin.
-      //
-      // Restricting the assignable set closes the other half: superadmin means
-      // "created this company", which is established at sign-up by
-      // createdCompany() and must not be grantable afterwards by anyone.
+      // You may edit your own harmless fields, join as a plain user, or leave
+      // voluntarily if you are not the owner. Approval, role change and
+      // administrative removal are trusted-only so the privilege mutation and
+      // immutable activity event are one transaction.
       allow update: if accountActive() && emailVerified() && (
         // -- your own profile: name, birthday and notification preferences.
         // Avatar path/revision writes are server-only so a replacement and its
@@ -811,44 +603,6 @@ service cloud.firestore {
         // leave their company with nobody able to administer it.
         || (
           userId == uid()
-          && resource.data.role != 'superadmin'
-          && request.resource.data.companyId == ''
-          && request.resource.data.role == 'user'
-          && membershipOf(request.resource.data) == 'active'
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['companyId', 'role', 'membership'])
-        )
-
-        // -- an admin managing a colleague
-        //
-        // Roles, and approving a pending join. `adminOf` would have let a
-        // moderator promote people, which is the line the user drew and the
-        // reason `companyAdminOf` is a separate function.
-        || (
-          userId != uid()
-          && companyAdminOf(resource.data.companyId)
-          && resource.data.role != 'superadmin'
-          && fieldUnchanged('companyId')
-          && request.resource.data.role in ['admin', 'moderator', 'user']
-          && membershipOf(request.resource.data) in ['active', 'pending']
-          && (
-            membershipOf(request.resource.data) != 'active'
-            || !existsAfter(
-              /databases/$(database)/documents/companies/$(resource.data.companyId)/bans/$(userId)
-            )
-          )
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['role', 'membership'])
-        )
-
-        // -- an admin removing a colleague
-        //
-        // The one case where somebody else may change your company, and only
-        // ever to empty. Anything else would be moving a colleague into another
-        // company without their say.
-        || (
-          userId != uid()
-          && companyAdminOf(resource.data.companyId)
           && resource.data.role != 'superadmin'
           && request.resource.data.companyId == ''
           && request.resource.data.role == 'user'

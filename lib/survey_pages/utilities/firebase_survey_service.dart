@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:echomeet/core/membership/member_directory.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:echomeet/survey_pages/utilities/survey_answer_keys.dart';
@@ -103,10 +102,6 @@ class FirebaseSurveyService {
             )
             .call<Map<String, dynamic>>(payload);
     return result.data;
-  }
-
-  Future<void> removeUserFromCompany(String userId) async {
-    await MemberDirectory.removeMember(firestore: _firestore, userId: userId);
   }
 
   Future<void> updateTextAnswersReviewed(
@@ -215,13 +210,5 @@ class FirebaseSurveyService {
         .collection('memberDirectory')
         .where('companyId', isEqualTo: companyId)
         .snapshots();
-  }
-
-  Future<void> updateUserRole(String userId, String newRole) async {
-    await MemberDirectory.updateMember(
-      firestore: FirebaseFirestore.instance,
-      userId: userId,
-      fields: {'role': newRole},
-    );
   }
 }

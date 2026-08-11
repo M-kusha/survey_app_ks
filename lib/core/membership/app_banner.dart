@@ -102,7 +102,7 @@ class _AppBannerState extends State<AppBanner> {
     if (companyId.isEmpty) return;
 
     try {
-      await _service.cancelDeletion(companyId);
+      await _service.cancelDeletion();
       await _refreshPending();
     } catch (_) {
       if (!mounted) return;

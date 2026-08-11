@@ -54,6 +54,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |
 | `saveAppointmentDefinition` | Auth + App Check callable; creates or revises canonical Timestamp appointment definitions |
 | `deleteContent` | Auth + App Check callable; establishes a write barrier and deletes one survey or appointment |
+| `administerCompany` | Auth + App Check callable; atomically applies company administration changes and their PII-free activity entries |
 | `onSurveyCreated` | `surveys/{surveyId}` create notification |
 | `onSurveyResponseCreated` | trusted initial grading from `surveyAnswerKeys` |
 | `onSurveyResponseDeleted` | invalidates live participation state after response deletion |
@@ -68,8 +69,9 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `purgeScheduledCompanies` | `30 3 * * *`, `Europe/Berlin` |
 | `purgeAccountDeletionLocks` | `15 * * * *`, UTC |
 
-The supporting modules are `account_deletion.ts`,
-`appointment_definition.ts`, `appointment_participants.ts`, `content_deletion.ts`,
+The supporting modules are `account_deletion.ts`, `activity_log.ts`,
+`appointment_definition.ts`, `appointment_participants.ts`,
+`company_administration.ts`, `content_deletion.ts`,
 `appointment_state.ts`, `join_requests.ts`, `messaging.ts`,
 `notification_copy.ts`, `onboarding.ts`, `profile_images.ts`, `purge.ts`,
 `scoring.ts`, `survey_publication.ts`, and `trusted_scoring.ts`. They are

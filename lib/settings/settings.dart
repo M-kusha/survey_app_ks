@@ -11,6 +11,7 @@ import 'package:echomeet/core/localization/app_locales.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/login/login.dart';
 import 'package:echomeet/login/login_logics.dart';
+import 'package:echomeet/settings/administrative_activity.dart';
 import 'package:echomeet/settings/biometrics_options.dart';
 import 'package:echomeet/settings/delete_account.dart';
 import 'package:echomeet/settings/font_size_provider.dart';
@@ -138,10 +139,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     setState(() => _openToJoin = open);
 
     try {
-      await CompanyAdminService().setJoinPolicy(
-        companyId: companyId,
-        open: open,
-      );
+      await CompanyAdminService().setJoinPolicy(open: open);
     } catch (_) {
       if (!mounted) return;
       setState(() => _openToJoin = previous);
@@ -269,10 +267,11 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     final membership = _membership;
     final companyId = membership?.companyId ?? '';
     final inCompany = companyId.isNotEmpty;
+    final activeCompanyAdmin = _canManagePeople && membership?.isActive == true;
 
     return SettingsGroup(
       title: 'company'.tr(),
-      footnote: _canManagePeople && inCompany
+      footnote: activeCompanyAdmin && inCompany
           ? (_openToJoin
                     ? 'join_policy_open_hint'
                     : 'join_policy_approval_hint')
@@ -316,7 +315,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
                 : Theme.of(context).colorScheme.error,
             onTap: membership.isClosing ? _cancelClosure : _closeCompany,
           ),
-        if (_canManagePeople && inCompany) ...[
+        if (activeCompanyAdmin && inCompany) ...[
           Material(
             type: MaterialType.transparency,
             child: SwitchListTile(
@@ -331,6 +330,13 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             title: 'banned_members'.tr(),
             subtitle: 'banned_members_hint'.tr(),
             onTap: () => _open(BannedMembersPage(companyId: companyId)),
+          ),
+          SettingsTile(
+            icon: Icons.history_rounded,
+            title: 'activity_log'.tr(),
+            subtitle: 'activity_log_hint'.tr(),
+            onTap: () =>
+                _open(AdministrativeActivityPage(companyId: companyId)),
           ),
         ],
       ],
@@ -381,7 +387,6 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
     try {
       final at = await CompanyAdminService().scheduleDeletion(
-        companyId: membership.companyId,
         password: password,
       );
       if (!mounted) return;
@@ -440,7 +445,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     if (companyId.isEmpty) return;
 
     try {
-      await CompanyAdminService().cancelDeletion(companyId);
+      await CompanyAdminService().cancelDeletion();
       if (!mounted) return;
       await _load();
       if (!mounted) return;
@@ -469,7 +474,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
           onTap: () => _open(PasswordChanger(isSuperAdmin: _isSuperAdmin)),
         ),
 
-        if (_isSuperAdmin || _canManagePeople || _isStaffViewer)
+        if (_isStaffViewer)
           SettingsTile(
             icon: Icons.group_outlined,
             title: 'user_management'.tr(),
