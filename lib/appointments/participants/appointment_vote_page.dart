@@ -343,9 +343,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       appBar: AppBar(
         title: Text(_appointment.title, overflow: TextOverflow.ellipsis),
         actions: [
-          if (calendarDownloadSupported &&
-              !_appointmentDeleted &&
-              _confirmedSlot != null)
+          if (!_appointmentDeleted && _confirmedSlot != null)
             IconButton(
               tooltip: 'add_to_calendar'.tr(),
               icon: const Icon(Icons.event_available_outlined),

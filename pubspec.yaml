@@ -41,6 +41,19 @@ dependencies:
   # calendar export reaches for Blob and URL directly, and an implicit
   # dependency would break the moment printing stopped needing it.
   web: ^1.1.1
+  # Hands the calendar file to Android's share sheet with the right MIME type.
+  # printing cannot do it: it hardcodes application/pdf on the payload.
+  #
+  # Held below 12. That line moved to the experimental JNI/native-assets build
+  # (jni, jni_flutter, objective_c, hooks), which this Flutter and Gradle
+  # combination cannot assemble - `flutter build apk` fails resolving the jni
+  # plugin directory. The 10.x line uses ordinary platform channels.
+  share_plus: ^10.1.4
+  # share_plus needs path_provider to stage the shared file. Its Android
+  # implementation moved to JNI at 2.3.0, and this Flutter and Gradle
+  # combination cannot resolve the jni plugin directory - `flutter build apk`
+  # fails before compiling anything. Held on the last channel-based release.
+  path_provider_android: 2.2.17
 
 
 dev_dependencies:

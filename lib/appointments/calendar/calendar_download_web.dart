@@ -4,8 +4,6 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-const calendarDownloadSupported = true;
-
 /// Saves the calendar file through an anchor download.
 ///
 /// The Blob carries `text/calendar` so the browser and the operating system
