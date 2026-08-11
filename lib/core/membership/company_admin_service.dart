@@ -19,6 +19,29 @@ class BannedMember {
   final DateTime? bannedAt;
 }
 
+class CompanyReauthenticationFailure implements Exception {
+  const CompanyReauthenticationFailure();
+}
+
+@visibleForTesting
+Future<void> reauthenticateForCompanyDeletion({
+  required String email,
+  required String password,
+  required Future<void> Function(AuthCredential credential) reauthenticate,
+  required Future<void> Function() forceRefresh,
+}) async {
+  final credential = EmailAuthProvider.credential(
+    email: email,
+    password: password,
+  );
+  try {
+    await reauthenticate(credential);
+  } on FirebaseAuthException {
+    throw const CompanyReauthenticationFailure();
+  }
+  await forceRefresh();
+}
+
 class CompanyAdminService {
   CompanyAdminService({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _db = firestore ?? FirebaseFirestore.instance,
@@ -185,12 +208,30 @@ class CompanyAdminService {
 
   static const gracePeriod = Duration(days: 7);
 
-  Future<DateTime> scheduleDeletion(String companyId) async {
+  Future<DateTime> scheduleDeletion({
+    required String companyId,
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || user.email == null) {
+      throw StateError('No signed-in user can schedule company deletion.');
+    }
+    await reauthenticateForCompanyDeletion(
+      email: user.email!,
+      password: password,
+      reauthenticate: (credential) async {
+        await user.reauthenticateWithCredential(credential);
+      },
+      forceRefresh: () async {
+        await user.getIdToken(true);
+      },
+    );
+
     final at = DateTime.now().add(gracePeriod);
 
     await _db.collection('companies').doc(companyId).update({
       'deletionScheduledFor': Timestamp.fromDate(at),
-      'deletionRequestedBy': _auth.currentUser?.uid,
+      'deletionRequestedBy': user.uid,
     });
 
     return at;

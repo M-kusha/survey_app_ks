@@ -25,6 +25,19 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Destructive scheduling needs credentials supplied within five minutes;
+    // the future allowance covers only small service clock differences.
+    function recentlyAuthenticated() {
+      return signedIn()
+        && 'auth_time' in request.auth.token
+        && request.auth.token.auth_time is int
+        && timestamp.value(request.auth.token.auth_time * 1000)
+             <= request.time + duration.value(1, 'm')
+        && request.time
+             <= timestamp.value(request.auth.token.auth_time * 1000)
+                  + duration.value(5, 'm');
+    }
+
     // A trusted account-deletion function creates this short-lived lock before
     // enumerating data. Existing sessions may retain valid ID tokens until Auth
     // is deleted, so every client write must fail while the lock exists.
@@ -365,7 +378,8 @@ service cloud.firestore {
           !('deletionScheduledFor' in request.resource.data)
           && !('deletionRequestedBy' in request.resource.data)
         ) || (
-          request.resource.data.deletionScheduledFor is timestamp
+          recentlyAuthenticated()
+          && request.resource.data.deletionScheduledFor is timestamp
           && request.resource.data.deletionRequestedBy == uid()
           // Client time is used to schedule the date, so tolerate one hour of
           // clock skew/network delay while still enforcing essentially a week.

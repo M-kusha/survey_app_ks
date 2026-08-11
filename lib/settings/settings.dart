@@ -376,9 +376,13 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
       if (confirmed != true || !mounted) return;
     }
 
+    final password = await _promptForCompanyPassword();
+    if (password == null || !mounted) return;
+
     try {
       final at = await CompanyAdminService().scheduleDeletion(
-        membership.companyId,
+        companyId: membership.companyId,
+        password: password,
       );
       if (!mounted) return;
       await _load();
@@ -389,10 +393,46 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
           namedArgs: {'date': DateFormat.yMMMd().add_jm().format(at)},
         ),
       );
+    } on CompanyReauthenticationFailure {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'invalid_old_password'.tr());
     } catch (_) {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     }
+  }
+
+  Future<String?> _promptForCompanyPassword() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('confirm'.tr()),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          autofocus: true,
+          decoration: InputDecoration(
+            labelText: 'password_label'.tr(),
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text('cancel'.tr()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(controller.text),
+            child: Text(
+              'close_company'.tr(),
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ),
+        ],
+      ),
+    ).whenComplete(controller.dispose);
   }
 
   Future<void> _cancelClosure() async {

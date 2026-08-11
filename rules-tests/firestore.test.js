@@ -325,6 +325,12 @@ const as = (uid) =>
     email: `${uid}@example.test`,
     email_verified: true,
   }).firestore();
+const asAuthenticatedAt = (uid, authTime) =>
+  testEnv.authenticatedContext(uid, {
+    email: `${uid}@example.test`,
+    email_verified: true,
+    auth_time: authTime,
+  }).firestore();
 const asUnverified = (uid) =>
   testEnv.authenticatedContext(uid, {
     email: `${uid}@example.test`,
@@ -1925,19 +1931,48 @@ describe('closing a company', () => {
   };
 
   it('only the owner may schedule it', async () => {
+    const freshAuthTime = Math.floor(Date.now() / 1000) - 60;
     // Ada is an admin and still may not: running a company and ending it are
     // different powers.
     await assertFails(
-      updateDoc(doc(as(ADA), 'companies', ACME), {
+      updateDoc(doc(asAuthenticatedAt(ADA, freshAuthTime), 'companies', ACME), {
         deletionScheduledFor: future,
         deletionRequestedBy: ADA,
       }),
     );
     await assertSucceeds(
-      updateDoc(doc(as(ALICE), 'companies', ACME), {
+      updateDoc(doc(asAuthenticatedAt(ALICE, freshAuthTime), 'companies', ACME), {
         deletionScheduledFor: future,
         deletionRequestedBy: ALICE,
       }),
+    );
+  });
+
+  it('rejects stale or missing authentication when scheduling', async () => {
+    const now = Math.floor(Date.now() / 1000);
+    for (const authTime of [now - 301, now + 61, undefined]) {
+      await assertFails(
+        updateDoc(doc(asAuthenticatedAt(ALICE, authTime), 'companies', ACME), {
+          deletionScheduledFor: future,
+          deletionRequestedBy: ALICE,
+        }),
+      );
+    }
+  });
+
+  it('tolerates one minute of authentication-service clock skew', async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(
+          asAuthenticatedAt(ALICE, Math.floor(Date.now() / 1000) + 30),
+          'companies',
+          ACME,
+        ),
+        {
+          deletionScheduledFor: future,
+          deletionRequestedBy: ALICE,
+        },
+      ),
     );
   });
 
