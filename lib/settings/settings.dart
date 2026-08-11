@@ -5,6 +5,7 @@ import 'package:echomeet/core/membership/company_admin_service.dart';
 import 'package:echomeet/core/membership/company_browser.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/membership/company_privilege_service.dart';
+import 'package:echomeet/core/membership/ownership_transfer_service.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/settings/banned_members.dart';
 import 'package:echomeet/core/layout/page_body.dart';
@@ -18,6 +19,7 @@ import 'package:echomeet/settings/create_company.dart';
 import 'package:echomeet/settings/delete_account.dart';
 import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/settings/notifications_options.dart';
+import 'package:echomeet/settings/ownership_transfer.dart';
 import 'package:echomeet/settings/password_change.dart';
 import 'package:echomeet/settings/profile_section.dart';
 import 'package:echomeet/settings/settings_kit.dart';
@@ -60,6 +62,9 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
       membership?.companyId,
       membership?.joinPolicy,
       membership?.deletionAt,
+      membership?.ownershipTransfer?.fromUid,
+      membership?.ownershipTransfer?.targetUid,
+      membership?.ownershipTransfer?.expiresAt,
       user?.id,
       user?.role,
       user?.membership,
@@ -271,6 +276,16 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     final inCompany = companyId.isNotEmpty;
     final canCreateCompany = membership?.state == MembershipState.noCompany;
     final activeCompanyAdmin = _canManagePeople && membership?.isActive == true;
+    final ownershipOffer = membership?.ownershipTransfer;
+    final canTransferOwnership =
+        _isSuperAdmin &&
+        inCompany &&
+        membership?.isActive == true &&
+        membership?.isClosing == false;
+    final hasOwnershipOffer =
+        membership?.isActive == true && ownershipOffer?.targetUid == _userId;
+    final ownershipOfferExpired =
+        ownershipOffer?.isExpiredAt(DateTime.now()) ?? false;
 
     return SettingsGroup(
       title: 'company'.tr(),
@@ -302,6 +317,26 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             title: 'create_company'.tr(),
             subtitle: 'create_company_settings_hint'.tr(),
             onTap: _openCreateCompany,
+          ),
+
+        if (hasOwnershipOffer)
+          SettingsTile(
+            icon: Icons.workspace_premium_outlined,
+            title: 'accept_ownership'.tr(),
+            subtitle: ownershipOfferExpired
+                ? 'ownership_transfer_expired'.tr()
+                : 'accept_ownership_hint'.tr(
+                    namedArgs: {'company': membership!.companyName},
+                  ),
+            onTap: ownershipOfferExpired ? null : _acceptOwnership,
+          ),
+
+        if (canTransferOwnership)
+          SettingsTile(
+            icon: Icons.swap_horiz_rounded,
+            title: 'transfer_ownership'.tr(),
+            subtitle: 'transfer_ownership_hint'.tr(),
+            onTap: _openOwnershipTransfer,
           ),
 
         if (_isSuperAdmin && inCompany)
@@ -491,6 +526,79 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     await _load();
     if (!mounted) return;
     UIUtils.showSnackBar(context, 'create_company_success'.tr());
+  }
+
+  Future<void> _openOwnershipTransfer() async {
+    final membership = _membership;
+    if (membership == null ||
+        !membership.isActive ||
+        membership.isClosing ||
+        membership.companyId.isEmpty ||
+        _userId.isEmpty) {
+      return;
+    }
+
+    final receipt = await Navigator.push<OwnershipTransferRequestReceipt>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => OwnershipTransferPage(
+          companyId: membership.companyId,
+          currentUid: _userId,
+        ),
+      ),
+    );
+    if (receipt == null || !mounted) return;
+
+    _sessionKey = null;
+    await context.read<MembershipProvider>().refresh();
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    UIUtils.showSnackBar(context, 'ownership_transfer_requested'.tr());
+  }
+
+  Future<void> _acceptOwnership() async {
+    final membership = _membership;
+    final offer = membership?.ownershipTransfer;
+    if (membership == null ||
+        !membership.isActive ||
+        offer == null ||
+        offer.targetUid != _userId) {
+      return;
+    }
+
+    final password = await promptForOwnershipPassword(
+      context: context,
+      title: 'accept_ownership'.tr(),
+      body: 'accept_ownership_confirm'.tr(
+        namedArgs: {'company': membership.companyName},
+      ),
+      actionLabel: 'accept_ownership'.tr(),
+    );
+    if (password == null || !mounted) return;
+
+    try {
+      await OwnershipTransferService().accept(password: password);
+      if (!mounted) return;
+      _sessionKey = null;
+      await Future.wait<void>([
+        context.read<MembershipProvider>().refresh(),
+        context.read<UserDataProvider>().loadCurrentUser(),
+      ]);
+      if (!mounted) return;
+      await _load();
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'ownership_transfer_accepted'.tr());
+    } on OwnershipTransferException catch (error) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(
+        context,
+        ownershipTransferFailureKey(error.failure).tr(),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      UIUtils.showSnackBar(context, 'ownership_transfer_unavailable'.tr());
+    }
   }
 
   Widget _buildAccountGroup() {

@@ -50,6 +50,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | --- | --- |
 | `completeOnboarding` | Auth + App Check callable; finalizes a verified private onboarding intent |
 | `createCompanyForCurrentUser` | Recent-Auth + App Check callable; creates a company for an eligible companyless account and makes it owner |
+| `transferCompanyOwnership` | Recent-Auth + App Check callable; requests or accepts an ownership hand-off to an active member |
 | `uploadProfileImage` | Auth + App Check callable; sanitizes and stores the caller's avatar |
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
 | `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |
@@ -74,8 +75,9 @@ The supporting modules are `account_deletion.ts`, `activity_log.ts`,
 `appointment_definition.ts`, `appointment_participants.ts`,
 `company_administration.ts`, `content_deletion.ts`,
 `appointment_state.ts`, `join_requests.ts`, `messaging.ts`,
-`notification_copy.ts`, `onboarding.ts`, `profile_images.ts`, `purge.ts`,
-`scoring.ts`, `survey_publication.ts`, and `trusted_scoring.ts`. They are
+`notification_copy.ts`, `onboarding.ts`, `ownership_transfer.ts`,
+`profile_images.ts`, `purge.ts`, `scoring.ts`, `survey_publication.ts`, and
+`trusted_scoring.ts`. They are
 compiled through the single
 `build` script and are not deployed independently. Server-side image decoding
 and re-encoding uses the exact locked `sharp` 0.35.3 dependency.

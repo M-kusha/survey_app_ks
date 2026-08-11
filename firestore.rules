@@ -302,6 +302,9 @@ service cloud.firestore {
 
       // Creation, settings, ownership, closure and destruction all go through
       // trusted functions so the state change and activity event cannot split.
+      // This includes the optional server-owned `ownershipTransfer` offer on
+      // the company document: clients may read it with the company, but may
+      // never add, amend, accept or remove it directly.
       allow create, update, delete: if false;
 
       // ---------- bans ----------

@@ -25,6 +25,10 @@ import {
   createCompanyForCurrentUser as createCompanyForCurrentUserOperation,
 } from './company_privileges';
 import {
+  OwnershipTransferError,
+  transferCompanyOwnershipForUser,
+} from './ownership_transfer';
+import {
   registerAppointmentParticipant,
   unregisterAppointmentParticipant,
 } from './appointment_participants';
@@ -268,6 +272,36 @@ export const createCompanyForCurrentUser = onCall(
         errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw new HttpsError('internal', 'company-creation-incomplete');
+    }
+  },
+);
+
+/** Two-step, recently authenticated hand-off to an active company member. */
+export const transferCompanyOwnership = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await transferCompanyOwnershipForUser(
+        request.auth.uid,
+        request.auth.token.auth_time,
+        request.data,
+      );
+    } catch (error) {
+      if (error instanceof OwnershipTransferError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('ownership transfer failed closed', {
+        uid: request.auth.uid,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'ownership-transfer-incomplete');
     }
   },
 );

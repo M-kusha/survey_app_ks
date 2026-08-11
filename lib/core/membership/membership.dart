@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/core/membership/member_directory.dart';
+import 'package:echomeet/core/membership/ownership_transfer_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -31,6 +32,7 @@ class Membership {
     this.companyName = '',
     this.joinPolicy = 'open',
     this.deletionAt,
+    this.ownershipTransfer,
   });
 
   static const unknown = Membership(state: MembershipState.noCompany);
@@ -41,6 +43,7 @@ class Membership {
   final String joinPolicy;
 
   final DateTime? deletionAt;
+  final OwnershipTransferOffer? ownershipTransfer;
 
   bool get isClosing => deletionAt != null;
 
@@ -77,6 +80,9 @@ class MembershipService {
     final joinPolicy = companyData?['joinPolicy'] as String? ?? 'open';
     final deletionAt = (companyData?['deletionScheduledFor'] as Timestamp?)
         ?.toDate();
+    final ownershipTransfer = companyData == null
+        ? null
+        : OwnershipTransferOffer.fromCompanyData(companyData);
 
     final ban = await _db
         .collection('companies')
@@ -92,6 +98,7 @@ class MembershipService {
         companyName: companyName,
         joinPolicy: joinPolicy,
         deletionAt: deletionAt,
+        ownershipTransfer: ownershipTransfer,
       );
     }
 
@@ -105,6 +112,7 @@ class MembershipService {
       companyName: companyName,
       joinPolicy: joinPolicy,
       deletionAt: deletionAt,
+      ownershipTransfer: ownershipTransfer,
     );
   }
 
@@ -209,6 +217,7 @@ class MembershipProvider extends ChangeNotifier {
   String _companyName = '';
   String _joinPolicy = 'open';
   DateTime? _deletionAt;
+  OwnershipTransferOffer? _ownershipTransfer;
   bool _companyExists = false;
   bool _companySeen = false;
   bool _banSeen = false;
@@ -283,6 +292,7 @@ class MembershipProvider extends ChangeNotifier {
     _companyName = '';
     _joinPolicy = 'open';
     _deletionAt = null;
+    _ownershipTransfer = null;
     _companyExists = false;
     _companySeen = companyId.isEmpty;
     _banSeen = companyId.isEmpty;
@@ -313,6 +323,9 @@ class MembershipProvider extends ChangeNotifier {
             _joinPolicy = companyData?['joinPolicy'] as String? ?? 'open';
             _deletionAt = (companyData?['deletionScheduledFor'] as Timestamp?)
                 ?.toDate();
+            _ownershipTransfer = companyData == null
+                ? null
+                : OwnershipTransferOffer.fromCompanyData(companyData);
             _recomputeMembership();
           },
           onError: (Object error) {
@@ -374,6 +387,7 @@ class MembershipProvider extends ChangeNotifier {
       companyName: _companyName,
       joinPolicy: _joinPolicy,
       deletionAt: _deletionAt,
+      ownershipTransfer: _ownershipTransfer,
     );
     _loading = false;
     _error = null;
@@ -394,6 +408,7 @@ class MembershipProvider extends ChangeNotifier {
     _companyName = '';
     _joinPolicy = 'open';
     _deletionAt = null;
+    _ownershipTransfer = null;
     _companyExists = false;
     _companySeen = false;
     _banSeen = false;

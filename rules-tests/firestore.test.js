@@ -165,6 +165,14 @@ const activityDocument = (overrides = {}) => ({
   ...overrides,
 });
 
+const ownershipTransferDocument = (overrides = {}) => ({
+  fromUid: ALICE,
+  targetUid: BOB,
+  requestedAt: new Date('2026-08-12T09:00:00.000Z'),
+  expiresAt: new Date('2026-08-14T09:00:00.000Z'),
+  ...overrides,
+});
+
 const surveyDocument = (id, overrides = {}) => ({
   surveyName: 'Q1 review',
   surveyDescription: 'A bounded test survey',
@@ -573,6 +581,121 @@ describe('administrative activity is immutable and company-scoped', () => {
       new Set([...first.docs, ...second.docs].map((snapshot) => snapshot.id))
         .size,
       31,
+    );
+  });
+});
+
+describe('ownership transfer state is trusted-only', () => {
+  const company = (db) => doc(db, 'companies', ACME);
+  const nameLock = (db) => doc(db, 'companyNames', 'acme');
+
+  const seedOfferAndNameLock = async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await updateDoc(company(db), {
+        ownershipTransfer: ownershipTransferDocument(),
+      });
+      await setDoc(nameLock(db), {
+        companyId: ACME,
+        createdBy: ALICE,
+      });
+    });
+  };
+
+  it('tolerates the optional offer on legitimate reads and ordinary writes', async () => {
+    await seedOfferAndNameLock();
+
+    const memberCompany = await assertSucceeds(getDoc(company(as(BOB))));
+    strictEqual(memberCompany.data().ownershipTransfer.targetUid, BOB);
+    await assertSucceeds(
+      updateMember(as(BOB), BOB, { fullName: 'Bob While Offer Pending' }),
+    );
+    await assertSucceeds(getDoc(doc(as(BOB), 'surveys', 'acme-survey')));
+
+    await assertSucceeds(
+      getDoc(doc(as(ALICE), 'companies', ACME, 'activity', 'base-event')),
+    );
+    await assertSucceeds(
+      getDocs(
+        query(
+          collection(as(ADA), 'companies', ACME, 'activity'),
+          limit(25),
+        ),
+      ),
+    );
+  });
+
+  it('denies clients adding, changing or removing an offer', async () => {
+    await assertFails(
+      updateDoc(company(as(ALICE)), {
+        ownershipTransfer: ownershipTransferDocument(),
+      }),
+    );
+    await assertFails(
+      updateDoc(company(as(BOB)), {
+        ownershipTransfer: ownershipTransferDocument(),
+      }),
+    );
+
+    await seedOfferAndNameLock();
+    await assertFails(
+      updateDoc(company(as(ALICE)), {
+        'ownershipTransfer.targetUid': ADA,
+      }),
+    );
+    await assertFails(
+      updateDoc(company(as(BOB)), {
+        ownershipTransfer: deleteField(),
+      }),
+    );
+  });
+
+  it('denies forged ownership acceptance as one atomic client batch', async () => {
+    await seedOfferAndNameLock();
+
+    const forgedTransfer = (db) => {
+      const batch = writeBatch(db);
+      batch.update(company(db), {
+        createdBy: BOB,
+        ownershipTransfer: deleteField(),
+      });
+      batch.update(nameLock(db), { createdBy: BOB });
+      batch.update(doc(db, 'users', ALICE), { role: 'admin' });
+      batch.update(doc(db, 'memberDirectory', ALICE), { role: 'admin' });
+      batch.update(doc(db, 'users', BOB), { role: 'superadmin' });
+      batch.update(doc(db, 'memberDirectory', BOB), { role: 'superadmin' });
+      return batch.commit();
+    };
+
+    await assertFails(forgedTransfer(as(ALICE)));
+    await assertFails(forgedTransfer(as(BOB)));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      const [companySnapshot, lockSnapshot, alice, bob] = await Promise.all([
+        getDoc(company(db)),
+        getDoc(nameLock(db)),
+        getDoc(doc(db, 'users', ALICE)),
+        getDoc(doc(db, 'users', BOB)),
+      ]);
+      strictEqual(companySnapshot.data().createdBy, ALICE);
+      strictEqual(companySnapshot.data().ownershipTransfer.targetUid, BOB);
+      strictEqual(lockSnapshot.data().createdBy, ALICE);
+      strictEqual(alice.data().role, 'superadmin');
+      strictEqual(bob.data().role, 'user');
+    });
+  });
+
+  it('denies each ownership and role primitive outside the callable', async () => {
+    await seedOfferAndNameLock();
+
+    await assertFails(updateDoc(company(as(BOB)), { createdBy: BOB }));
+    await assertFails(updateDoc(nameLock(as(BOB)), { createdBy: BOB }));
+    await assertFails(
+      updateMember(as(BOB), BOB, { role: 'superadmin' }),
+    );
+    await assertFails(
+      updateMember(as(ALICE), BOB, { role: 'superadmin' }),
     );
   });
 });
