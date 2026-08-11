@@ -869,6 +869,43 @@ describe('survey submissions', () => {
     );
   });
 
+  it('staff review verdicts are bounded booleans', async () => {
+    const participant = doc(
+      as(ALICE),
+      'surveys',
+      'acme-survey',
+      'participants',
+      BOB,
+    );
+    await assertSucceeds(
+      updateDoc(participant, {
+        textAnswersReviewed: {
+          'acme-survey-Q0': true,
+          'acme-survey-Q1': false,
+        },
+      }),
+    );
+
+    for (const verdict of ['true', null, 1]) {
+      await assertFails(
+        updateDoc(participant, {
+          textAnswersReviewed: { 'acme-survey-Q0': verdict },
+        }),
+      );
+    }
+
+    await assertFails(
+      updateDoc(participant, {
+        textAnswersReviewed: Object.fromEntries(
+          Array.from({ length: 101 }, (_, index) => [
+            `acme-survey-Q${index}`,
+            true,
+          ]),
+        ),
+      }),
+    );
+  });
+
   it('a participant reads their own result, an admin reads everyone\'s', async () => {
     await assertSucceeds(
       getDoc(doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB)),

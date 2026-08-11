@@ -1049,7 +1049,10 @@ service cloud.firestore {
             'textAnswersReviewed'
           ])
           && request.resource.data.textAnswersReviewed is map
-          && request.resource.data.textAnswersReviewed.size() <= 100;
+          && request.resource.data.textAnswersReviewed.size() <= 100
+          && request.resource.data.textAnswersReviewed.values().hasOnly([
+            true, false
+          ]);
 
         // A submitted response is a durable record. Staff may remove somebody
         // else's response, but nobody can erase their own submission.

@@ -172,6 +172,7 @@ class Participant {
   }
 
   factory Participant.fromFirestore(Map<String, dynamic> data) {
+    final reviews = _decodeTextAnswerReviews(data['textAnswersReviewed']);
     return Participant(
       userId: data['userId'] ?? '',
       name: data['name'] ?? '',
@@ -183,15 +184,33 @@ class Participant {
       profileImageRevision: readProfileImageRevision(
         data['profileImageRevision'],
       ),
-      textAnswersReviewed: Map<String, bool>.from(
-        data['textAnswersReviewed'] ?? {},
-      ),
+      textAnswersReviewed: reviews.values,
       totalCorrectAnswers: data['totalCorrectAnswers'] ?? 0,
       gradedQuestionCount: data['gradedQuestionCount'] as int?,
-      gradingStatus: data['gradingStatus'] as String?,
+      gradingStatus: reviews.malformed
+          ? 'error'
+          : data['gradingStatus'] as String?,
       participations: List<Map<String, dynamic>>.from(
         data['participations'] ?? [],
       ),
     );
   }
+}
+
+({Map<String, bool> values, bool malformed}) _decodeTextAnswerReviews(
+  Object? raw,
+) {
+  if (raw == null) return (values: const {}, malformed: false);
+  if (raw is! Map || raw.length > 100) {
+    return (values: const {}, malformed: true);
+  }
+
+  final values = <String, bool>{};
+  for (final entry in raw.entries) {
+    if (entry.key is! String || entry.value is! bool) {
+      return (values: const {}, malformed: true);
+    }
+    values[entry.key as String] = entry.value as bool;
+  }
+  return (values: values, malformed: false);
 }

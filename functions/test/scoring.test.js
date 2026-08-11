@@ -115,4 +115,26 @@ describe('trusted survey scoring', () => {
       hasPendingReview: false,
     });
   });
+
+  it('malformed and unknown reviews remain pending without granting credit', () => {
+    const score = () => scoreSurveySubmission(
+      [{ type: 'Text' }],
+      [{ type: 'Text' }],
+      { Q0: ['answer'] },
+      {
+        'survey-42-Q0': 'true',
+        'survey-42-Q99': true,
+      },
+      'survey-42',
+    );
+
+    const first = score();
+    assert.deepEqual(first, {
+      score: 0,
+      correctCount: 0,
+      gradedCount: 0,
+      hasPendingReview: true,
+    });
+    assert.deepEqual(score(), first);
+  });
 });
