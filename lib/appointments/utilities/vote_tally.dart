@@ -19,6 +19,14 @@ enum VoteStatus {
     VoteStatus.no => 'declined',
   };
 
+  /// Lives here rather than beside the vote buttons so the PDF builder can name
+  /// a status without importing Material.
+  String get labelKey => switch (this) {
+    VoteStatus.yes => 'will_participate',
+    VoteStatus.maybe => 'maybe_participate',
+    VoteStatus.no => 'will_not_participate',
+  };
+
   static VoteStatus? fromWire(String? value) => switch (value) {
     'joined' => VoteStatus.yes,
     'maybe' => VoteStatus.maybe,

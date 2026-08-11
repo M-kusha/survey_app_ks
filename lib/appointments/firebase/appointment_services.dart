@@ -153,6 +153,39 @@ class AppointmentService {
     return userDoc.data()?['fullName'] as String? ?? 'Unknown';
   }
 
+  /// Names of the people who may vote in one company, keyed by user id.
+  ///
+  /// The directory is the only trustworthy source: a vote carries a name the
+  /// participant's own client wrote, so it can name a colleague. Streaming the
+  /// company also reveals who has not answered yet, which the votes alone
+  /// cannot say.
+  ///
+  /// Only active members are returned. Someone still awaiting approval cannot
+  /// read the meeting at all, so listing them as outstanding would describe a
+  /// wait that can never end. Membership is filtered here rather than in the
+  /// query so this stays a single-field lookup needing no composite index.
+  Stream<Map<String, String>> watchCompanyMemberNames(String companyId) {
+    final id = companyId.trim();
+    if (id.isEmpty) return Stream.value(const {});
+
+    return _db
+        .collection('memberDirectory')
+        .where('companyId', isEqualTo: id)
+        .snapshots()
+        .map((snapshot) {
+          final names = <String, String>{};
+          for (final document in snapshot.docs) {
+            final data = document.data();
+            final fullName = data['fullName'];
+            if (data['membership'] != 'active') continue;
+            if (fullName is String && fullName.trim().isNotEmpty) {
+              names[document.id] = fullName.trim();
+            }
+          }
+          return Map.unmodifiable(names);
+        });
+  }
+
   Future<int> confirmTimeSlot(
     String appointmentId,
     TimeSlot timeSlotToConfirm,

@@ -25,11 +25,7 @@ IconData voteIcon(VoteStatus status) => switch (status) {
   VoteStatus.no => Icons.close_rounded,
 };
 
-String voteLabelKey(VoteStatus status) => switch (status) {
-  VoteStatus.yes => 'will_participate',
-  VoteStatus.maybe => 'maybe_participate',
-  VoteStatus.no => 'will_not_participate',
-};
+String voteLabelKey(VoteStatus status) => status.labelKey;
 
 class VoteSlotCard extends StatelessWidget {
   const VoteSlotCard({

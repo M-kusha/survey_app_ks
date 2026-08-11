@@ -6,6 +6,7 @@ import 'package:echomeet/appointments/calendar/appointment_ics.dart';
 import 'package:echomeet/appointments/calendar/calendar_download.dart';
 import 'package:echomeet/appointments/edit/appointment_edit.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
+import 'package:echomeet/appointments/participants/appointment_participants_page.dart';
 import 'package:echomeet/appointments/participants/vote_slot_card.dart';
 import 'package:echomeet/appointments/utilities/vote_tally.dart';
 import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
@@ -343,6 +344,14 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       appBar: AppBar(
         title: Text(_appointment.title, overflow: TextOverflow.ellipsis),
         actions: [
+          // Reachable even before anyone votes: the roster answers "who has not
+          // answered", which is the question an organizer has on day one.
+          if (!_appointmentDeleted)
+            IconButton(
+              tooltip: 'all_participants'.tr(),
+              icon: const Icon(Icons.group_outlined),
+              onPressed: _openParticipants,
+            ),
           if (!_appointmentDeleted && _confirmedSlot != null)
             IconButton(
               tooltip: 'add_to_calendar'.tr(),
@@ -443,7 +452,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
                 isTied: tally.isTied,
                 enabled: _canVote,
                 onChoose: (status) => _choose(slot, status),
-                onShowVoters: () => _showVoters(slot),
+                onShowVoters: _openParticipants,
                 onConfirm: widget.isAdmin && confirmed == null
                     ? () => _confirm(slot)
                     : null,
@@ -455,14 +464,13 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
     );
   }
 
-  void _showVoters(TimeSlot slot) {
-    final forSlot = _votes.where((vote) => vote.slotId == slot.slotId).toList();
-
-    showModalBottomSheet<void>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) =>
-          _VoterSheet(slot: slot, zoneId: _appointment.zoneId, votes: forSlot),
+  void _openParticipants() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            AppointmentParticipantsPage(appointment: _appointment),
+      ),
     );
   }
 }
@@ -591,78 +599,3 @@ class _Notice extends StatelessWidget {
   }
 }
 
-class _VoterSheet extends StatelessWidget {
-  const _VoterSheet({
-    required this.slot,
-    required this.zoneId,
-    required this.votes,
-  });
-
-  final TimeSlot slot;
-  final String zoneId;
-  final List<AppointmentParticipants> votes;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    final groups = <VoteStatus, List<AppointmentParticipants>>{};
-    for (final vote in votes) {
-      final status = VoteStatus.fromWire(vote.status);
-      if (status != null) (groups[status] ??= []).add(vote);
-    }
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          Spacing.xl,
-          0,
-          Spacing.xl,
-          Spacing.xl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AppointmentTimeText(
-              startAt: slot.startAt,
-              endAt: slot.endAt,
-              zoneId: zoneId,
-              style: theme.textTheme.titleMedium,
-            ),
-            const SizedBox(height: Spacing.lg),
-            if (votes.isEmpty)
-              Text(
-                'nobody_voted_yet'.tr(),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            for (final status in VoteStatus.values)
-              if (groups[status]?.isNotEmpty ?? false) ...[
-                SectionLabel(
-                  label: voteLabelKey(status).tr(),
-                  count: groups[status]!.length,
-                ),
-                for (final vote in groups[status]!)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-                    child: Row(
-                      children: [
-                        Icon(
-                          voteIcon(status),
-                          size: 16,
-                          color: voteColor(context, status),
-                        ),
-                        const SizedBox(width: Spacing.md),
-                        Text(vote.userName, style: theme.textTheme.bodyMedium),
-                      ],
-                    ),
-                  ),
-              ],
-          ],
-        ),
-      ),
-    );
-  }
-}
