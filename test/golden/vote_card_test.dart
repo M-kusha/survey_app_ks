@@ -13,9 +13,9 @@ import '../support/load_translations.dart';
 final _fixed = DateTime(2025, 3, 12, 14);
 
 TimeSlot _slot(int day, {bool confirmed = false}) => TimeSlot(
+  slotId: 'slot-$day',
   start: DateTime(2025, 3, day, 14),
   end: DateTime(2025, 3, day, 15),
-  expirationDate: DateTime(2025, 3, 1),
   isConfirmed: confirmed,
 );
 
@@ -70,7 +70,14 @@ void main() {
             // Leading, voted yes, admin can confirm.
             VoteSlotCard(
               slot: _slot(12),
-              tally: SlotTally(start: _fixed, yes: 5, maybe: 2, no: 1),
+              zoneId: 'Europe/Berlin',
+              tally: SlotTally(
+                slotId: 'slot-12',
+                start: _fixed,
+                yes: 5,
+                maybe: 2,
+                no: 1,
+              ),
               myStatus: VoteStatus.yes,
               isLeader: true,
               isTied: false,
@@ -83,7 +90,14 @@ void main() {
             // Nobody has answered: no bar at all, rather than an empty one.
             VoteSlotCard(
               slot: _slot(13),
-              tally: SlotTally(start: _fixed, yes: 0, maybe: 0, no: 0),
+              zoneId: 'Europe/Berlin',
+              tally: SlotTally(
+                slotId: 'slot-13',
+                start: _fixed,
+                yes: 0,
+                maybe: 0,
+                no: 0,
+              ),
               myStatus: null,
               isLeader: false,
               isTied: false,
@@ -95,7 +109,14 @@ void main() {
             // Voting closed: buttons visibly inert, counts still readable.
             VoteSlotCard(
               slot: _slot(14, confirmed: true),
-              tally: SlotTally(start: _fixed, yes: 3, maybe: 0, no: 4),
+              zoneId: 'Europe/Berlin',
+              tally: SlotTally(
+                slotId: 'slot-14',
+                start: _fixed,
+                yes: 3,
+                maybe: 0,
+                no: 4,
+              ),
               myStatus: VoteStatus.no,
               isLeader: false,
               isTied: false,

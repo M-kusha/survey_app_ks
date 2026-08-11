@@ -1,4 +1,5 @@
 import 'package:echomeet/core/time/deadline.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -22,6 +23,21 @@ void main() {
       expect(deadline.labelKey, 'deadline_tomorrow');
     });
 
+    test('spring-forward tomorrow remains one calendar day away', () {
+      final beforeJump = appointmentTimeInZone(
+        DateTime.utc(2026, 3, 28, 11),
+        'Europe/Berlin',
+      );
+      final afterJump = appointmentTimeInZone(
+        DateTime.utc(2026, 3, 29, 10),
+        'Europe/Berlin',
+      );
+
+      final deadline = deadlineFor(afterJump, now: beforeJump);
+      expect(deadline.days, 1);
+      expect(deadline.labelKey, 'deadline_tomorrow');
+    });
+
     test('within the week is soon', () {
       final deadline = deadlineFor(DateTime(2025, 3, 14), now: now);
       expect(deadline.urgency, DeadlineUrgency.soon);
@@ -41,6 +57,10 @@ void main() {
       expect(deadline.urgency, DeadlineUrgency.passed);
       expect(deadline.isPassed, isTrue);
       expect(deadline.labelKey, 'deadline_closed');
+    });
+
+    test('the exact deadline instant is already closed', () {
+      expect(deadlineFor(now, now: now).isPassed, isTrue);
     });
   });
 

@@ -1,30 +1,35 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_dialogs.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 class TimeSlotEditor extends StatelessWidget {
   const TimeSlotEditor({
     super.key,
     required this.slots,
+    required this.zoneId,
     required this.onChanged,
   });
 
   final List<TimeSlot> slots;
+  final String zoneId;
   final ValueChanged<List<TimeSlot>> onChanged;
 
   Future<void> _add(BuildContext context) async {
-    final slot = await _editSlot(context, null);
+    final slot = await _editSlot(context, null, zoneId);
     if (slot == null) return;
     onChanged([...slots, slot]..sort((a, b) => a.start.compareTo(b.start)));
   }
 
   Future<void> _edit(BuildContext context, int index) async {
-    final slot = await _editSlot(context, slots[index]);
+    final slot = await _editSlot(context, slots[index], zoneId);
     if (slot == null) return;
 
     final next = [...slots];
@@ -51,6 +56,7 @@ class TimeSlotEditor extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: Spacing.sm),
               child: _SlotRow(
                 slot: slots[i],
+                zoneId: zoneId,
                 onTap: () => _edit(context, i),
                 onRemove: () => _remove(i),
               ),
@@ -77,11 +83,13 @@ class TimeSlotEditor extends StatelessWidget {
 class _SlotRow extends StatelessWidget {
   const _SlotRow({
     required this.slot,
+    required this.zoneId,
     required this.onTap,
     required this.onRemove,
   });
 
   final TimeSlot slot;
+  final String zoneId;
   final VoidCallback onTap;
   final VoidCallback onRemove;
 
@@ -91,7 +99,9 @@ class _SlotRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final app = context.appColors;
 
-    final isPast = slot.start.isBefore(DateTime.now());
+    final start = appointmentTimeInZone(slot.startAt, zoneId);
+    final end = appointmentTimeInZone(slot.endAt, zoneId);
+    final isPast = slot.startAt.isBefore(DateTime.now());
 
     return ContentCard(
       onTap: onTap,
@@ -109,14 +119,14 @@ class _SlotRow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  DateFormat.E().format(slot.start).toUpperCase(),
+                  DateFormat.E().format(start).toUpperCase(),
                   style: theme.textTheme.labelSmall?.copyWith(
                     color: scheme.primary,
                     fontSize: 9,
                   ),
                 ),
                 Text(
-                  DateFormat.d().format(slot.start),
+                  DateFormat.d().format(start),
                   style: theme.textTheme.titleMedium?.copyWith(
                     color: scheme.primary,
                     height: 1,
@@ -131,7 +141,7 @@ class _SlotRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  DateFormat.MMMMEEEEd().format(slot.start),
+                  DateFormat.MMMMEEEEd().format(start),
                   style: theme.textTheme.bodyLarge,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -139,8 +149,8 @@ class _SlotRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '${DateFormat.jm().format(slot.start)} – '
-                      '${DateFormat.jm().format(slot.end)}',
+                      '${DateFormat.jm().format(start)} – '
+                      '${DateFormat.jm().format(end)} · $zoneId',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -180,7 +190,7 @@ class _SlotRow extends StatelessWidget {
   }
 
   static String _durationLabel(TimeSlot slot) {
-    final minutes = slot.end.difference(slot.start).inMinutes;
+    final minutes = slot.endAt.difference(slot.startAt).inMinutes;
     if (minutes <= 0) return '';
     if (minutes < 60) {
       return 'duration_minutes'.tr(namedArgs: {'m': '$minutes'});
@@ -227,15 +237,25 @@ class _EmptySlots extends StatelessWidget {
   }
 }
 
-Future<TimeSlot?> _editSlot(BuildContext context, TimeSlot? existing) async {
+Future<TimeSlot?> _editSlot(
+  BuildContext context,
+  TimeSlot? existing,
+  String zoneId,
+) async {
   final now = DateTime.now();
-  final initial = existing?.start ?? now.add(const Duration(days: 1));
+  final initial = appointmentTimeInZone(
+    existing?.startAt ?? now.add(const Duration(days: 1)),
+    zoneId,
+  );
+  final nowInZone = appointmentTimeInZone(now, zoneId);
 
   final day = await showDatePicker(
     context: context,
-    initialDate: initial.isBefore(now) ? now : initial,
-    firstDate: DateTime(now.year, now.month, now.day),
-    lastDate: now.add(const Duration(days: 365 * 2)),
+    initialDate: existing == null && initial.isBefore(nowInZone)
+        ? nowInZone
+        : initial,
+    firstDate: DateTime(nowInZone.year, nowInZone.month, nowInZone.day),
+    lastDate: nowInZone.add(const Duration(days: 365 * 2)),
   );
   if (day == null || !context.mounted) return null;
 
@@ -246,13 +266,29 @@ Future<TimeSlot?> _editSlot(BuildContext context, TimeSlot? existing) async {
   );
   if (start == null || !context.mounted) return null;
 
-  final startsAt = DateTime(
+  final wallTime = DateTime.utc(
     day.year,
     day.month,
     day.day,
     start.hour,
     start.minute,
   );
+  final resolution = resolveAppointmentWallTime(
+    zoneId: zoneId,
+    wallTime: wallTime,
+  );
+  if (resolution.isNonexistent) {
+    await showNonexistentAppointmentTime(context);
+    return null;
+  }
+  final startsAt = resolution.isAmbiguous
+      ? await chooseRepeatedAppointmentTime(
+          context,
+          resolution.instants,
+          zoneId,
+        )
+      : resolution.single;
+  if (startsAt == null || !context.mounted) return null;
 
   final minutes = await showModalBottomSheet<int>(
     context: context,
@@ -265,13 +301,33 @@ Future<TimeSlot?> _editSlot(BuildContext context, TimeSlot? existing) async {
   );
   if (minutes == null) return null;
 
-  return TimeSlot(
-    start: startsAt,
-    end: startsAt.add(Duration(minutes: minutes)),
+  final endsAt = startsAt.add(Duration(minutes: minutes));
 
-    expirationDate: startsAt,
+  return TimeSlot(
+    slotId: appointmentSlotIdAfterEdit(
+      existing: existing,
+      startAt: startsAt,
+      endAt: endsAt,
+    ),
+    start: startsAt,
+    end: endsAt,
     isConfirmed: existing?.isConfirmed ?? false,
   );
+}
+
+@visibleForTesting
+String appointmentSlotIdAfterEdit({
+  required TimeSlot? existing,
+  required DateTime startAt,
+  required DateTime endAt,
+  String Function()? idFactory,
+}) {
+  if (existing != null &&
+      existing.startAt == canonicalAppointmentInstant(startAt) &&
+      existing.endAt == canonicalAppointmentInstant(endAt)) {
+    return existing.slotId;
+  }
+  return (idFactory ?? const Uuid().v4)();
 }
 
 class _DurationSheet extends StatelessWidget {

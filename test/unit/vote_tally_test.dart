@@ -3,9 +3,9 @@ import 'package:echomeet/appointments/utilities/vote_tally.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 TimeSlot slot(int day) => TimeSlot(
+  slotId: 'slot-$day',
   start: DateTime(2025, 3, day, 10),
   end: DateTime(2025, 3, day, 11),
-  expirationDate: DateTime(2025, 3, 1),
 );
 
 AppointmentParticipants vote(
@@ -16,9 +16,7 @@ AppointmentParticipants vote(
 }) => AppointmentParticipants(
   userId: userId,
   userName: name,
-  profileImageUrl: '',
-  date: on.start,
-  timeSlot: on,
+  slotId: on.slotId,
   status: status.wireName,
   participated: true,
 );
@@ -66,20 +64,20 @@ void main() {
       // not implement — so it was reference equality and only ever worked while
       // the same objects stayed in the widget tree.
       final rebuilt = TimeSlot(
-        start: monday.start,
-        end: monday.end,
-        expirationDate: monday.expirationDate,
+        slotId: monday.slotId,
+        start: monday.startAt,
+        end: monday.endAt,
       );
 
       final tally = tallyVotes([monday], [vote('a', rebuilt, VoteStatus.yes)]);
       expect(tally.forSlot(monday)!.yes, 1);
     });
 
-    test('keeps slots with the same start and different ends distinct', () {
+    test('keeps slots with distinct stable IDs separate', () {
       final shorter = TimeSlot(
-        start: monday.start,
-        end: monday.start.add(const Duration(minutes: 30)),
-        expirationDate: monday.expirationDate,
+        slotId: 'slot-shorter',
+        start: monday.startAt,
+        end: monday.startAt.add(const Duration(minutes: 30)),
       );
       final tally = tallyVotes(
         [shorter, monday],

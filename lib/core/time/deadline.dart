@@ -32,7 +32,7 @@ Deadline deadlineFor(
 }) {
   final remaining = closesAt.difference(now);
 
-  if (!remaining.isNegative) {
+  if (remaining > Duration.zero) {
     final days = _calendarDaysBetween(now, closesAt);
 
     return Deadline._(
@@ -68,8 +68,8 @@ DateTime? nearestFutureDeadline(
 }
 
 int _calendarDaysBetween(DateTime from, DateTime to) {
-  final start = DateTime(from.year, from.month, from.day);
-  final end = DateTime(to.year, to.month, to.day);
+  final start = DateTime.utc(from.year, from.month, from.day);
+  final end = DateTime.utc(to.year, to.month, to.day);
   return end.difference(start).inDays;
 }
 

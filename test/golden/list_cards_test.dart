@@ -43,9 +43,9 @@ Survey _survey({
 );
 
 TimeSlot _slot(int day, int hour, {bool confirmed = false}) => TimeSlot(
+  slotId: 'slot-$day-$hour',
   start: DateTime(2025, 3, day, hour),
   end: DateTime(2025, 3, day, hour + 1),
-  expirationDate: _now.add(const Duration(days: 3)),
   isConfirmed: confirmed,
 );
 
@@ -54,18 +54,20 @@ Appointment _appointment({
   required Duration closesIn,
   required List<TimeSlot> slots,
   int voters = 4,
-}) => Appointment(
-  appointmentId: 'id-$title',
-  title: title,
-  description: '',
-  participants: [],
-  availableDates: const [],
-  availableTimeSlots: slots,
-  confirmedTimeSlots: const [],
-  expirationDate: _now.add(closesIn),
-  creationDate: _now.subtract(const Duration(days: 4)),
-  participantUserIds: List.generate(voters, (i) => 'u$i'),
-);
+}) {
+  final confirmed = slots.where((slot) => slot.isConfirmed).firstOrNull;
+  return Appointment(
+    appointmentId: 'id-$title',
+    title: title,
+    description: '',
+    zoneId: 'Europe/Berlin',
+    availableTimeSlots: slots,
+    expirationDate: _now.add(closesIn),
+    creationDate: _now.subtract(const Duration(days: 4)),
+    confirmedSlotId: confirmed?.slotId,
+    participantUserIds: List.generate(voters, (i) => 'u$i'),
+  );
+}
 
 Future<void> _pump(WidgetTester tester, ThemeData theme, Widget child) async {
   tester.view.physicalSize = const Size(560, 1180);

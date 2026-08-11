@@ -1,11 +1,14 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/utilities/vote_tally.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 Color voteColor(BuildContext context, VoteStatus status) {
   final app = context.appColors;
@@ -32,6 +35,7 @@ class VoteSlotCard extends StatelessWidget {
   const VoteSlotCard({
     super.key,
     required this.slot,
+    required this.zoneId,
     required this.tally,
     required this.myStatus,
     required this.isLeader,
@@ -43,6 +47,7 @@ class VoteSlotCard extends StatelessWidget {
   });
 
   final TimeSlot slot;
+  final String zoneId;
   final SlotTally? tally;
   final VoteStatus? myStatus;
 
@@ -57,6 +62,7 @@ class VoteSlotCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<DeviceTimeZone?>();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final app = context.appColors;
@@ -80,15 +86,12 @@ class VoteSlotCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      DateFormat.MMMMEEEEd().format(slot.start),
+                    AppointmentTimeText(
+                      startAt: slot.startAt,
+                      endAt: slot.endAt,
+                      zoneId: zoneId,
                       style: theme.textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${DateFormat.jm().format(slot.start)} – '
-                      '${DateFormat.jm().format(slot.end)}',
-                      style: theme.textTheme.bodySmall?.copyWith(
+                      secondaryStyle: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
                     ),

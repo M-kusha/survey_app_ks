@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/core/membership/member_directory.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
@@ -136,6 +137,7 @@ class CompanyAdminService {
     final appointments = await _db
         .collection('appointments')
         .where('companyId', isEqualTo: companyId)
+        .where('schemaVersion', isEqualTo: Appointment.schemaVersion)
         .get();
 
     for (final appointment in appointments.docs) {

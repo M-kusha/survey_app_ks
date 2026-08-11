@@ -25,8 +25,6 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
     setState(() {
       final appointment = _appointment!;
       appointment.availableTimeSlots = slots;
-
-      appointment.availableDates = slots.map((slot) => slot.start).toList();
     });
   }
 
@@ -52,10 +50,15 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
       primaryLabel: 'next'.tr(),
 
       onPrimary:
-          slots.isEmpty || slots.any((s) => s.start.isBefore(DateTime.now()))
+          slots.isEmpty ||
+              slots.any((slot) => !slot.startAt.isAfter(DateTime.now()))
           ? null
           : _next,
-      child: TimeSlotEditor(slots: slots, onChanged: _setSlots),
+      child: TimeSlotEditor(
+        slots: slots,
+        zoneId: appointment.zoneId,
+        onChanged: _setSlots,
+      ),
     );
   }
 }

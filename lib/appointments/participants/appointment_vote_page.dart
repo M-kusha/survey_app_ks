@@ -6,10 +6,12 @@ import 'package:echomeet/appointments/edit/appointment_edit.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/participants/vote_slot_card.dart';
 import 'package:echomeet/appointments/utilities/vote_tally.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/time/deadline.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/core/widgets/wizard_scaffold.dart';
@@ -79,10 +81,10 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
   void _scheduleDeadlineRefresh() {
     _deadlineTimer?.cancel();
     final remaining = _appointment.expirationDate.difference(DateTime.now());
-    if (remaining.isNegative) return;
+    if (remaining <= Duration.zero) return;
 
-    // deadlineFor treats an exact zero duration as still open. Rebuild just
-    // after the boundary so controls cannot remain enabled on an idle page.
+    // Rebuild just after the strict boundary so controls cannot remain enabled
+    // on an idle page.
     _deadlineTimer = Timer(remaining + const Duration(milliseconds: 10), () {
       if (!mounted) return;
       setState(_pending.clear);
@@ -271,18 +273,17 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
   }
 
   Future<void> _confirm(TimeSlot slot) async {
+    final startOffset = appointmentUtcOffset(slot.startAt, _appointment.zoneId);
+    final endOffset = appointmentUtcOffset(slot.endAt, _appointment.zoneId);
+    final creatorTime =
+        '${formatAppointmentRange(startAt: slot.startAt, endAt: slot.endAt, zoneId: _appointment.zoneId, locale: context.locale.toLanguageTag())} (${_appointment.zoneId}, $startOffset'
+        '${startOffset == endOffset ? '' : ' → $endOffset'})';
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('confirm_this_time'.tr()),
         content: Text(
-          'confirm_this_time_body'.tr(
-            namedArgs: {
-              'time':
-                  '${DateFormat.yMMMMEEEEd().format(slot.start)}, '
-                  '${DateFormat.jm().format(slot.start)}',
-            },
-          ),
+          'confirm_this_time_body'.tr(namedArgs: {'time': creatorTime}),
         ),
         actions: [
           TextButton(
@@ -300,11 +301,15 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
     if (ok != true) return;
 
     try {
-      await _service.confirmTimeSlot(_appointment.appointmentId, slot);
+      final revision = await _service.confirmTimeSlot(
+        _appointment.appointmentId,
+        slot,
+      );
       if (!mounted) return;
       setState(() {
-        for (final s in _appointment.availableTimeSlots) {
-          s.isConfirmed = slotKeyOf(s) == slotKeyOf(slot);
+        _appointment.setConfirmedSlot(slot.slotId);
+        if (_appointment.revision < revision) {
+          _appointment.revision = revision;
         }
       });
     } catch (_) {
@@ -406,6 +411,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
               padding: const EdgeInsets.only(bottom: Spacing.md),
               child: VoteSlotCard(
                 slot: slot,
+                zoneId: _appointment.zoneId,
                 tally: tally.forSlot(slot),
                 myStatus: _statusFor(slot),
                 isLeader:
@@ -428,14 +434,13 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
   }
 
   void _showVoters(TimeSlot slot) {
-    final forSlot = _votes
-        .where((vote) => slotKeyOf(vote.timeSlot) == slotKeyOf(slot))
-        .toList();
+    final forSlot = _votes.where((vote) => vote.slotId == slot.slotId).toList();
 
     showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (context) => _VoterSheet(slot: slot, votes: forSlot),
+      builder: (context) =>
+          _VoterSheet(slot: slot, zoneId: _appointment.zoneId, votes: forSlot),
     );
   }
 }
@@ -514,10 +519,14 @@ class _Header extends StatelessWidget {
                 Icon(Icons.check_circle_rounded, color: app.success, size: 20),
                 const SizedBox(width: Spacing.md),
                 Expanded(
-                  child: Text(
-                    '${DateFormat.yMMMMEEEEd().format(confirmed!.start)} · '
-                    '${DateFormat.jm().format(confirmed!.start)}',
+                  child: AppointmentTimeText(
+                    startAt: confirmed!.startAt,
+                    endAt: confirmed!.endAt,
+                    zoneId: appointment.zoneId,
                     style: theme.textTheme.titleSmall,
+                    secondaryStyle: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
@@ -561,9 +570,14 @@ class _Notice extends StatelessWidget {
 }
 
 class _VoterSheet extends StatelessWidget {
-  const _VoterSheet({required this.slot, required this.votes});
+  const _VoterSheet({
+    required this.slot,
+    required this.zoneId,
+    required this.votes,
+  });
 
   final TimeSlot slot;
+  final String zoneId;
   final List<AppointmentParticipants> votes;
 
   @override
@@ -588,9 +602,10 @@ class _VoterSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '${DateFormat.MMMMEEEEd().format(slot.start)} · '
-              '${DateFormat.jm().format(slot.start)}',
+            AppointmentTimeText(
+              startAt: slot.startAt,
+              endAt: slot.endAt,
+              zoneId: zoneId,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: Spacing.lg),

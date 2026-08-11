@@ -1,8 +1,10 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/create/appointment_deadline_picker.dart';
 import 'package:echomeet/appointments/create/time_slot_editor.dart';
 import 'package:echomeet/appointments/edit/appointment_edit_conflict.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
@@ -36,7 +38,6 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
 
   late final TextEditingController _title;
   late final TextEditingController _description;
-  late final AppointmentEditBaseline _baseline;
   late List<TimeSlot> _slots;
   late DateTime _deadline;
 
@@ -46,17 +47,16 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
   @override
   void initState() {
     super.initState();
-    _baseline = AppointmentEditBaseline.fromAppointment(widget.appointment);
     _title = TextEditingController(text: widget.appointment.title);
     _description = TextEditingController(text: widget.appointment.description);
     _slots = widget.appointment.availableTimeSlots.map(_copySlot).toList();
-    _deadline = widget.appointment.expirationDate;
+    _deadline = widget.appointment.expirationAt;
   }
 
   TimeSlot _copySlot(TimeSlot slot) => TimeSlot(
-    start: slot.start,
-    end: slot.end,
-    expirationDate: slot.expirationDate,
+    slotId: slot.slotId,
+    start: slot.startAt,
+    end: slot.endAt,
     isConfirmed: slot.isConfirmed,
   );
 
@@ -67,23 +67,27 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
     super.dispose();
   }
 
-  TimeSlot? get _confirmed =>
-      _slots.where((slot) => slot.isConfirmed).firstOrNull;
+  TimeSlot? get _confirmed {
+    if (_reopenVoting) return null;
+    final confirmedId = widget.appointment.confirmedSlotId;
+    if (confirmedId == null) return null;
+    return widget.appointment.availableTimeSlots
+        .where((slot) => slot.slotId == confirmedId)
+        .firstOrNull;
+  }
 
   Future<void> _pickDeadline() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
+    final earliest = _slots
+        .map((slot) => slot.startAt)
+        .reduce((left, right) => left.isBefore(right) ? left : right);
+    final picked = await pickAppointmentDeadline(
       context: context,
-      initialDate: _deadline.isBefore(now) ? now : _deadline,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365 * 2)),
-      helpText: 'select_voting_expiration_date'.tr(),
+      initial: _deadline,
+      earliestStartAt: earliest,
+      zoneId: widget.appointment.zoneId,
     );
     if (picked == null) return;
-
-    setState(() {
-      _deadline = DateTime(picked.year, picked.month, picked.day, 23, 59);
-    });
+    setState(() => _deadline = picked);
   }
 
   Future<void> _clearConfirmation() async {
@@ -110,11 +114,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
       _reopenVoting = true;
       _slots = [
         for (final slot in _slots)
-          TimeSlot(
-            start: slot.start,
-            end: slot.end,
-            expirationDate: slot.expirationDate,
-          ),
+          TimeSlot(slotId: slot.slotId, start: slot.startAt, end: slot.endAt),
       ];
     });
   }
@@ -125,17 +125,40 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
       UIUtils.showSnackBar(context, 'appointment_needs_a_time'.tr());
       return;
     }
+    final confirmedId = widget.appointment.confirmedSlotId;
+    if (!_reopenVoting &&
+        confirmedId != null &&
+        !_slots.any((slot) => slot.slotId == confirmedId)) {
+      UIUtils.showSnackBar(context, 'appointment_edit_conflict'.tr());
+      return;
+    }
+
+    final edited = Appointment(
+      companyId: widget.appointment.companyId,
+      createdBy: widget.appointment.createdBy,
+      appointmentId: widget.appointment.appointmentId,
+      title: _title.text.trim(),
+      description: _description.text.trim(),
+      zoneId: widget.appointment.zoneId,
+      availableTimeSlots: _slots,
+      expirationDate: _deadline,
+      creationDate: widget.appointment.createdAt,
+      revision: widget.appointment.revision,
+      confirmedSlotId: _reopenVoting
+          ? null
+          : widget.appointment.confirmedSlotId,
+      participantUserIds: widget.appointment.participantUserIds,
+    );
+    if (!edited.isValid()) {
+      UIUtils.showSnackBar(context, 'appointment_deadline_invalid_body'.tr());
+      return;
+    }
 
     setState(() => _saving = true);
 
     try {
       await _service.updateAppointment(
-        appointmentId: widget.appointment.appointmentId,
-        baseline: _baseline,
-        title: _title.text.trim(),
-        description: _description.text.trim(),
-        availableTimeSlots: _slots,
-        expirationDate: _deadline,
+        appointment: edited,
         reopenVoting: _reopenVoting,
       );
       if (!mounted) return;
@@ -173,6 +196,7 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
                 if (confirmed != null) ...[
                   _ConfirmedBanner(
                     slot: confirmed,
+                    zoneId: widget.appointment.zoneId,
                     onClear: _clearConfirmation,
                   ),
                   const SizedBox(height: Spacing.lg),
@@ -210,12 +234,17 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
                 const SizedBox(height: Spacing.md),
                 TimeSlotEditor(
                   slots: _slots,
+                  zoneId: widget.appointment.zoneId,
                   onChanged: (slots) => setState(() => _slots = slots),
                 ),
                 const SizedBox(height: Spacing.xl),
                 Text('voting_closes'.tr(), style: theme.textTheme.titleMedium),
                 const SizedBox(height: Spacing.md),
-                _DeadlineRow(date: _deadline, onTap: _pickDeadline),
+                _DeadlineRow(
+                  date: _deadline,
+                  zoneId: widget.appointment.zoneId,
+                  onTap: _pickDeadline,
+                ),
                 const SizedBox(height: Spacing.xxl),
               ],
             ),
@@ -239,9 +268,14 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
 }
 
 class _ConfirmedBanner extends StatelessWidget {
-  const _ConfirmedBanner({required this.slot, required this.onClear});
+  const _ConfirmedBanner({
+    required this.slot,
+    required this.zoneId,
+    required this.onClear,
+  });
 
   final TimeSlot slot;
+  final String zoneId;
   final VoidCallback onClear;
 
   @override
@@ -266,9 +300,10 @@ class _ConfirmedBanner extends StatelessWidget {
             ],
           ),
           const SizedBox(height: Spacing.xs),
-          Text(
-            '${DateFormat.yMMMMEEEEd().format(slot.start)} · '
-            '${DateFormat.jm().format(slot.start)}',
+          AppointmentTimeText(
+            startAt: slot.startAt,
+            endAt: slot.endAt,
+            zoneId: zoneId,
             style: theme.textTheme.titleSmall,
           ),
           const SizedBox(height: Spacing.xs),
@@ -285,16 +320,21 @@ class _ConfirmedBanner extends StatelessWidget {
 }
 
 class _DeadlineRow extends StatelessWidget {
-  const _DeadlineRow({required this.date, required this.onTap});
+  const _DeadlineRow({
+    required this.date,
+    required this.zoneId,
+    required this.onTap,
+  });
 
   final DateTime date;
+  final String zoneId;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final isPast = date.isBefore(DateTime.now());
+    final isPast = !date.isAfter(DateTime.now());
 
     return ContentCard(
       onTap: onTap,
@@ -319,9 +359,13 @@ class _DeadlineRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  DateFormat.yMMMMEEEEd().format(date),
+                AppointmentTimeText(
+                  startAt: date,
+                  zoneId: zoneId,
                   style: theme.textTheme.titleSmall,
+                  secondaryStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 if (isPast)
                   Text(

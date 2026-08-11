@@ -7,6 +7,8 @@ import 'package:echomeet/core/notifications/notification_locale_service.dart';
 import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/core/security/app_check_bootstrap.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
+import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/appointments/firebase/appointment_provider.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/firebase_options.dart';
@@ -23,12 +25,14 @@ import 'package:echomeet/utilities/routes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
+import 'package:flutter_quill/flutter_quill.dart'
+    show FlutterQuillLocalizations;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  initializeAppointmentTimeZones();
   late final AdaptiveThemeMode? savedThemeMode;
   try {
     await Firebase.initializeApp(
@@ -57,6 +61,7 @@ Future<void> main() async {
         ChangeNotifierProvider<FontSizeProvider>(
           create: (context) => FontSizeProvider(),
         ),
+        ChangeNotifierProvider(create: (_) => DeviceTimeZone()),
         Provider<AppointmentService>(create: (_) => AppointmentService()),
         Provider<FirebaseServices>(create: (_) => FirebaseServices()),
         Provider<RegisterLogic>(create: (_) => RegisterLogic()),
@@ -138,6 +143,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<DeviceTimeZone>();
     Intl.defaultLocale = context.locale.toLanguageTag();
     NotificationLocaleService.observe(context.locale);
 

@@ -27,12 +27,13 @@ enum VoteStatus {
   };
 }
 
-typedef SlotKey = ({DateTime start, DateTime end});
+typedef SlotKey = String;
 
-SlotKey slotKeyOf(TimeSlot slot) => (start: slot.start, end: slot.end);
+SlotKey slotKeyOf(TimeSlot slot) => slot.slotId;
 
 class SlotTally {
   const SlotTally({
+    required this.slotId,
     required this.start,
     this.end,
     required this.yes,
@@ -40,6 +41,7 @@ class SlotTally {
     required this.no,
   });
 
+  final String slotId;
   final DateTime start;
   final DateTime? end;
   final int yes;
@@ -50,8 +52,7 @@ class SlotTally {
 
   int get score => yes * VoteStatus.yes.weight + maybe;
 
-  bool matches(TimeSlot slot) =>
-      start == slot.start && (end == null || end == slot.end);
+  bool matches(TimeSlot slot) => slotId == slot.slotId;
 }
 
 class AppointmentTally {
@@ -81,7 +82,7 @@ AppointmentTally tallyVotes(
     final status = VoteStatus.fromWire(vote.status);
     if (status == null) continue;
 
-    (byUser[vote.userId] ??= {})[slotKeyOf(vote.timeSlot)] = status;
+    (byUser[vote.userId] ??= {})[vote.slotId] = status;
   }
 
   final tallies = [
@@ -105,6 +106,7 @@ AppointmentTally tallyVotes(
         }
 
         return SlotTally(
+          slotId: slot.slotId,
           start: slot.start,
           end: slot.end,
           yes: yes,
@@ -144,6 +146,6 @@ Map<SlotKey, VoteStatus> votesOf(
   return {
     for (final vote in votes)
       if (vote.userId == userId && VoteStatus.fromWire(vote.status) != null)
-        slotKeyOf(vote.timeSlot): VoteStatus.fromWire(vote.status)!,
+        vote.slotId: VoteStatus.fromWire(vote.status)!,
   };
 }

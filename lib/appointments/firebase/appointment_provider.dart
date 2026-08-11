@@ -29,8 +29,6 @@ class AppointmentDataProvider extends ChangeNotifier {
   String? _authUserId;
   String? _companyId;
   String? _participationUserId;
-  Set<String> _legacyAppointmentIds = {};
-  Map<String, bool> _legacyParticipationStatus = {};
   int _loadGeneration = 0;
   bool _disposed = false;
 
@@ -63,8 +61,6 @@ class AppointmentDataProvider extends ChangeNotifier {
 
     _companyId = companyId;
     _appointments = [];
-    _legacyAppointmentIds = {};
-    _legacyParticipationStatus = {};
     userParticipationStatus = {};
     isAnyTimeSlotConfirmed = {};
     _isLoading = true;
@@ -76,6 +72,7 @@ class AppointmentDataProvider extends ChangeNotifier {
     _appointmentsSubscription = _db
         .collection('appointments')
         .where('companyId', isEqualTo: companyId)
+        .where('schemaVersion', isEqualTo: Appointment.schemaVersion)
         .snapshots()
         .listen(
           (snapshot) {
@@ -85,20 +82,9 @@ class AppointmentDataProvider extends ChangeNotifier {
               return;
             }
 
-            final legacyAppointmentIds = <String>{};
-            _appointments = snapshot.docs.map((doc) {
-              final data = doc.data();
-              final appointment = Appointment.fromFirestore(data);
-              if (!data.containsKey('participantUserIds')) {
-                legacyAppointmentIds.add(appointment.appointmentId);
-              }
-              return appointment;
-            }).toList();
-            _legacyAppointmentIds = legacyAppointmentIds;
-            _legacyParticipationStatus.removeWhere(
-              (appointmentId, _) =>
-                  !legacyAppointmentIds.contains(appointmentId),
-            );
+            _appointments = snapshot.docs
+                .map((doc) => Appointment.fromFirestore(doc.data()))
+                .toList();
             _refreshDerivedState();
             _isLoading = false;
             _error = null;
@@ -136,40 +122,8 @@ class AppointmentDataProvider extends ChangeNotifier {
 
   Future<void> preloadUserParticipationStatus(String userId) async {
     _participationUserId = userId;
-    final companyId = _companyId;
-    final generation = _loadGeneration;
-    final legacyStatus = <String, bool>{};
-    await Future.wait([
-      for (final appointment in _appointments)
-        if (_legacyAppointmentIds.contains(appointment.appointmentId))
-          hasCurrentUserParticipated(appointment.appointmentId, userId).then(
-            (participated) =>
-                legacyStatus[appointment.appointmentId] = participated,
-          ),
-    ]);
-    if (_disposed ||
-        generation != _loadGeneration ||
-        _companyId != companyId ||
-        _participationUserId != userId) {
-      return;
-    }
-    _legacyParticipationStatus = legacyStatus;
     _refreshParticipationState();
     _notify();
-  }
-
-  Future<bool> hasCurrentUserParticipated(
-    String appointmentId,
-    String userId,
-  ) async {
-    final participantsSnapshot = await _db
-        .collection('appointments')
-        .doc(appointmentId)
-        .collection('participants')
-        .where('userId', isEqualTo: userId)
-        .get();
-
-    return participantsSnapshot.docs.isNotEmpty;
   }
 
   void _refreshDerivedState() {
@@ -182,20 +136,14 @@ class AppointmentDataProvider extends ChangeNotifier {
     userParticipationStatus = {
       for (final appointment in _appointments)
         appointment.appointmentId:
-            userId != null &&
-            userId.isNotEmpty &&
-            (appointment.hasVoted(userId) ||
-                (_legacyParticipationStatus[appointment.appointmentId] ??
-                    false)),
+            userId != null && userId.isNotEmpty && appointment.hasVoted(userId),
     };
   }
 
   void _refreshConfirmationState() {
     isAnyTimeSlotConfirmed = {
       for (final appointment in _appointments)
-        appointment.appointmentId:
-            appointment.confirmedTimeSlots.isNotEmpty ||
-            appointment.availableTimeSlots.any((slot) => slot.isConfirmed),
+        appointment.appointmentId: appointment.confirmedSlotId != null,
     };
   }
 
@@ -207,8 +155,6 @@ class AppointmentDataProvider extends ChangeNotifier {
     _companyId = null;
     _participationUserId = null;
     _appointments = [];
-    _legacyAppointmentIds = {};
-    _legacyParticipationStatus = {};
     _currentAppointment = null;
     userParticipationStatus = {};
     isAnyTimeSlotConfirmed = {};

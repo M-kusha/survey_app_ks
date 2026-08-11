@@ -1,194 +1,355 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 
 class AppointmentParticipants {
-  String userId;
-  String userName;
-  String profileImageUrl;
-  DateTime date;
-  TimeSlot timeSlot;
-  String status;
-  bool participated;
-
-  AppointmentParticipants({
+  const AppointmentParticipants({
     required this.userId,
     required this.userName,
-    required this.profileImageUrl,
-    required this.date,
-    required this.timeSlot,
+    required this.slotId,
     required this.status,
     required this.participated,
   });
 
-  void setTimeSlot(TimeSlot newTimeSlot) {
-    timeSlot = newTimeSlot;
-  }
+  final String userId;
+  final String userName;
+  final String slotId;
+  final String status;
+  final bool participated;
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'userId': userId,
-      'userName': userName,
-      'date': date.toIso8601String(),
-      'timeSlot': timeSlot.toFirestore(),
-      'status': status,
-      'participated': participated,
-      'profileImageUrl': profileImageUrl,
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+    'userId': userId,
+    'userName': userName,
+    'slotId': slotId,
+    'status': status,
+    'participated': participated,
+  };
 
-  static AppointmentParticipants fromFirestore(Map<String, dynamic> map) {
+  factory AppointmentParticipants.fromFirestore(Map<String, dynamic> map) {
+    if (!_hasExactKeys(map, const {
+      'userId',
+      'userName',
+      'slotId',
+      'status',
+      'participated',
+    })) {
+      throw const FormatException('Vote fields are not canonical.');
+    }
+    final status = _requiredString(map, 'status');
+    if (!const {'joined', 'maybe', 'declined'}.contains(status) ||
+        map['participated'] != true) {
+      throw const FormatException('Vote state is invalid.');
+    }
     return AppointmentParticipants(
-      userId: map['userId'] as String? ?? 'Unknown',
-      userName: map['userName'] as String? ?? 'Unknown',
-      date: DateTime.parse(map['date'] as String? ?? '1970-01-01T00:00:00Z'),
-      timeSlot: TimeSlot.fromFirestore(
-        map['timeSlot'] as Map<String, dynamic>? ?? {},
-      ),
-      status: map['status'] as String? ?? 'Unknown',
-      participated: map['participated'] as bool? ?? false,
-      profileImageUrl: map['profileImageUrl'] as String? ?? '',
+      userId: _requiredString(map, 'userId'),
+      userName: _requiredString(map, 'userName'),
+      slotId: _requiredString(map, 'slotId'),
+      status: status,
+      participated: true,
     );
   }
 }
 
 class TimeSlot {
-  DateTime start;
-  DateTime end;
-  DateTime expirationDate;
+  TimeSlot({
+    required this.slotId,
+    required DateTime start,
+    required DateTime end,
+    this.isConfirmed = false,
+  }) : startAt = canonicalAppointmentInstant(start),
+       endAt = canonicalAppointmentInstant(end);
+
+  final String slotId;
+  final DateTime startAt;
+  final DateTime endAt;
   bool isConfirmed;
 
-  TimeSlot({
-    required this.start,
-    required this.end,
-    required this.expirationDate,
-    this.isConfirmed = false,
-  });
+  DateTime get start => startAt.toLocal();
+  DateTime get end => endAt.toLocal();
 
-  Map<String, dynamic> toFirestore() {
-    return {
-      'start': start.toIso8601String(),
-      'end': end.toIso8601String(),
-      'expirationDate': expirationDate.toIso8601String(),
-      'isConfirmed': isConfirmed,
-    };
-  }
+  Map<String, dynamic> toFirestore() => {
+    'slotId': slotId,
+    'startAt': Timestamp.fromDate(startAt),
+    'endAt': Timestamp.fromDate(endAt),
+  };
 
-  static TimeSlot fromFirestore(Map<String, dynamic> map) {
+  factory TimeSlot.fromFirestore(
+    Map<String, dynamic> map, {
+    String? confirmedSlotId,
+  }) {
+    if (!_hasExactKeys(map, const {'slotId', 'startAt', 'endAt'})) {
+      throw const FormatException('Appointment slot fields are not canonical.');
+    }
+    final slotId = _requiredString(map, 'slotId');
+    final startAt = _requiredTimestamp(map, 'startAt');
+    final endAt = _requiredTimestamp(map, 'endAt');
+    if (!startAt.isBefore(endAt)) {
+      throw const FormatException('Appointment slot duration is invalid.');
+    }
     return TimeSlot(
-      start: DateTime.parse(map['start'] as String? ?? '1970-01-01T00:00:00Z'),
-      end: DateTime.parse(map['end'] as String? ?? '1970-01-01T00:00:00Z'),
-      expirationDate: DateTime.parse(
-        map['expirationDate'] as String? ?? '1970-01-01T00:00:00Z',
-      ),
-      isConfirmed: map['isConfirmed'] as bool? ?? false,
+      slotId: slotId,
+      start: startAt,
+      end: endAt,
+      isConfirmed: slotId == confirmedSlotId,
     );
   }
 }
 
 class Appointment {
-  String? companyId;
-  String? createdBy;
-  String appointmentId;
-  String title;
-  String description;
-  List<DateTime> availableDates;
-  List<TimeSlot> availableTimeSlots = [];
-  List<AppointmentParticipants> participants;
-  DateTime expirationDate;
-  List<TimeSlot> confirmedTimeSlots = [];
-  DateTime creationDate;
-
-  List<String> participantUserIds;
-
-  int get participationCount => participantUserIds.length;
-
-  bool hasVoted(String userId) => participantUserIds.contains(userId);
-
   Appointment({
     this.companyId,
     this.createdBy,
     required this.appointmentId,
     required this.title,
     required this.description,
-    required this.participants,
-    required this.availableDates,
+    required this.zoneId,
     required this.availableTimeSlots,
-    required this.confirmedTimeSlots,
-    required this.expirationDate,
-    required this.creationDate,
+    required DateTime expirationDate,
+    required DateTime creationDate,
+    this.revision = 0,
+    this.confirmedSlotId,
     this.participantUserIds = const [],
-  });
+  }) : expirationAt = canonicalAppointmentInstant(expirationDate),
+       createdAt = canonicalAppointmentInstant(creationDate) {
+    _applyConfirmation();
+  }
 
-  static Appointment fromFirestore(Map<String, dynamic> map) {
+  static const schemaVersion = 2;
+
+  String? companyId;
+  String? createdBy;
+  String appointmentId;
+  String title;
+  String description;
+  String zoneId;
+  List<TimeSlot> availableTimeSlots;
+  DateTime expirationAt;
+  DateTime createdAt;
+  int revision;
+  String? confirmedSlotId;
+  List<String> participantUserIds;
+
+  DateTime get expirationDate => expirationAt.toLocal();
+  set expirationDate(DateTime value) {
+    expirationAt = canonicalAppointmentInstant(value);
+  }
+
+  DateTime get creationDate => createdAt.toLocal();
+
+  List<TimeSlot> get confirmedTimeSlots => confirmedSlotId == null
+      ? const []
+      : availableTimeSlots
+            .where((slot) => slot.slotId == confirmedSlotId)
+            .toList(growable: false);
+
+  int get participationCount => participantUserIds.length;
+
+  bool hasVoted(String userId) => participantUserIds.contains(userId);
+
+  void setConfirmedSlot(String? slotId) {
+    confirmedSlotId = slotId;
+    _applyConfirmation();
+  }
+
+  factory Appointment.fromFirestore(Map<String, dynamic> map) {
+    if (!_hasExactKeys(map, const {
+          'schemaVersion',
+          'revision',
+          'appointmentId',
+          'companyId',
+          'createdBy',
+          'title',
+          'description',
+          'zoneId',
+          'expirationAt',
+          'slots',
+          'slotIds',
+          'confirmedSlotId',
+          'participantUserIds',
+          'createdAt',
+        }) ||
+        map['schemaVersion'] != schemaVersion) {
+      throw const FormatException('Unsupported appointment schema.');
+    }
+    final rawConfirmedSlotId = map['confirmedSlotId'];
+    if (rawConfirmedSlotId != null && rawConfirmedSlotId is! String) {
+      throw const FormatException('Confirmed appointment slot is invalid.');
+    }
+    final confirmedSlotId = rawConfirmedSlotId as String?;
+    final revision = map['revision'];
+    if (revision is! int || revision < 1 || revision > 9007199254740991) {
+      throw const FormatException('Appointment revision is unavailable.');
+    }
+    final rawSlots = map['slots'];
+    if (rawSlots is! List) {
+      throw const FormatException('Appointment slots are unavailable.');
+    }
+    if (rawSlots.isEmpty || rawSlots.length > 100) {
+      throw const FormatException('Appointment slot count is invalid.');
+    }
+    final slots = <TimeSlot>[];
+    for (final slot in rawSlots) {
+      if (slot is! Map) {
+        throw const FormatException('Appointment slot is invalid.');
+      }
+      slots.add(
+        TimeSlot.fromFirestore(
+          Map<String, dynamic>.from(slot),
+          confirmedSlotId: confirmedSlotId,
+        ),
+      );
+    }
+    if (map['slotIds'] is! List || map['participantUserIds'] is! List) {
+      throw const FormatException('Appointment indexes are unavailable.');
+    }
+    final slotIds = List<String>.from(map['slotIds'] as List);
+    if (slotIds.length != slots.length ||
+        slotIds.toSet().length != slotIds.length ||
+        slots.indexed.any((entry) => entry.$2.slotId != slotIds[entry.$1]) ||
+        (confirmedSlotId != null && !slotIds.contains(confirmedSlotId))) {
+      throw const FormatException('Appointment slot IDs are inconsistent.');
+    }
+    final rawParticipants = map['participantUserIds'] as List;
+    if (rawParticipants.any(
+          (id) => id is! String || id.isEmpty || id.contains('/'),
+        ) ||
+        rawParticipants.toSet().length != rawParticipants.length) {
+      throw const FormatException('Appointment participants are invalid.');
+    }
+    final description = map['description'];
+    if (description is! String ||
+        description.trim().isEmpty ||
+        description.length > 5000) {
+      throw const FormatException('Appointment description is invalid.');
+    }
+
     return Appointment(
-      companyId: map['companyId'],
-      createdBy: map['createdBy'] as String?,
-      title: map['title'],
-      description: map['description'],
-      availableDates: List<DateTime>.from(
-        (map['availableDates'] as List<dynamic>).map((d) => DateTime.parse(d)),
-      ),
-      participants: (map['participants'] as List<dynamic>).map((p) {
-        return AppointmentParticipants.fromFirestore(p);
-      }).toList(),
-      availableTimeSlots: (map['availableTimeSlots'] as List<dynamic>).map((
-        ts,
-      ) {
-        return TimeSlot.fromFirestore(ts);
-      }).toList(),
-      appointmentId: map['appointmentId'],
-      confirmedTimeSlots: (map['confirmedTimeSlots'] as List<dynamic>).map((
-        ts,
-      ) {
-        return TimeSlot.fromFirestore(ts);
-      }).toList(),
-      expirationDate: DateTime.parse(map['expirationDate']),
-      participantUserIds: List<String>.from(
-        (map['participantUserIds'] as List<dynamic>?) ?? const [],
-      ),
-
-      creationDate: _readDate(map['creationDate']),
+      companyId: _requiredString(map, 'companyId'),
+      createdBy: _requiredString(map, 'createdBy'),
+      appointmentId: _requiredString(map, 'appointmentId'),
+      title: _requiredString(map, 'title'),
+      description: description,
+      zoneId: requireIanaTimeZone(_requiredString(map, 'zoneId')),
+      availableTimeSlots: slots,
+      expirationDate: _requiredTimestamp(map, 'expirationAt'),
+      creationDate: _requiredTimestamp(map, 'createdAt'),
+      revision: revision,
+      confirmedSlotId: confirmedSlotId,
+      participantUserIds: List<String>.from(rawParticipants),
     );
   }
 
-  static DateTime _readDate(Object? value) => switch (value) {
-    Timestamp() => value.toDate(),
-    DateTime() => value,
-    String() => DateTime.parse(value),
-
-    _ => DateTime.fromMillisecondsSinceEpoch(0),
-  };
-
   Map<String, dynamic> toFirestore() {
-    Map<String, dynamic> data = {
-      'companyId': companyId,
+    final tenant = companyId;
+    final owner = createdBy;
+    if (tenant == null || owner == null) {
+      throw StateError('A persisted appointment requires its server owner.');
+    }
+    if (revision < 1 || revision > 9007199254740991) {
+      throw StateError('A persisted appointment requires a valid revision.');
+    }
+    _validateDefinition();
+    return {
+      'schemaVersion': schemaVersion,
+      'revision': revision,
+      'appointmentId': appointmentId,
+      'companyId': tenant,
+      'createdBy': owner,
       'title': title,
       'description': description,
-      'availableDates': availableDates.map((d) => d.toIso8601String()).toList(),
-      'participants': participants.map((p) => p.toFirestore()).toList(),
-      'availableTimeSlots': availableTimeSlots
-          .map((ts) => ts.toFirestore())
-          .toList(),
-      'appointmentId': appointmentId,
-      'expirationDate': expirationDate.toIso8601String(),
-      // A Timestamp lives beside the legacy ISO string so security rules and
-      // scheduled functions can compare the deadline without breaking reads
-      // of existing appointments.
-      'expirationAt': Timestamp.fromDate(expirationDate),
-      'confirmedTimeSlots': confirmedTimeSlots
-          .map((ts) => ts.toFirestore())
-          .toList(),
+      'zoneId': zoneId,
+      'expirationAt': Timestamp.fromDate(expirationAt),
+      'slots': availableTimeSlots.map((slot) => slot.toFirestore()).toList(),
+      'slotIds': availableTimeSlots.map((slot) => slot.slotId).toList(),
+      'confirmedSlotId': confirmedSlotId,
       'participantUserIds': participantUserIds,
-      'creationDate': creationDate,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
-
-    if (companyId != null) data['companyId'] = companyId;
-    if (createdBy != null) data['createdBy'] = createdBy;
-
-    return data;
   }
 
-  bool isValid() {
-    bool isExpirationDateValid = expirationDate.isAfter(DateTime.now());
-    return title.isNotEmpty && description.isNotEmpty && isExpirationDateValid;
+  Map<String, dynamic> toCallableDefinition() {
+    _validateDefinition();
+    return {
+      'title': title,
+      'description': description,
+      'zoneId': zoneId,
+      'expirationAtMillis': expirationAt.millisecondsSinceEpoch,
+      'slots': [
+        for (final slot in availableTimeSlots)
+          {
+            'slotId': slot.slotId,
+            'startAtMillis': slot.startAt.millisecondsSinceEpoch,
+            'endAtMillis': slot.endAt.millisecondsSinceEpoch,
+          },
+      ],
+    };
+  }
+
+  bool isValid({DateTime? now}) {
+    try {
+      _validateDefinition();
+    } on Object {
+      return false;
+    }
+    return title.trim().isNotEmpty &&
+        description.trim().isNotEmpty &&
+        isValidAppointmentDeadline(
+          now: now ?? DateTime.now(),
+          expirationAt: expirationAt,
+          slotStarts: availableTimeSlots.map((slot) => slot.startAt),
+        );
+  }
+
+  void _validateDefinition() {
+    requireIanaTimeZone(zoneId);
+    if (title.trim().isEmpty || title.length > 160) {
+      throw StateError('Appointment title is invalid.');
+    }
+    if (description.trim().isEmpty || description.length > 5000) {
+      throw StateError('Appointment description is invalid.');
+    }
+    if (availableTimeSlots.isEmpty || availableTimeSlots.length > 100) {
+      throw StateError('Appointment slot count is invalid.');
+    }
+    final ids = <String>{};
+    for (final slot in availableTimeSlots) {
+      if (!_identifier.hasMatch(slot.slotId) || !ids.add(slot.slotId)) {
+        throw StateError('Appointment slot IDs must be unique.');
+      }
+      if (!slot.startAt.isBefore(slot.endAt)) {
+        throw StateError('Appointment slots require a positive duration.');
+      }
+    }
+    if (confirmedSlotId != null && !ids.contains(confirmedSlotId)) {
+      throw StateError('The confirmed slot is not offered.');
+    }
+    final earliestStartAt = availableTimeSlots
+        .map((slot) => slot.startAt)
+        .reduce((left, right) => left.isBefore(right) ? left : right);
+    if (!expirationAt.isBefore(earliestStartAt)) {
+      throw StateError('The appointment deadline is outside its valid range.');
+    }
+  }
+
+  void _applyConfirmation() {
+    for (final slot in availableTimeSlots) {
+      slot.isConfirmed = slot.slotId == confirmedSlotId;
+    }
   }
 }
+
+String _requiredString(Map<String, dynamic> map, String key) {
+  final value = map[key];
+  if (value is String && value.isNotEmpty) return value;
+  throw FormatException('Appointment field $key is unavailable.');
+}
+
+DateTime _requiredTimestamp(Map<String, dynamic> map, String key) {
+  final value = map[key];
+  if (value is Timestamp) return canonicalAppointmentInstant(value.toDate());
+  throw FormatException('Appointment field $key is not a Timestamp.');
+}
+
+final _identifier = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
+
+bool _hasExactKeys(Map<String, dynamic> map, Set<String> expected) =>
+    map.length == expected.length && expected.every(map.containsKey);

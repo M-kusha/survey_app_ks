@@ -1,9 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/create/appointment_deadline_picker.dart';
 import 'package:echomeet/appointments/create/step4_create_appointment.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
@@ -25,55 +28,54 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _appointment ??= ModalRoute.of(context)!.settings.arguments as Appointment;
+    if (_appointment != null) return;
+    _appointment = ModalRoute.of(context)!.settings.arguments as Appointment;
+    final appointment = _appointment!;
+    if (appointment.availableTimeSlots.isNotEmpty &&
+        !isValidAppointmentDeadline(
+          now: DateTime.now(),
+          expirationAt: appointment.expirationAt,
+          slotStarts: appointment.availableTimeSlots.map(
+            (slot) => slot.startAt,
+          ),
+        )) {
+      appointment.expirationDate = defaultAppointmentDeadline(
+        now: DateTime.now(),
+        earliestStartAt: _latestSensible,
+      );
+    }
   }
 
   DateTime get _latestSensible {
     final slots = _appointment!.availableTimeSlots;
     if (slots.isEmpty) return DateTime.now().add(const Duration(days: 365));
-    return slots.map((s) => s.start).reduce((a, b) => a.isBefore(b) ? a : b);
+    return slots
+        .map((slot) => slot.startAt)
+        .reduce((left, right) => left.isBefore(right) ? left : right);
   }
 
   Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final latest = _latestSensible;
-
-    final picked = await showDatePicker(
+    final appointment = _appointment!;
+    final picked = await pickAppointmentDeadline(
       context: context,
-      initialDate: _appointment!.expirationDate.isAfter(latest)
-          ? latest
-          : _appointment!.expirationDate,
-      firstDate: now,
-      lastDate: latest.isAfter(now) ? latest : now,
-      helpText: 'select_voting_expiration_date'.tr(),
+      initial: appointment.expirationAt,
+      earliestStartAt: _latestSensible,
+      zoneId: appointment.zoneId,
     );
     if (picked == null) return;
-
-    setState(() {
-      _appointment!.expirationDate = DateTime(
-        picked.year,
-        picked.month,
-        picked.day,
-        23,
-        59,
-      );
-    });
+    setState(() => appointment.expirationDate = picked);
   }
 
   void _setDaysFromNow(int days) {
-    final target = DateTime.now().add(Duration(days: days));
+    final now = canonicalAppointmentInstant(DateTime.now());
     final latest = _latestSensible;
-
-    setState(() {
-      final chosen = target.isAfter(latest) ? latest : target;
-      _appointment!.expirationDate = DateTime(
-        chosen.year,
-        chosen.month,
-        chosen.day,
-        23,
-        59,
-      );
-    });
+    final target = now.add(Duration(days: days));
+    final chosen = target.isBefore(latest)
+        ? target
+        : latest.subtract(const Duration(milliseconds: 1));
+    if (chosen.isAfter(now)) {
+      setState(() => _appointment!.expirationDate = chosen);
+    }
   }
 
   Future<void> _create() async {
@@ -97,9 +99,6 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
               Step4CreateAppointment(appointment: appointment),
         ),
       );
-    } on StateError {
-      if (!mounted) return;
-      UIUtils.showSnackBar(context, 'no_company_error'.tr());
     } catch (_) {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
@@ -125,7 +124,11 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _DeadlineCard(date: appointment.expirationDate, onTap: _pickDate),
+          _DeadlineCard(
+            date: appointment.expirationAt,
+            zoneId: appointment.zoneId,
+            onTap: _pickDate,
+          ),
           const SizedBox(height: Spacing.md),
           Wrap(
             spacing: Spacing.sm,
@@ -148,9 +151,14 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
 }
 
 class _DeadlineCard extends StatelessWidget {
-  const _DeadlineCard({required this.date, required this.onTap});
+  const _DeadlineCard({
+    required this.date,
+    required this.zoneId,
+    required this.onTap,
+  });
 
   final DateTime date;
+  final String zoneId;
   final VoidCallback onTap;
 
   @override
@@ -187,9 +195,13 @@ class _DeadlineCard extends StatelessWidget {
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
-                Text(
-                  DateFormat.yMMMMEEEEd().format(date),
+                AppointmentTimeText(
+                  startAt: date,
+                  zoneId: zoneId,
                   style: theme.textTheme.titleSmall,
+                  secondaryStyle: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -255,12 +267,14 @@ class _ReviewCard extends StatelessWidget {
                       alpha: 0.55,
                     ),
                   ),
-                  child: Text(
-                    '${DateFormat.MMMEd().format(slot.start)} · '
-                    '${DateFormat.jm().format(slot.start)}',
+                  child: AppointmentTimeText(
+                    startAt: slot.startAt,
+                    endAt: slot.endAt,
+                    zoneId: appointment.zoneId,
                     style: theme.textTheme.labelSmall?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),
+                    maxLines: 1,
                   ),
                 ),
             ],

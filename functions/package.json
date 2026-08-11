@@ -7,8 +7,6 @@
   },
   "main": "lib/index.js",
   "scripts": {
-    "backfill:appointment-expiration": "node scripts/backfill_appointment_expiration.js",
-    "backfill:appointment-participants": "node scripts/backfill_appointment_participants.js",
     "backfill:company-directory": "node scripts/backfill_company_directory.js",
     "migrate:avatar-privacy": "node scripts/migrate_avatar_privacy.js",
     "build": "tsc",

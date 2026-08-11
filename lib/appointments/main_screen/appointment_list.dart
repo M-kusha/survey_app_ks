@@ -2,13 +2,16 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/participants/appointment_vote_page.dart';
+import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/time/deadline.dart';
+import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class AppointmentListItem extends StatelessWidget {
   const AppointmentListItem({
@@ -32,6 +35,7 @@ class AppointmentListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    context.watch<DeviceTimeZone?>();
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final app = context.appColors;
@@ -133,7 +137,10 @@ class AppointmentListItem extends StatelessWidget {
 
           if (appointment.availableTimeSlots.isNotEmpty) ...[
             const SizedBox(height: Spacing.md),
-            _SlotStrip(slots: appointment.availableTimeSlots),
+            _SlotStrip(
+              slots: appointment.availableTimeSlots,
+              zoneId: appointment.zoneId,
+            ),
           ],
         ],
       ),
@@ -195,9 +202,10 @@ class _DateBlock extends StatelessWidget {
 }
 
 class _SlotStrip extends StatelessWidget {
-  const _SlotStrip({required this.slots});
+  const _SlotStrip({required this.slots, required this.zoneId});
 
   final List<TimeSlot> slots;
+  final String zoneId;
 
   static const _maxShown = 3;
 
@@ -220,6 +228,7 @@ class _SlotStrip extends StatelessWidget {
       children: [
         for (final slot in shown)
           Container(
+            constraints: const BoxConstraints(maxWidth: 480),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Radii.sm),
@@ -239,12 +248,17 @@ class _SlotStrip extends StatelessWidget {
                   Icon(Icons.check_rounded, size: 12, color: app.success),
                   const SizedBox(width: 4),
                 ],
-                Text(
-                  DateFormat.E().add_jm().format(slot.start),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: slot.isConfirmed
-                        ? app.success
-                        : scheme.onSurfaceVariant,
+                Flexible(
+                  child: AppointmentTimeText(
+                    startAt: slot.startAt,
+                    endAt: slot.endAt,
+                    zoneId: zoneId,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: slot.isConfirmed
+                          ? app.success
+                          : scheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
                   ),
                 ),
               ],

@@ -11,7 +11,9 @@ import {
   collectionGroup,
   deleteDoc,
   deleteField,
+  disableNetwork,
   doc,
+  enableNetwork,
   getDoc,
   getDocs,
   query,
@@ -35,10 +37,9 @@ const MOLLY = 'molly'; //  moderator at Acme — runs content, not people
 const ADA = 'ada'; //      admin at Acme — runs people
 
 const slot = {
-  start: '2030-01-10T09:00:00.000Z',
-  end: '2030-01-10T10:00:00.000Z',
-  expirationDate: '2030-01-10T09:00:00.000Z',
-  isConfirmed: false,
+  slotId: 'morning-slot',
+  startAt: new Date('2030-01-10T09:00:00.000Z'),
+  endAt: new Date('2030-01-10T10:00:00.000Z'),
 };
 
 const userDocument = (uid, overrides = {}) => ({
@@ -209,28 +210,28 @@ const submissionDocument = (uid, overrides = {}) => ({
 });
 
 const appointmentDocument = (id, overrides = {}) => ({
+  schemaVersion: 2,
+  revision: 1,
+  appointmentId: id,
   companyId: ACME,
+  createdBy: ALICE,
   title: 'Standup',
   description: 'Weekly standup',
-  availableDates: [slot.start],
-  participants: [],
-  availableTimeSlots: [slot],
-  appointmentId: id,
-  expirationDate: '2030-01-09T23:59:00.000Z',
+  zoneId: 'Europe/Berlin',
   expirationAt: new Date('2030-01-09T23:59:00.000Z'),
-  confirmedTimeSlots: [],
-  participantUserIds: [ALICE],
-  creationDate: new Date(),
-  createdBy: ALICE,
+  slots: [slot],
+  slotIds: [slot.slotId],
+  confirmedSlotId: null,
+  participantUserIds: [],
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
   ...overrides,
 });
 
 const voteDocument = (uid, overrides = {}) => ({
-  userName: uid[0].toUpperCase() + uid.slice(1),
-  date: slot.start,
-  timeSlot: slot,
-  status: 'joined',
   userId: uid,
+  userName: uid[0].toUpperCase() + uid.slice(1),
+  slotId: slot.slotId,
+  status: 'joined',
   participated: true,
   ...overrides,
 });
@@ -384,6 +385,36 @@ describe('company isolation', () => {
   it('appointments stay inside their company', async () => {
     await assertSucceeds(getDoc(doc(as(BOB), 'appointments', 'acme-standup')));
     await assertFails(getDoc(doc(as(CAROL), 'appointments', 'acme-standup')));
+  });
+
+  it('appointment lists require both tenant and canonical-schema filters', async () => {
+    const appointments = collection(as(BOB), 'appointments');
+    await assertFails(
+      getDocs(query(appointments, where('companyId', '==', ACME))),
+    );
+    await assertFails(
+      getDocs(query(appointments, where('schemaVersion', '==', 2))),
+    );
+
+    const ownCanonical = await assertSucceeds(
+      getDocs(
+        query(
+          appointments,
+          where('companyId', '==', ACME),
+          where('schemaVersion', '==', 2),
+        ),
+      ),
+    );
+    strictEqual(ownCanonical.size, 1);
+    await assertFails(
+      getDocs(
+        query(
+          appointments,
+          where('companyId', '==', RIVAL),
+          where('schemaVersion', '==', 2),
+        ),
+      ),
+    );
   });
 });
 
@@ -979,60 +1010,107 @@ describe('survey authoring', () => {
   });
 });
 
-// Vote documents are authoritative. A trusted create/delete trigger derives
-// participantUserIds; client rules never permit that parent cache to change.
+// Canonical appointment content is callable-owned. Vote documents remain
+// direct writes, keyed by the stable slot id and bounded by server time.
 describe('voting on an appointment', () => {
   const appt = () => 'acme-standup';
+  const voteId = (uid, slotId = slot.slotId) => `${uid}-${slotId}`;
 
-  it('a colleague cannot forge the parent voter list without a vote', async () => {
+  it('denies every direct appointment create or content edit', async () => {
     await assertFails(
-      updateDoc(doc(as(BOB), 'appointments', appt()), {
-        participantUserIds: [ALICE, BOB],
+      setDoc(
+        doc(as(ADA), 'appointments', 'direct-create'),
+        appointmentDocument('direct-create', { createdBy: ADA }),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(as(ADA), 'appointments', appt()), {
+        title: 'Direct edit',
+        revision: 1,
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(as(ADA), 'appointments', appt()), {
+        participantUserIds: [BOB],
+        revision: 1,
       }),
     );
   });
 
-  it('an admin cannot forge the server-derived parent voter list either', async () => {
-    await assertFails(
-      updateDoc(doc(as(ALICE), 'appointments', appt()), {
-        participantUserIds: [ALICE, BOB],
-      }),
-    );
-  });
+  it('allows only a null-to-offered-slot confirmation with revision +1', async () => {
+    const ref = doc(as(ADA), 'appointments', appt());
 
-  it('an admin can still edit the appointment properly', async () => {
+    await assertFails(updateDoc(ref, { confirmedSlotId: slot.slotId }));
+    await assertFails(
+      updateDoc(ref, { confirmedSlotId: 'not-offered', revision: 2 }),
+    );
+    await assertFails(
+      updateDoc(ref, { confirmedSlotId: slot.slotId, revision: 3 }),
+    );
     await assertSucceeds(
-      updateDoc(doc(as(ALICE), 'appointments', appt()), { title: 'Renamed' }),
+      updateDoc(ref, { confirmedSlotId: slot.slotId, revision: 2 }),
+    );
+
+    // Reopening/clearing is callable-owned, as is replacing a confirmation.
+    await assertFails(updateDoc(ref, { confirmedSlotId: null, revision: 3 }));
+    await assertFails(
+      updateDoc(ref, { confirmedSlotId: slot.slotId, revision: 3 }),
     );
   });
 
-  it('a legacy appointment without the server voter cache stays editable', async () => {
+  it('accepts the backend terminal safe-integer revision without overflowing it', async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
-        participantUserIds: deleteField(),
+      await setDoc(
+        doc(ctx.firestore(), 'appointments', 'terminal-revision'),
+        appointmentDocument('terminal-revision', {
+          revision: Number.MAX_SAFE_INTEGER,
+        }),
+      );
+    });
+
+    const ref = doc(as(ADA), 'appointments', 'terminal-revision');
+    await assertSucceeds(getDoc(ref));
+    await assertFails(
+      updateDoc(ref, {
+        confirmedSlotId: slot.slotId,
+        revision: Number.MAX_SAFE_INTEGER + 1,
+      }),
+    );
+  });
+
+  it('fails closed for a legacy string-based appointment document', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'appointments', 'legacy-string'), {
+        companyId: ACME,
+        title: 'Legacy',
+        description: 'Offset-less strings',
+        appointmentId: 'legacy-string',
+        expirationDate: '2030-01-09T23:59:00',
+        availableTimeSlots: [
+          { start: '2030-01-10T09:00:00', end: '2030-01-10T10:00:00' },
+        ],
       });
     });
 
-    await assertSucceeds(
-      updateDoc(doc(as(ALICE), 'appointments', appt()), { title: 'Legacy edit' }),
-    );
+    await assertFails(getDoc(doc(as(BOB), 'appointments', 'legacy-string')));
     await assertFails(
-      updateDoc(doc(as(ALICE), 'appointments', appt()), {
-        participantUserIds: [],
+      updateDoc(doc(as(ADA), 'appointments', 'legacy-string'), {
+        confirmedSlotId: 'legacy-slot',
+        revision: 1,
       }),
     );
   });
 
-  it('accepts only the caller\'s vote for an exact offered slot', async () => {
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
+  it('accepts the caller canonical vote for an offered stable slot id', async () => {
     await assertSucceeds(
       setDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(BOB)),
         voteDocument(BOB),
       ),
     );
+  });
 
-    const forged = { ...slot, end: '2030-01-10T11:00:00.000Z' };
+  it('rejects unoffered, mismatched, and legacy timestamp-derived vote ids', async () => {
     await assertFails(
       setDoc(
         doc(
@@ -1040,18 +1118,39 @@ describe('voting on an appointment', () => {
           'appointments',
           appt(),
           'participants',
-          `${BOB}-${forged.start}-${forged.end}`,
+          voteId(BOB, 'not-offered'),
         ),
-        voteDocument(BOB, { timeSlot: forged, date: forged.start }),
+        voteDocument(BOB, { slotId: 'not-offered' }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          as(BOB),
+          'appointments',
+          appt(),
+          'participants',
+          `${BOB}-2030-01-10T09:00:00-2030-01-10T10:00:00`,
+        ),
+        voteDocument(BOB),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(BOB)),
+        {
+          ...voteDocument(BOB),
+          date: '2030-01-10T09:00:00',
+          timeSlot: { start: '2030-01-10T09:00:00' },
+        },
       ),
     );
   });
 
-  it('a voter cannot claim a colleague\'s display name', async () => {
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
+  it('a voter cannot claim a colleague\'s canonical display name', async () => {
     await assertFails(
       setDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(BOB)),
         voteDocument(BOB, { userName: 'Alice' }),
       ),
     );
@@ -1070,13 +1169,12 @@ describe('voting on an appointment', () => {
     await assertSucceeds(updateMember(as(BOB), BOB, { fullName: 'Robert' }));
     strictEqual((await getDoc(response)).data().name, 'Bob');
 
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
     const vote = doc(
       as(BOB),
       'appointments',
       appt(),
       'participants',
-      voteId,
+      voteId(BOB),
     );
     await assertFails(setDoc(vote, voteDocument(BOB)));
     await assertSucceeds(
@@ -1095,27 +1193,34 @@ describe('voting on an appointment', () => {
         submissionDocument(ALICE),
       ),
     );
-
-    const voteId = `${ALICE}-${slot.start}-${slot.end}`;
     await assertFails(
       setDoc(
-        doc(as(ALICE), 'appointments', appt(), 'participants', voteId),
+        doc(
+          as(ALICE),
+          'appointments',
+          appt(),
+          'participants',
+          voteId(ALICE),
+        ),
         voteDocument(ALICE),
       ),
     );
   });
 
-  it('the deterministic vote id makes a repeated vote an update, not a duplicate', async () => {
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
-    const ref = doc(as(BOB), 'appointments', appt(), 'participants', voteId);
+  it('a repeated stable vote id updates one document instead of duplicating', async () => {
+    const ref = doc(
+      as(BOB),
+      'appointments',
+      appt(),
+      'participants',
+      voteId(BOB),
+    );
     await assertSucceeds(setDoc(ref, voteDocument(BOB)));
     await assertSucceeds(setDoc(ref, voteDocument(BOB, { status: 'maybe' })));
-
-    const stored = await getDoc(ref);
-    strictEqual(stored.data().status, 'maybe');
+    strictEqual((await getDoc(ref)).data().status, 'maybe');
   });
 
-  it('an outsider cannot create a vote or vote for another user', async () => {
+  it('an outsider cannot vote or write another user stable vote id', async () => {
     await assertFails(
       setDoc(
         doc(
@@ -1123,119 +1228,157 @@ describe('voting on an appointment', () => {
           'appointments',
           appt(),
           'participants',
-          `${CAROL}-${slot.start}-${slot.end}`,
+          voteId(CAROL),
         ),
         voteDocument(CAROL),
       ),
     );
     await assertFails(
       setDoc(
-        doc(
-          as(BOB),
-          'appointments',
-          appt(),
-          'participants',
-          `${CAROL}-${slot.start}-${slot.end}`,
-        ),
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(CAROL)),
         voteDocument(CAROL),
       ),
     );
   });
 
-  it('a voter can delete their own vote so the trusted trigger can reconcile', async () => {
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
-    const ref = doc(as(BOB), 'appointments', appt(), 'participants', voteId);
+  it('a voter can delete their own canonical vote while voting is open', async () => {
+    const ref = doc(
+      as(BOB),
+      'appointments',
+      appt(),
+      'participants',
+      voteId(BOB),
+    );
     await assertSucceeds(setDoc(ref, voteDocument(BOB)));
     await assertSucceeds(deleteDoc(ref));
   });
 
-  it('a voter cannot overwrite another member\'s vote document', async () => {
-    const aliceVoteId = `${ALICE}-${slot.start}-${slot.end}`;
-    await testEnv.withSecurityRulesDisabled(async (ctx) => {
-      await setDoc(
-        doc(
-          ctx.firestore(),
-          'appointments',
-          appt(),
-          'participants',
-          aliceVoteId,
-        ),
-        voteDocument(ALICE),
-      );
-    });
-
-    await assertFails(
-      updateDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', aliceVoteId),
-        { status: 'declined', userId: BOB },
-      ),
+  it('denies self-delete after the server deadline', async () => {
+    const ref = doc(
+      as(BOB),
+      'appointments',
+      appt(),
+      'participants',
+      voteId(BOB),
     );
-  });
-
-  it('the Timestamp deadline closes vote writes', async () => {
+    await assertSucceeds(setDoc(ref, voteDocument(BOB)));
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
         expirationAt: new Date(Date.now() - 60_000),
       });
     });
 
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
-    await assertFails(
-      setDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
-        voteDocument(BOB),
+    await assertFails(deleteDoc(ref));
+  });
+
+  it('denies self-delete after confirmation but preserves admin cleanup', async () => {
+    const selfRef = doc(
+      as(BOB),
+      'appointments',
+      appt(),
+      'participants',
+      voteId(BOB),
+    );
+    await assertSucceeds(setDoc(selfRef, voteDocument(BOB)));
+    await assertSucceeds(
+      updateDoc(doc(as(ADA), 'appointments', appt()), {
+        confirmedSlotId: slot.slotId,
+        revision: 2,
+      }),
+    );
+
+    await assertFails(deleteDoc(selfRef));
+    await assertSucceeds(
+      deleteDoc(
+        doc(
+          as(ADA),
+          'appointments',
+          appt(),
+          'participants',
+          voteId(BOB),
+        ),
       ),
     );
   });
 
-  it('legacy appointments remain readable but require expirationAt backfill to vote', async () => {
+  it('server time wins both directions of device-clock disagreement', async () => {
+    const futureDeadline = new Date(Date.now() + 60_000);
+    const deviceClockAhead = new Date(futureDeadline.getTime() + 86_400_000);
+    strictEqual(deviceClockAhead >= futureDeadline, true);
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
-        expirationAt: deleteField(),
+        expirationAt: futureDeadline,
       });
     });
 
-    await assertSucceeds(getDoc(doc(as(BOB), 'appointments', appt())));
-    const voteId = `${BOB}-${slot.start}-${slot.end}`;
-    await assertFails(
+    // A device that incorrectly looks closed cannot change server acceptance.
+    await assertSucceeds(
       setDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(BOB)),
         voteDocument(BOB),
       ),
     );
 
-    await assertSucceeds(
-      updateDoc(doc(as(ALICE), 'appointments', appt()), {
-        expirationAt: new Date('2030-01-09T23:59:00.000Z'),
-      }),
-    );
-    await assertSucceeds(
+    const pastDeadline = new Date(Date.now() - 60_000);
+    const deviceClockBehind = new Date(pastDeadline.getTime() - 86_400_000);
+    strictEqual(deviceClockBehind < pastDeadline, true);
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
+        expirationAt: pastDeadline,
+      });
+    });
+
+    // A manipulated device that looks open cannot override request.time.
+    await assertFails(
       setDoc(
-        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
+        doc(as(ALICE), 'appointments', appt(), 'participants', voteId(ALICE)),
+        voteDocument(ALICE),
+      ),
+    );
+  });
+
+  it('rejects a vote queued before cutoff when it synchronizes after cutoff', async () => {
+    const voter = as(BOB);
+    await disableNetwork(voter);
+    const queuedResult = assertFails(
+      setDoc(
+        doc(voter, 'appointments', appt(), 'participants', voteId(BOB)),
+        voteDocument(BOB),
+      ),
+    );
+
+    try {
+      await testEnv.withSecurityRulesDisabled(async (ctx) => {
+        await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
+          expirationAt: new Date(Date.now() - 1),
+        });
+      });
+    } finally {
+      await enableNetwork(voter);
+    }
+
+    await queuedResult;
+  });
+
+  it('rejects once an emulator-authored server deadline has been reached', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
+        expirationAt: serverTimestamp(),
+      });
+    });
+
+    await assertFails(
+      setDoc(
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId(BOB)),
         voteDocument(BOB),
       ),
     );
   });
 
-  it('an admin can confirm exactly one offered slot and deliberately reopen', async () => {
-    const confirmed = { ...slot, isConfirmed: true };
-    const ref = doc(as(ALICE), 'appointments', appt());
-
-    await assertSucceeds(
-      updateDoc(ref, {
-        availableTimeSlots: [confirmed],
-        confirmedTimeSlots: [confirmed],
-      }),
-    );
-    await assertFails(
-      updateDoc(ref, { confirmedTimeSlots: [confirmed, confirmed] }),
-    );
-    await assertSucceeds(
-      updateDoc(ref, {
-        availableTimeSlots: [slot],
-        confirmedTimeSlots: [],
-      }),
-    );
+  it('excludes the exact expiration instant with a strict less-than boundary', () => {
+    const rules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+    strictEqual(rules.includes('request.time < data.expirationAt'), true);
+    strictEqual(rules.includes('request.time <= data.expirationAt'), false);
   });
 });
 
@@ -1287,14 +1430,14 @@ describe('notes are private', () => {
 // people. Enforced here rather than only in the UI, because the UI is a
 // suggestion and this is the rule.
 describe('moderators run content, not people', () => {
-  it('a moderator publishes surveys through the backend but may write appointments', async () => {
+  it('a moderator publishes surveys and appointments only through backends', async () => {
     await assertFails(
       createSurvey(as(MOLLY), 'new-survey', {
         surveyName: 'By a moderator',
         createdBy: MOLLY,
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       setDoc(doc(as(MOLLY), 'appointments', 'new-meeting'), {
         ...appointmentDocument('new-meeting', {
           title: 'By a moderator',
@@ -1589,7 +1732,7 @@ describe('the join policy is admin-only', () => {
 
 describe('account-deletion participation cleanup', () => {
   it('is not exposed as a client collection-group sweep', async () => {
-    const bobVoteId = `${BOB}-${slot.start}-${slot.end}`;
+    const bobVoteId = `${BOB}-${slot.slotId}`;
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore();
       await setDoc(
@@ -1641,7 +1784,7 @@ describe('account deletion write lock', () => {
           'appointments',
           'acme-standup',
           'participants',
-          `${BOB}-${slot.start}-${slot.end}`,
+          `${BOB}-${slot.slotId}`,
         ),
         voteDocument(BOB),
       ),

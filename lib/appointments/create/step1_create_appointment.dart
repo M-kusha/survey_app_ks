@@ -1,9 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class Step1CreateAppointment extends StatefulWidget {
   const Step1CreateAppointment({super.key});
@@ -24,7 +26,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
     super.dispose();
   }
 
-  void _next() {
+  void _next(String zoneId) {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final now = DateTime.now();
@@ -34,12 +36,9 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
       arguments: Appointment(
         title: _title.text.trim(),
         description: _description.text.trim(),
-        participants: [],
-        availableDates: [],
+        zoneId: zoneId,
         availableTimeSlots: [],
         appointmentId: '',
-        confirmedTimeSlots: [],
-
         expirationDate: now.add(const Duration(days: 7)),
         creationDate: now,
       ),
@@ -48,6 +47,8 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
 
   @override
   Widget build(BuildContext context) {
+    final deviceTimeZone = context.watch<DeviceTimeZone>();
+    final zoneId = deviceTimeZone.zoneId;
     return WizardScaffold(
       step: 1,
       totalSteps: 3,
@@ -55,7 +56,7 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
       title: 'create_appointment_step1_title'.tr(),
       subtitle: 'create_appointment_step1_subhead'.tr(),
       primaryLabel: 'next'.tr(),
-      onPrimary: _next,
+      onPrimary: zoneId == null ? null : () => _next(zoneId),
       child: Form(
         key: _formKey,
         child: Column(
@@ -73,6 +74,26 @@ class Step1CreateAppointmentState extends State<Step1CreateAppointment> {
             ),
             const SizedBox(height: Spacing.md),
             _DescriptionField(controller: _description),
+            const SizedBox(height: Spacing.md),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.public_rounded),
+                title: Text('appointment_creator_timezone'.tr()),
+                subtitle: Text(
+                  zoneId ??
+                      (deviceTimeZone.error == null
+                          ? 'appointment_timezone_loading'.tr()
+                          : 'appointment_timezone_error'.tr()),
+                ),
+                trailing: deviceTimeZone.error == null
+                    ? null
+                    : IconButton(
+                        tooltip: 'retry'.tr(),
+                        onPressed: deviceTimeZone.refresh,
+                        icon: const Icon(Icons.refresh_rounded),
+                      ),
+              ),
+            ),
           ],
         ),
       ),

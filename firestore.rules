@@ -1078,176 +1078,140 @@ service cloud.firestore {
     match /appointments/{appointmentId} {
       function validAppointmentDocument(data) {
         return data.keys().hasOnly([
+            'schemaVersion',
+            'revision',
+            'appointmentId',
             'companyId',
+            'createdBy',
             'title',
             'description',
-            'availableDates',
-            'participants',
-            'availableTimeSlots',
-            'appointmentId',
-            'expirationDate',
+            'zoneId',
             'expirationAt',
-            'confirmedTimeSlots',
+            'slots',
+            'slotIds',
+            'confirmedSlotId',
             'participantUserIds',
-            'creationDate',
-            'createdBy'
+            'createdAt'
           ])
           && data.keys().hasAll([
-            'companyId', 'title', 'description', 'availableDates',
-            'participants', 'availableTimeSlots', 'appointmentId',
-            'expirationDate', 'confirmedTimeSlots', 'creationDate'
+            'schemaVersion', 'revision', 'appointmentId', 'companyId',
+            'createdBy', 'title', 'description', 'zoneId', 'expirationAt',
+            'slots', 'slotIds', 'confirmedSlotId', 'participantUserIds',
+            'createdAt'
           ])
+          && data.schemaVersion == 2
+          && data.revision is int
+          && data.revision >= 1
+          && data.revision <= 9007199254740991
+          && data.appointmentId == appointmentId
           && data.companyId is string
+          && data.companyId.size() > 0
+          && data.companyId.size() <= 128
+          && data.createdBy is string
+          && data.createdBy.size() > 0
+          && data.createdBy.size() <= 128
           && data.title is string
           && data.title.size() > 0
           && data.title.size() <= 160
           && data.description is string
+          && data.description.size() > 0
           && data.description.size() <= 5000
-          && data.availableDates is list
-          && data.participants is list
-          && data.availableTimeSlots is list
-          && data.availableTimeSlots.size() > 0
-          && data.availableTimeSlots.size() <= 100
-          && data.appointmentId == appointmentId
-          // The ISO string remains for existing clients. New writes also carry
-          // expirationAt, the Timestamp used for enforceable deadlines.
-          && data.expirationDate is string
-          && (!('expirationAt' in data) || data.expirationAt is timestamp)
-          && data.confirmedTimeSlots is list
-          // Legacy appointments predate the server-derived voter cache. Keep
-          // those parents editable/confirmable without letting any client add
-          // or alter the field; trusted vote triggers and the backfill own it.
-          && (!('participantUserIds' in data)
-              || data.participantUserIds is list)
-          && data.creationDate is timestamp
-          // Appointments created before the notification trigger had no
-          // creator field. New documents require it below, while update rules
-          // exclude it from affectedKeys so a legacy document cannot invent
-          // or reassign an owner later.
-          && (!('createdBy' in data) || data.createdBy is string);
-      }
-
-      function validConfirmationTransition() {
-        return request.resource.data.confirmedTimeSlots.size() <= 1
+          && data.zoneId is string
+          && data.zoneId.size() > 0
+          && data.zoneId.size() <= 128
+          && data.expirationAt is timestamp
+          && data.slots is list
+          && data.slots.size() > 0
+          && data.slots.size() <= 100
+          && data.slotIds is list
+          && data.slotIds.size() == data.slots.size()
+          && data.slotIds.toSet().size() == data.slotIds.size()
           && (
-            request.resource.data.confirmedTimeSlots.size() == 0
-            || request.resource.data.confirmedTimeSlots[0]
-                 in request.resource.data.availableTimeSlots
+            data.confirmedSlotId == null
+            || (
+              data.confirmedSlotId is string
+              && data.confirmedSlotId in data.slotIds
+            )
           )
-          && (
-            resource.data.confirmedTimeSlots.size() == 0
-            || request.resource.data.confirmedTimeSlots.size() == 0
-            || request.resource.data.confirmedTimeSlots
-                 == resource.data.confirmedTimeSlots
-          );
+          && data.participantUserIds is list
+          && data.participantUserIds.toSet().size()
+               == data.participantUserIds.size()
+          && data.createdAt is timestamp;
       }
 
-      function appointmentAcceptsVotes() {
-        return 'expirationAt' in resource.data
-          && resource.data.expirationAt is timestamp
-          && request.time < resource.data.expirationAt;
+      function validDirectConfirmation() {
+        return validAppointmentDocument(resource.data)
+          && validAppointmentDocument(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'confirmedSlotId', 'revision'
+          ])
+          && request.resource.data.diff(resource.data).affectedKeys().hasAll([
+            'confirmedSlotId', 'revision'
+          ])
+          && resource.data.confirmedSlotId == null
+          && request.resource.data.confirmedSlotId is string
+          && request.resource.data.confirmedSlotId in resource.data.slotIds
+          && request.resource.data.revision == resource.data.revision + 1;
       }
 
-      allow read: if sameCompany(resource.data.companyId);
+      function appointmentAcceptsVotes(data) {
+        return validAppointmentDocument(data)
+          && data.confirmedSlotId == null
+          && data.expirationAt is timestamp
+          && request.time < data.expirationAt;
+      }
 
-      allow create: if accountActive()
-        && adminOf(request.resource.data.companyId)
-        && validAppointmentDocument(request.resource.data)
-        && 'createdBy' in request.resource.data
-        && 'expirationAt' in request.resource.data
-        && request.resource.data.createdBy == uid()
-        && request.resource.data.expirationAt > request.time
-        && request.resource.data.creationDate <= request.time
-        && request.resource.data.participants.size() == 0
-        && request.resource.data.confirmedTimeSlots.size() == 0
-        && 'participantUserIds' in request.resource.data
-        && request.resource.data.participantUserIds.size() == 0;
+      allow get: if validAppointmentDocument(resource.data)
+        && sameCompany(resource.data.companyId);
+      // Collection queries must constrain both tenant and canonical schema.
+      // Parent writes are trusted-only, so these two filters bound every
+      // possible result to this caller's clean v2 appointment set.
+      allow list: if resource.data.schemaVersion == 2
+        && sameCompany(resource.data.companyId);
+
+      // Canonical creation and content edits are owned by the trusted callable.
+      allow create: if false;
       allow delete: if accountActive() && adminOf(resource.data.companyId);
 
-      // Appointment content stays with staff. participantUserIds is a compact
-      // cache derived by trusted vote create/delete triggers; no client,
-      // including an admin client, may author it directly.
+      // Staff may only make the one latency-sensitive transition directly.
+      // Clearing/reopening and all content edits return to the callable.
       allow update: if accountActive()
         && adminOf(resource.data.companyId)
-        && fieldUnchanged('companyId')
-        && validAppointmentDocument(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'title', 'description', 'availableDates', 'participants',
-          'availableTimeSlots', 'expirationDate', 'expirationAt',
-          'confirmedTimeSlots'
-        ])
-        && (
-          !request.resource.data.diff(resource.data).affectedKeys().hasAny([
-            'expirationDate', 'expirationAt'
-          ])
-          || request.resource.data.diff(resource.data).affectedKeys().hasAll([
-            'expirationDate', 'expirationAt'
-          ])
-          || (
-            !('expirationAt' in resource.data)
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['expirationAt'])
-          )
-        )
-        && (
-          !request.resource.data.diff(resource.data).affectedKeys()
-            .hasAny(['expirationAt'])
-          || request.resource.data.expirationAt > request.time
-        )
-        && validConfirmationTransition();
+        && validDirectConfirmation();
 
-      // Participant ids here are '<uid>-<slotStart>-<slotEnd>', so ownership is
-      // asserted through the userId field rather than the document id.
+      // Participant ids are stable '<uid>-<slotId>' keys.
       match /participants/{participantId} {
+        function appointmentData() {
+          return get(
+            /databases/$(database)/documents/appointments/$(appointmentId)
+          ).data;
+        }
+
         function appointmentCompanyId() {
-          return get(/databases/$(database)/documents/appointments/$(appointmentId))
-                   .data.companyId;
+          return appointmentData().companyId;
         }
 
         function appointmentOpen() {
-          return get(
-            /databases/$(database)/documents/appointments/$(appointmentId)
-          ).data.confirmedTimeSlots.size() == 0
-            && get(
-              /databases/$(database)/documents/appointments/$(appointmentId)
-            ).data.expirationAt is timestamp
-            && request.time < get(
-              /databases/$(database)/documents/appointments/$(appointmentId)
-            ).data.expirationAt;
+          return appointmentAcceptsVotes(appointmentData());
         }
 
         function validVote(data) {
           return data.keys().hasOnly([
-              'userName', 'date', 'timeSlot', 'status', 'userId', 'participated'
+              'userId', 'userName', 'slotId', 'status', 'participated'
             ])
             && data.keys().hasAll([
-              'userName', 'date', 'timeSlot', 'status', 'userId', 'participated'
+              'userId', 'userName', 'slotId', 'status', 'participated'
             ])
             && callerUsesCanonicalMemberName(
               appointmentCompanyId(),
               data.userName
             )
-            && data.date is string
-            && data.timeSlot is map
-            && data.timeSlot.keys().hasOnly([
-              'start', 'end', 'expirationDate', 'isConfirmed'
-            ])
-            && data.timeSlot.keys().hasAll([
-              'start', 'end', 'expirationDate', 'isConfirmed'
-            ])
-            && data.timeSlot.start is string
-            && data.timeSlot.end is string
-            && data.timeSlot.expirationDate is string
-            && data.timeSlot.isConfirmed is bool
-            && data.date == data.timeSlot.start
-            && data.timeSlot in get(
-              /databases/$(database)/documents/appointments/$(appointmentId)
-            ).data.availableTimeSlots
+            && data.slotId is string
+            && data.slotId in appointmentData().slotIds
             && data.status in ['joined', 'maybe', 'declined']
             && data.userId == uid()
             && data.participated == true
-            && participantId
-                 == uid() + '-' + data.timeSlot.start + '-' + data.timeSlot.end;
+            && participantId == uid() + '-' + data.slotId;
         }
 
         // Everyone in the company can see who is coming to a meeting.
@@ -1269,6 +1233,7 @@ service cloud.firestore {
             (
               resource.data.userId == uid()
               && sameCompany(appointmentCompanyId())
+              && appointmentOpen()
             )
             || adminOf(appointmentCompanyId())
           );

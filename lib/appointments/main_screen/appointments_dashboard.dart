@@ -166,8 +166,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     bool voted(Appointment a) =>
         provider.userParticipationStatus[a.appointmentId] ?? false;
 
-    bool settled(Appointment a) =>
-        a.availableTimeSlots.any((slot) => slot.isConfirmed);
+    bool settled(Appointment a) => a.confirmedSlotId != null;
 
     bool live(Appointment a) => a.expirationDate.isAfter(now) && !settled(a);
 

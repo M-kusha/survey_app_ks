@@ -93,29 +93,54 @@ export function appointmentCreatedCopy(
 export function appointmentConfirmedCopy(
   locale: NotificationLocale,
   title: unknown,
-  startUtc?: string,
+  startAt?: Date,
+  zoneId?: string,
 ): NotificationMessage {
   const name = nameOr(locale, title, meetingFallback);
+  const formattedStart = formatAppointmentStart(locale, startAt, zoneId);
   return {
     en: {
       title: 'Meeting time confirmed',
-      body: startUtc
-        ? `${name} — ${startUtc}`
+      body: formattedStart
+        ? `${name} — ${formattedStart}`
         : `${name} has a confirmed time.`,
     },
     de: {
       title: 'Termin bestätigt',
-      body: startUtc
-        ? `${name} — ${startUtc}`
+      body: formattedStart
+        ? `${name} — ${formattedStart}`
         : `${name} hat jetzt einen bestätigten Termin.`,
     },
     sq: {
       title: 'Orari i takimit u konfirmua',
-      body: startUtc
-        ? `${name} — ${startUtc}`
+      body: formattedStart
+        ? `${name} — ${formattedStart}`
         : `${name} ka një orar të konfirmuar.`,
     },
   }[locale];
+}
+
+function formatAppointmentStart(
+  locale: NotificationLocale,
+  startAt?: Date,
+  zoneId?: string,
+): string | undefined {
+  if (!(startAt instanceof Date) || Number.isNaN(startAt.getTime()) ||
+      typeof zoneId !== 'string' || !zoneId) return undefined;
+  try {
+    return new Intl.DateTimeFormat({ en: 'en-US', de: 'de-DE', sq: 'sq-AL' }[locale], {
+      timeZone: zoneId,
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(startAt);
+  } catch {
+    return undefined;
+  }
 }
 
 export function surveyReminderCopy(

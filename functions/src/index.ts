@@ -20,6 +20,14 @@ import {
   registerAppointmentParticipant,
   unregisterAppointmentParticipant,
 } from './appointment_participants';
+import {
+  AppointmentDefinitionError,
+  saveAppointmentDefinitionForUser,
+} from './appointment_definition';
+import {
+  appointmentConfirmationTransition,
+  appointmentIsSettled,
+} from './appointment_state';
 import { activeMemberIds, companyAdminIds, notify } from './messaging';
 import {
   appointmentConfirmedCopy,
@@ -116,6 +124,36 @@ export const saveSurveyDefinition = onCall(
           error instanceof Error ? error.constructor.name : typeof error,
       });
       throw new HttpsError('internal', 'survey-publication-incomplete');
+    }
+  },
+);
+
+/** App-Check-protected boundary for canonical appointment create/update. */
+export const saveAppointmentDefinition = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await saveAppointmentDefinitionForUser(
+        request.auth.uid,
+        request.data,
+      );
+    } catch (error) {
+      if (error instanceof AppointmentDefinitionError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('appointment definition failed closed', {
+        uid: request.auth.uid,
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'appointment-definition-incomplete');
     }
   },
 );
@@ -484,19 +522,8 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
     const after = event.data?.after.data();
     if (!before || !after) return;
 
-    const wasConfirmed = (before.confirmedTimeSlots ?? []).length;
-    const nowConfirmed = (after.confirmedTimeSlots ?? []).length;
-
-    // Only on the transition. Any other edit to the meeting must not re-announce
-    // a time everybody already knows.
-    if (nowConfirmed <= wasConfirmed) return;
-
-    const slot = (after.confirmedTimeSlots ?? [])[nowConfirmed - 1] ?? {};
-    const start = typeof slot.start === 'string' ? new Date(slot.start) : null;
-    const startUtc =
-      start != null && !Number.isNaN(start.getTime())
-        ? start.toUTCString()
-        : undefined;
+    const confirmation = appointmentConfirmationTransition(before, after);
+    if (!confirmation) return;
 
     // Every member still entitled to this company. Raw voter ids are not an
     // authorization source: they may be stale after a removal or ban.
@@ -507,7 +534,12 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
     await notify(
       { userIds: members },
       (locale) => ({
-        ...appointmentConfirmedCopy(locale, after.title, startUtc),
+        ...appointmentConfirmedCopy(
+          locale,
+          after.title,
+          confirmation.startAt,
+          confirmation.zoneId,
+        ),
         data: {
           type: 'appointment',
           appointmentId: event.params.appointmentId,
@@ -603,10 +635,7 @@ export const remindExpiring = onSchedule(
       if (!companyId) continue;
 
       // A settled meeting wants nothing further from anybody.
-      const slots = (appointment.get('availableTimeSlots') ?? []) as {
-        isConfirmed?: boolean;
-      }[];
-      if (slots.some((slot) => slot.isConfirmed)) continue;
+      if (appointmentIsSettled(appointment.data())) continue;
 
       // Vote documents are authoritative. The parent index is updated by an
       // at-least-once trigger and can lag for a few seconds, which is not a

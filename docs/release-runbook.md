@@ -52,6 +52,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `uploadProfileImage` | Auth + App Check callable; sanitizes and stores the caller's avatar |
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
 | `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |
+| `saveAppointmentDefinition` | Auth + App Check callable; creates or revises canonical Timestamp appointment definitions |
 | `onSurveyCreated` | `surveys/{surveyId}` create notification |
 | `onSurveyResponseCreated` | trusted initial grading from `surveyAnswerKeys` |
 | `onSurveyResponseDeleted` | invalidates live participation state after response deletion |
@@ -67,7 +68,8 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `purgeAccountDeletionLocks` | `15 * * * *`, UTC |
 
 The supporting modules are `account_deletion.ts`,
-`appointment_participants.ts`, `join_requests.ts`, `messaging.ts`,
+`appointment_definition.ts`, `appointment_participants.ts`,
+`appointment_state.ts`, `join_requests.ts`, `messaging.ts`,
 `notification_copy.ts`, `onboarding.ts`, `profile_images.ts`, `purge.ts`,
 `scoring.ts`, `survey_publication.ts`, and `trusted_scoring.ts`. They are
 compiled through the single
@@ -76,21 +78,18 @@ and re-encoding uses the exact locked `sharp` 0.35.3 dependency.
 
 ### Operator scripts in `functions/package.json`
 
-All four commands below exist in the current manifest and point to a present
+Both commands below exist in the current manifest and point to a present
 file under `functions/scripts`. A dry-run still reads production.
 
 | npm command | Script | Clean rerun gate | Ordering dependency |
 | --- | --- | --- | --- |
 | `backfill:company-directory` | `backfill_company_directory.js` | `create=0 conflicts=0` | before directory-dependent rules/clients |
-| `backfill:appointment-expiration` | `backfill_appointment_expiration.js` | future eligible `0`, validation conflicts `0` | reviewed timezone provenance; before reminder/rule rollout |
-| `backfill:appointment-participants` | `backfill_appointment_participants.js` | `backfill=0 conflicts=0` | before rules depend on the cache |
 | `migrate:avatar-privacy` | `migrate_avatar_privacy.js` | phase-specific zero actions/conflicts | member directory + guarded Functions before access; rules/client before prepare/switch |
 
 ### Existing focused documents
 
 - `app-check.md`: provider selection and gradual enforcement.
-- `appointment-expiration-backfill.md`: timestamp/timezone migration details.
-- `appointment-participant-backfill.md`: trusted participant-cache migration.
+- `appointment-time-model.md`: canonical instants, DST choices, deadlines, and display policy.
 - `avatar-privacy-migration.md`: access, prepare, and switch invariants.
 - `company-directory-backfill.md`: public company projection.
 - `verified-onboarding.md`: verified deferred tenant creation/join.
@@ -315,39 +314,7 @@ npm run backfill:company-directory -- --project echomeet-app
 
 Gate: `create=0 conflicts=0`.
 
-### 4.2 Appointment expiration timestamps
-
-First run without a timezone assumption:
-
-```powershell
-npm run backfill:appointment-expiration -- --project echomeet-app
-```
-
-If it reports timezone-less legacy values, stop until production provenance
-establishes the intended IANA zone. Operator geography is not evidence. Then use
-the same reviewed zone for dry-run, apply, and clean rerun:
-
-```powershell
-npm run backfill:appointment-expiration -- --project echomeet-app --assume-time-zone <reviewed-IANA-zone>
-npm run backfill:appointment-expiration -- --project echomeet-app --assume-time-zone <reviewed-IANA-zone> --apply
-npm run backfill:appointment-expiration -- --project echomeet-app --assume-time-zone <reviewed-IANA-zone>
-```
-
-Gate: `Future legacy documents eligible: 0` and
-`Validation conflicts: 0`. If the first dry-run needs no assumption, use the
-same three-command sequence without `--assume-time-zone`.
-
-### 4.3 Appointment participant cache
-
-```powershell
-npm run backfill:appointment-participants -- --project echomeet-app
-npm run backfill:appointment-participants -- --project echomeet-app --apply
-npm run backfill:appointment-participants -- --project echomeet-app
-```
-
-Gate: `backfill=0 conflicts=0`.
-
-### 4.4 Historic verified-owner and name-lock audit
+### 4.2 Historic verified-owner and name-lock audit
 
 **[EXTERNAL / MANUAL - security/data owner]** There is no repository script for
 this read-only audit. Using an approved, project-pinned Admin SDK procedure,
@@ -528,20 +495,10 @@ outputs to the release record:
 ```powershell
 Set-Location .\functions
 npm run backfill:company-directory -- --project echomeet-app
-npm run backfill:appointment-expiration -- --project echomeet-app
-npm run backfill:appointment-participants -- --project echomeet-app
 npm run migrate:avatar-privacy -- --project echomeet-app --phase access
 npm run migrate:avatar-privacy -- --project echomeet-app --phase prepare
 npm run migrate:avatar-privacy -- --project echomeet-app --phase switch
 Set-Location ..
-```
-
-Run the displayed appointment command only if the approved migration used no
-timezone assumption. Otherwise replace that one line with the following,
-using the same reviewed IANA value as the apply:
-
-```powershell
-npm run backfill:appointment-expiration -- --project echomeet-app --assume-time-zone <reviewed-IANA-zone>
 ```
 
 Every phase must meet its documented zero-action, zero-conflict gate. Any new
