@@ -661,50 +661,6 @@ service cloud.firestore {
     // ---------- surveys ----------
 
     match /surveys/{surveyId} {
-      function validSurveyDocument(data) {
-        return data.keys().hasOnly([
-            'surveyName',
-            'surveyDescription',
-            'timeCreated',
-            'questions',
-            'id',
-            'participants',
-            'deadline',
-            'timeLimitPerQuestion',
-            'surveyType',
-            'companyId',
-            'createdBy',
-            'responsesRevision'
-          ])
-          && data.keys().hasAll([
-            'surveyName', 'surveyDescription', 'timeCreated', 'questions', 'id',
-            'participants', 'deadline', 'timeLimitPerQuestion', 'surveyType',
-            'companyId', 'createdBy'
-          ])
-          && data.surveyName is string
-          && data.surveyName.size() > 0
-          && data.surveyName.size() <= 160
-          && data.surveyDescription is string
-          && data.surveyDescription.size() <= 5000
-          && data.timeCreated is timestamp
-          && data.questions is list
-          && data.questions.size() > 0
-          && data.questions.size() <= 100
-          && data.id == surveyId
-          && data.participants is list
-          && data.participants.size() == 0
-          && data.deadline is timestamp
-          && data.timeLimitPerQuestion is int
-          && data.timeLimitPerQuestion >= 0
-          && data.timeLimitPerQuestion <= 86400
-          && data.surveyType in [0, 1]
-          && data.companyId is string
-          && (!('responsesRevision' in data)
-              || (data.responsesRevision is int
-                  && data.responsesRevision == 0))
-          && data.createdBy == uid();
-      }
-
       allow read: if sameCompany(resource.data.companyId);
 
       // The Admin SDK callable is the only survey-definition writer.
@@ -820,25 +776,10 @@ service cloud.firestore {
       }
     }
 
-    // Grading material is write-only at survey creation and immutable after
-    // publication. Cloud Functions use the Admin SDK and are not subject to
-    // these client rules. Even an administrator client cannot retrieve a key.
+    // Grading material, written only by the publication callable and immutable
+    // afterwards. Cloud Functions use the Admin SDK and are not subject to
+    // these client rules.
     match /surveyAnswerKeys/{surveyId} {
-      function validAnswerKey(data) {
-        return data.keys().hasOnly([
-            'schemaVersion', 'surveyId', 'companyId', 'questionKeys'
-          ])
-          && data.keys().hasAll([
-            'schemaVersion', 'surveyId', 'companyId', 'questionKeys'
-          ])
-          && data.schemaVersion == 1
-          && data.surveyId == surveyId
-          && data.companyId is string
-          && data.questionKeys is list
-          && data.questionKeys.size() > 0
-          && data.questionKeys.size() <= 100;
-      }
-
       // Staff only, and only inside their own company.
       //
       // They wrote these answers, and reviewing a submission means showing
