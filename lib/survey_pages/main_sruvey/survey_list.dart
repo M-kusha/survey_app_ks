@@ -109,6 +109,18 @@ class SurveyListItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // Already loaded with the survey and shown nowhere in the
+                    // list, which left a wide card carrying a short title and
+                    // little else.
+                    if (survey.surveyDescription.trim().isNotEmpty) ...[
+                      const SizedBox(height: Spacing.xs),
+                      Text(
+                        survey.surveyDescription,
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),

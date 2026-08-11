@@ -97,7 +97,13 @@ class ContentCard extends StatelessWidget {
     final radius = BorderRadius.circular(18);
 
     return Material(
-      color: muted ? scheme.surfaceContainerLowest : scheme.surfaceContainerLow,
+      // Previously `surfaceContainerLowest` when muted, which in light mode is
+      // pure white — so an expired card was the brightest thing on the page,
+      // exactly backwards. The two tones now come from one place.
+      color: muted ? scheme.mutedCardSurface : scheme.cardSurface,
+      // A muted card sits flat on the page; a live one is lifted off it.
+      elevation: muted ? 0 : scheme.cardElevation,
+      shadowColor: scheme.shadow.withValues(alpha: 0.18),
       borderRadius: radius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -182,6 +188,57 @@ class _ProgressRule extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// One column of cards on a narrow window, two on a wide one.
+///
+/// A single column capped at reading width leaves most of a desktop window
+/// empty, which is what made the lists look sparse. Cards vary in height, so
+/// the two columns are packed independently and items alternate between them,
+/// rather than being laid out in rows: a row-based grid stretches every card to
+/// the tallest in its row and puts the empty space straight back.
+class CardColumns extends StatelessWidget {
+  const CardColumns({
+    super.key,
+    required this.children,
+    this.spacing = Spacing.md,
+  });
+
+  final List<Widget> children;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget stack(List<Widget> items) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: EdgeInsets.only(bottom: spacing),
+            child: item,
+          ),
+      ],
+    );
+
+    // A lone card keeps its column rather than stretching across both, so a
+    // one-item section lines up with the sections above and below it.
+    if (!context.canShowTwoPanes) return stack(children);
+
+    final left = <Widget>[];
+    final right = <Widget>[];
+    for (final (index, child) in children.indexed) {
+      (index.isEven ? left : right).add(child);
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(child: stack(left)),
+        SizedBox(width: spacing),
+        Expanded(child: stack(right)),
+      ],
     );
   }
 }

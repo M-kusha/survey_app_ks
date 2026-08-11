@@ -102,6 +102,18 @@ class AppointmentListItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    // Already loaded and shown nowhere in the list. A meeting's
+                    // description is usually what tells you whether it concerns
+                    // you, which is exactly the decision this row exists for.
+                    if (appointment.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: Spacing.xs),
+                      Text(
+                        appointment.description,
+                        style: theme.textTheme.bodySmall,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: Spacing.sm),
                     Wrap(
                       spacing: Spacing.sm,

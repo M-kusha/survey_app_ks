@@ -221,8 +221,9 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     return Scaffold(
       body: SafeArea(
         child: PageBody(
-          maxWidth: 720,
-
+          // Wide enough for two columns of cards where there is room for them,
+          // and reading width where there is not.
+          maxWidth: context.canShowTwoPanes ? 1100 : 720,
           scrollable: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -346,18 +347,18 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
           ])
             if (group.isNotEmpty) ...[
               SectionLabel(label: labelKey.tr(), count: group.length),
-              for (final survey in group)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: Spacing.md),
-                  child: SurveyListItem(
-                    survey: survey,
-                    isAdmin: isAdmin,
-
-                    hasParticipated:
-                        provider.userParticipationStatus[survey.id] ?? false,
-                    onChanged: _refresh,
-                  ),
-                ),
+              CardColumns(
+                children: [
+                  for (final survey in group)
+                    SurveyListItem(
+                      survey: survey,
+                      isAdmin: isAdmin,
+                      hasParticipated:
+                          provider.userParticipationStatus[survey.id] ?? false,
+                      onChanged: _refresh,
+                    ),
+                ],
+              ),
             ],
         ],
       ),

@@ -236,8 +236,9 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     return Scaffold(
       body: SafeArea(
         child: PageBody(
-          maxWidth: 720,
-
+          // Wide enough for two columns of cards where there is room for them,
+          // and reading width where there is not.
+          maxWidth: context.canShowTwoPanes ? 1100 : 720,
           scrollable: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -370,23 +371,24 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
           ])
             if (group.isNotEmpty) ...[
               SectionLabel(label: labelKey.tr(), count: group.length),
-              for (final appointment in group)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: Spacing.md),
-                  child: AppointmentListItem(
-                    appointment: appointment,
-                    hasUserParticipated:
-                        provider.userParticipationStatus[appointment
-                            .appointmentId] ??
-                        false,
-                    isAdmin: isAdmin,
-                    isAnyTimeSLotConfirmed:
-                        provider.isAnyTimeSlotConfirmed[appointment
-                            .appointmentId] ??
-                        false,
-                    onChanged: _refresh,
-                  ),
-                ),
+              CardColumns(
+                children: [
+                  for (final appointment in group)
+                    AppointmentListItem(
+                      appointment: appointment,
+                      hasUserParticipated:
+                          provider.userParticipationStatus[appointment
+                              .appointmentId] ??
+                          false,
+                      isAdmin: isAdmin,
+                      isAnyTimeSLotConfirmed:
+                          provider.isAnyTimeSlotConfirmed[appointment
+                              .appointmentId] ??
+                          false,
+                      onChanged: _refresh,
+                    ),
+                ],
+              ),
             ],
         ],
       ),

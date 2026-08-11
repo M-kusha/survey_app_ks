@@ -28,16 +28,17 @@ abstract final class AppTheme {
     return base.copyWith(
       extensions: [appColors],
       textTheme: textTheme,
-      scaffoldBackgroundColor: scheme.surface,
+      scaffoldBackgroundColor: scheme.pageSurface,
 
-      canvasColor: scheme.surface,
+      canvasColor: scheme.pageSurface,
       dividerTheme: DividerThemeData(
         color: scheme.outlineVariant,
         thickness: 1,
         space: Spacing.lg,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: scheme.surface,
+        // Matches the page so there is no seam where the bar ends.
+        backgroundColor: scheme.pageSurface,
         foregroundColor: scheme.onSurface,
         surfaceTintColor: scheme.surfaceTint,
         elevation: 0,
@@ -49,9 +50,10 @@ abstract final class AppTheme {
             : SystemUiOverlayStyle.dark,
       ),
       cardTheme: CardThemeData(
-        color: scheme.surfaceContainerLow,
+        color: scheme.cardSurface,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        elevation: scheme.cardElevation,
+        shadowColor: scheme.shadow.withValues(alpha: 0.18),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(Radii.lg),
@@ -336,6 +338,37 @@ abstract final class AppTheme {
       ),
     );
   }
+}
+
+/// Which tone the page is, and which tone sits on top of it.
+///
+/// Material 3's light surfaces are all within a few percent of white, so the
+/// default arrangement — a card on `surface` — renders #F3F3FA on #F9F9FF, a
+/// contrast ratio of 1.05. The card is invisible; only its hairline border
+/// suggests anything is there, and a screen of them reads as empty. Light mode
+/// therefore tints the page and lifts cards to white, which is the relationship
+/// the eye already knows as "card on a page".
+///
+/// Dark mode keeps Material's direction. There a lighter panel on a darker page
+/// already separates, and inverting it would sink cards below the page for no
+/// gain.
+extension AppSurfaces on ColorScheme {
+  bool get _isDark => brightness == Brightness.dark;
+
+  /// Behind everything: scaffolds, app bars, the canvas.
+  Color get pageSurface => _isDark ? surface : surfaceContainer;
+
+  /// Cards, sheets and anything meant to read as raised off the page.
+  Color get cardSurface =>
+      _isDark ? surfaceContainerLow : surfaceContainerLowest;
+
+  /// A card whose content is finished or expired: present, but not competing.
+  Color get mutedCardSurface =>
+      _isDark ? surfaceContainerLowest : surfaceContainer;
+
+  /// Cards carry a real shadow in light mode. In dark mode a shadow is a
+  /// darker smudge on an already dark page, so tone alone does the work.
+  double get cardElevation => _isDark ? 0 : 1;
 }
 
 abstract final class Radii {
