@@ -104,7 +104,11 @@ void main() {
   group('the create button', () {
     Widget fabScreen() => Scaffold(
       body: const SizedBox.expand(),
-      floatingActionButton: CreateFab(label: 'Add meeting', onPressed: () {}),
+      floatingActionButton: CreateFab(
+        heroTag: 'test-create-fab',
+        label: 'Add meeting',
+        onPressed: () {},
+      ),
     );
 
     testWidgets('is a plain circle on a phone', (tester) async {
