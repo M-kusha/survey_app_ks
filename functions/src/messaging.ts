@@ -36,12 +36,24 @@ type UserDelivery = {
   locale: NotificationLocale;
 };
 
+export type AuthUserLookup = (
+  userIds: string[],
+) => Promise<{ uid: string; emailVerified: boolean; disabled: boolean }[]>;
+
+async function lookupAuthUsers(userIds: string[]) {
+  const result = await getAuth().getUsers(userIds.map((uid) => ({ uid })));
+  return result.users;
+}
+
 /**
  * Keeps notification recipients aligned with the Firebase Auth security
  * boundary. A Firestore profile can outlive its Auth account, and a newly
  * registered profile exists before its email address has been verified.
  */
-async function verifiedEnabledAuthIds(userIds: string[]): Promise<Set<string>> {
+export async function verifiedEnabledAuthIds(
+  userIds: string[],
+  lookup: AuthUserLookup = lookupAuthUsers,
+): Promise<Set<string>> {
   const candidates = [...new Set(userIds)].filter(
     (id) => typeof id === 'string' && id.length > 0 && id.length <= 128,
   );
@@ -52,17 +64,14 @@ async function verifiedEnabledAuthIds(userIds: string[]): Promise<Set<string>> {
   for (let start = 0; start < candidates.length; start += 100) {
     const chunk = candidates.slice(start, start + 100);
     try {
-      const result = await getAuth().getUsers(chunk.map((uid) => ({ uid })));
-      for (const user of result.users) {
+      const users = await lookup(chunk);
+      for (const user of users) {
         if (user.emailVerified && !user.disabled) allowed.add(user.uid);
       }
-    } catch (error) {
-      // Fail closed for this whole chunk: an Auth outage or malformed legacy
-      // account must delay delivery, never leak company content.
-      logger.error('notification audience Auth lookup failed; batch skipped', {
-        batchSize: chunk.length,
-        error: error instanceof Error ? error.message : String(error),
-      });
+    } catch {
+      // Never return a partial audience or expose raw Auth SDK details. The
+      // notification trigger fails before any FCM send and can retry safely.
+      throw new Error('notification-audience-auth-unavailable');
     }
   }
 

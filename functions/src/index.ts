@@ -309,7 +309,7 @@ async function notifyJoinRequest(
  * fastest way to teach somebody that these notifications are noise.
  */
 export const onSurveyCreated = onDocumentCreated(
-  { document: 'surveys/{surveyId}', region },
+  { document: 'surveys/{surveyId}', region, retry: true },
   async (event) => {
     const survey = event.data?.data();
     if (!survey) return;
@@ -490,7 +490,7 @@ export const onSurveyResponseUpdated = onDocumentUpdated(
 
 /** A new meeting poll, announced the same way. */
 export const onAppointmentCreated = onDocumentCreated(
-  { document: 'appointments/{appointmentId}', region },
+  { document: 'appointments/{appointmentId}', region, retry: true },
   async (event) => {
     const appointment = event.data?.data();
     if (!appointment) return;
@@ -547,7 +547,7 @@ export const onAppointmentVoteDeleted = onDocumentDeleted(
  * when the meeting is.
  */
 export const onTimeSlotConfirmed = onDocumentUpdated(
-  { document: 'appointments/{appointmentId}', region },
+  { document: 'appointments/{appointmentId}', region, retry: true },
   async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
@@ -587,7 +587,7 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
  * discover one was to happen to open the member list.
  */
 export const onJoinRequested = onDocumentUpdated(
-  { document: 'users/{userId}', region },
+  { document: 'users/{userId}', region, retry: true },
   async (event) => {
     const before = event.data?.before.data();
     const after = event.data?.after.data();
@@ -605,7 +605,7 @@ export const onJoinRequested = onDocumentUpdated(
 
 /** Registration creates a pending profile rather than updating an old one. */
 export const onJoinRequestedAtRegistration = onDocumentCreated(
-  { document: 'users/{userId}', region },
+  { document: 'users/{userId}', region, retry: true },
   async (event) => {
     const profile = event.data?.data();
     if (!profile) return;
@@ -621,7 +621,12 @@ export const onJoinRequestedAtRegistration = onDocumentCreated(
  * of them off.
  */
 export const remindExpiring = onSchedule(
-  { schedule: '0 9 * * *', timeZone: 'Europe/Berlin', region },
+  {
+    schedule: '0 9 * * *',
+    timeZone: 'Europe/Berlin',
+    region,
+    retryCount: 1,
+  },
   async () => {
     const db = getFirestore();
     const now = new Date();
