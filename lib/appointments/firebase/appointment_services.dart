@@ -12,17 +12,22 @@ class AppointmentService {
     FirebaseFunctions? functions,
     AppointmentDefinitionCallable? definitionCallable,
     String Function()? appointmentIdFactory,
+    AppointmentDefinitionCallable? contentDeletionCallable,
   }) : _firestore = firestore,
        _appointmentIdFactory = appointmentIdFactory,
        _saveDefinition =
            definitionCallable ??
            _firebaseDefinitionCallable(
              functions ?? FirebaseFunctions.instanceFor(region: 'europe-west4'),
-           );
+           ),
+       _deleteContent =
+           contentDeletionCallable ??
+           ((payload) => _firebaseContentDeletion(functions, payload));
 
   final FirebaseFirestore? _firestore;
   final String Function()? _appointmentIdFactory;
   final AppointmentDefinitionCallable _saveDefinition;
+  final AppointmentDefinitionCallable _deleteContent;
   FirebaseFirestore get _db => _firestore ?? FirebaseFirestore.instance;
 
   Future<String> createAppointment(Appointment appointment) async {
@@ -63,19 +68,11 @@ class AppointmentService {
   }
 
   Future<void> deleteAppointment(String appointmentId) async {
-    final appointment = _db.collection('appointments').doc(appointmentId);
-    final votes = await appointment.collection('participants').get();
-
-    const chunkSize = 400;
-    for (var start = 0; start < votes.docs.length; start += chunkSize) {
-      final batch = _db.batch();
-      final end = (start + chunkSize).clamp(0, votes.docs.length);
-      for (final doc in votes.docs.sublist(start, end)) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
-    }
-    await appointment.delete();
+    final result = await _deleteContent({
+      'entityType': 'appointment',
+      'entityId': appointmentId,
+    });
+    _requireDeletionReceipt(result, 'appointment', appointmentId);
   }
 
   Future<bool> isAnyTimeSlotConfirmed(String appointmentId) async {
@@ -223,6 +220,37 @@ class AppointmentService {
         .call<Map<String, dynamic>>(payload);
     return result.data;
   };
+
+  static Future<Map<String, dynamic>> _firebaseContentDeletion(
+    FirebaseFunctions? functions,
+    Map<String, dynamic> payload,
+  ) async {
+    final result =
+        await (functions ??
+                FirebaseFunctions.instanceFor(region: 'europe-west4'))
+            .httpsCallable(
+              'deleteContent',
+              options: HttpsCallableOptions(
+                timeout: const Duration(minutes: 2),
+              ),
+            )
+            .call<Map<String, dynamic>>(payload);
+    return result.data;
+  }
+
+  static void _requireDeletionReceipt(
+    Map<String, dynamic> result,
+    String entityType,
+    String entityId,
+  ) {
+    if (result['deleted'] != true ||
+        result['entityType'] != entityType ||
+        result['entityId'] != entityId) {
+      throw const FormatException(
+        'The content deletion response was incomplete.',
+      );
+    }
+  }
 
   static void _applyCanonicalResult(
     Appointment appointment,

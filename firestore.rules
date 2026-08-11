@@ -440,6 +440,9 @@ service cloud.firestore {
         allow create: if accountActive()
           && companyAdminOf(companyId)
           && bannedUserId != uid()
+          && !exists(
+            /databases/$(database)/documents/accountDeletionLocks/$(bannedUserId)
+          )
           && exists(/databases/$(database)/documents/users/$(bannedUserId))
           && get(/databases/$(database)/documents/users/$(bannedUserId))
                .data.companyId == companyId
@@ -935,11 +938,9 @@ service cloud.firestore {
 
       // The Admin SDK callable is the only survey-definition writer.
       allow create, update: if false;
-      allow delete: if accountActive()
-        && adminOf(resource.data.companyId)
-        && !existsAfter(
-          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
-        );
+      // The trusted deletion callable first establishes a server-owned parent
+      // barrier and then removes every descendant and private key.
+      allow delete: if false;
 
       // One submission per participant, keyed by uid.
       match /participants/{participantId} {
@@ -954,6 +955,12 @@ service cloud.firestore {
             && request.time <= get(
               /databases/$(database)/documents/surveys/$(surveyId)
             ).data.deadline;
+        }
+
+        function surveyAcceptsParticipantWrites() {
+          return !('deletionStartedAt' in get(
+            /databases/$(database)/documents/surveys/$(surveyId)
+          ).data);
         }
 
         function validSubmission(data) {
@@ -1009,6 +1016,7 @@ service cloud.firestore {
 
         // You submit your own answers, under your own id, once.
         allow create: if accountActive()
+          && surveyAcceptsParticipantWrites()
           && participantId == uid()
           && validSubmission(request.resource.data)
           && sameCompany(surveyCompanyId())
@@ -1021,6 +1029,7 @@ service cloud.firestore {
         // derives the complete score and correct-answer total atomically.
         // No client, including an admin client, may author those totals.
         allow update: if accountActive()
+          && surveyAcceptsParticipantWrites()
           && adminOf(surveyCompanyId())
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'textAnswersReviewed'
@@ -1031,6 +1040,7 @@ service cloud.firestore {
         // A submitted response is a durable record. Staff may remove somebody
         // else's response, but nobody can erase their own submission.
         allow delete: if accountActive()
+          && surveyAcceptsParticipantWrites()
           && participantId != uid()
           && adminOf(surveyCompanyId());
       }
@@ -1066,11 +1076,7 @@ service cloud.firestore {
 
       allow create, update: if false;
 
-      allow delete: if accountActive()
-        && adminOf(resource.data.companyId)
-        && !existsAfter(
-          /databases/$(database)/documents/surveys/$(surveyId)
-        );
+      allow delete: if false;
     }
 
     // ---------- appointments ----------
@@ -1091,7 +1097,8 @@ service cloud.firestore {
             'slotIds',
             'confirmedSlotId',
             'participantUserIds',
-            'createdAt'
+            'createdAt',
+            'deletionStartedAt'
           ])
           && data.keys().hasAll([
             'schemaVersion', 'revision', 'appointmentId', 'companyId',
@@ -1136,12 +1143,17 @@ service cloud.firestore {
           && data.participantUserIds is list
           && data.participantUserIds.toSet().size()
                == data.participantUserIds.size()
-          && data.createdAt is timestamp;
+          && data.createdAt is timestamp
+          && (
+            !('deletionStartedAt' in data)
+            || data.deletionStartedAt is timestamp
+          );
       }
 
       function validDirectConfirmation() {
         return validAppointmentDocument(resource.data)
           && validAppointmentDocument(request.resource.data)
+          && !('deletionStartedAt' in resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'confirmedSlotId', 'revision'
           ])
@@ -1156,6 +1168,7 @@ service cloud.firestore {
 
       function appointmentAcceptsVotes(data) {
         return validAppointmentDocument(data)
+          && !('deletionStartedAt' in data)
           && data.confirmedSlotId == null
           && data.expirationAt is timestamp
           && request.time < data.expirationAt;
@@ -1171,7 +1184,7 @@ service cloud.firestore {
 
       // Canonical creation and content edits are owned by the trusted callable.
       allow create: if false;
-      allow delete: if accountActive() && adminOf(resource.data.companyId);
+      allow delete: if false;
 
       // Staff may only make the one latency-sensitive transition directly.
       // Clearing/reopening and all content edits return to the callable.
@@ -1193,6 +1206,10 @@ service cloud.firestore {
 
         function appointmentOpen() {
           return appointmentAcceptsVotes(appointmentData());
+        }
+
+        function appointmentAcceptsParticipantWrites() {
+          return !('deletionStartedAt' in appointmentData());
         }
 
         function validVote(data) {
@@ -1229,6 +1246,7 @@ service cloud.firestore {
           && appointmentOpen();
 
         allow delete: if accountActive()
+          && appointmentAcceptsParticipantWrites()
           && (
             (
               resource.data.userId == uid()

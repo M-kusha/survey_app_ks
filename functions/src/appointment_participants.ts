@@ -9,20 +9,29 @@ import { FieldValue, getFirestore } from 'firebase-admin/firestore';
  */
 export async function registerAppointmentParticipant(
   appointmentId: string,
+  participantId: string,
   userId: unknown,
 ): Promise<void> {
   if (typeof userId !== 'string' || userId.length === 0) return;
 
-  const appointment = getFirestore().collection('appointments').doc(appointmentId);
-  try {
-    await appointment.update({
+  const db = getFirestore();
+  const appointment = db.collection('appointments').doc(appointmentId);
+  const vote = appointment.collection('participants').doc(participantId);
+  const deletionLock = db.collection('accountDeletionLocks').doc(userId);
+
+  await db.runTransaction(async (transaction) => {
+    const [parent, currentVote, lock] = await transaction.getAll(
+      appointment,
+      vote,
+      deletionLock,
+    );
+    if (!parent.exists || !currentVote.exists || lock.exists) return;
+    if (currentVote.get('userId') !== userId) return;
+
+    transaction.update(appointment, {
       participantUserIds: FieldValue.arrayUnion(userId),
     });
-  } catch (error) {
-    // Company/appointment purges delete children before their parent. A delayed
-    // event for an already deleted parent is expected and has nothing to repair.
-    if (!isNotFound(error)) throw error;
-  }
+  });
 }
 
 /** Removes the uid only after its final vote document has gone. */
@@ -53,9 +62,4 @@ export async function unregisterAppointmentParticipant(
       participantUserIds: FieldValue.arrayRemove(userId),
     });
   });
-}
-
-function isNotFound(error: unknown): boolean {
-  const code = (error as { code?: unknown } | null)?.code;
-  return code === 5 || code === '5' || code === 'not-found';
 }

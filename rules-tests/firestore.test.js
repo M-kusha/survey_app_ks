@@ -1003,10 +1003,13 @@ describe('survey authoring', () => {
     );
   });
 
-  it('an ordinary user cannot delete a survey', async () => {
+  it('every client must use the trusted survey-deletion boundary', async () => {
     await assertFails(deleteSurvey(as(BOB), 'acme-survey'));
     await assertFails(deleteDoc(doc(as(ALICE), 'surveys', 'acme-survey')));
-    await assertSucceeds(deleteSurvey(as(ALICE), 'acme-survey'));
+    await assertFails(deleteSurvey(as(ALICE), 'acme-survey'));
+    await assertFails(
+      deleteDoc(doc(as(ALICE), 'surveyAnswerKeys', 'acme-survey')),
+    );
   });
 });
 
@@ -1382,6 +1385,99 @@ describe('voting on an appointment', () => {
   });
 });
 
+describe('trusted content deletion write barriers', () => {
+  const appointmentId = 'acme-standup';
+  const bobVoteId = `${BOB}-${slot.slotId}`;
+
+  beforeEach(async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore();
+      await setDoc(
+        doc(db, 'appointments', appointmentId, 'participants', bobVoteId),
+        voteDocument(BOB),
+      );
+      await updateDoc(doc(db, 'surveys', 'acme-survey'), {
+        deletionStartedAt: new Date(),
+      });
+      await updateDoc(doc(db, 'appointments', appointmentId), {
+        deletionStartedAt: new Date(),
+      });
+    });
+  });
+
+  it('keeps marked parents and existing children readable until final deletion', async () => {
+    await assertSucceeds(getDoc(doc(as(BOB), 'surveys', 'acme-survey')));
+    await assertSucceeds(
+      getDoc(doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB)),
+    );
+    await assertSucceeds(getDoc(doc(as(BOB), 'appointments', appointmentId)));
+    await assertSucceeds(
+      getDoc(
+        doc(as(BOB), 'appointments', appointmentId, 'participants', bobVoteId),
+      ),
+    );
+  });
+
+  it('denies every survey participant mutation after the marker', async () => {
+    await assertFails(
+      setDoc(
+        doc(as(ALICE), 'surveys', 'acme-survey', 'participants', ALICE),
+        submissionDocument(ALICE),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(as(ADA), 'surveys', 'acme-survey', 'participants', BOB), {
+        textAnswersReviewed: { 'acme-survey-Q0': true },
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(as(ADA), 'surveys', 'acme-survey', 'participants', BOB)),
+    );
+  });
+
+  it('denies every appointment mutation after the marker', async () => {
+    const bobVote = doc(
+      as(BOB),
+      'appointments',
+      appointmentId,
+      'participants',
+      bobVoteId,
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          as(ALICE),
+          'appointments',
+          appointmentId,
+          'participants',
+          `${ALICE}-${slot.slotId}`,
+        ),
+        voteDocument(ALICE),
+      ),
+    );
+    await assertFails(updateDoc(bobVote, { status: 'maybe' }));
+    await assertFails(deleteDoc(bobVote));
+    await assertFails(
+      deleteDoc(
+        doc(
+          as(ADA),
+          'appointments',
+          appointmentId,
+          'participants',
+          bobVoteId,
+        ),
+      ),
+    );
+    await assertFails(
+      updateDoc(doc(as(ADA), 'appointments', appointmentId), {
+        confirmedSlotId: slot.slotId,
+        revision: 2,
+      }),
+    );
+    await assertFails(deleteDoc(doc(as(ADA), 'appointments', appointmentId)));
+  });
+});
+
 describe('notes are private', () => {
   beforeEach(async () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
@@ -1456,9 +1552,9 @@ describe('moderators run content, not people', () => {
     );
   });
 
-  it('a moderator may delete a survey or a meeting', async () => {
-    await assertSucceeds(deleteSurvey(as(MOLLY), 'acme-survey'));
-    await assertSucceeds(
+  it('a moderator cannot bypass trusted content deletion', async () => {
+    await assertFails(deleteSurvey(as(MOLLY), 'acme-survey'));
+    await assertFails(
       deleteDoc(doc(as(MOLLY), 'appointments', 'acme-standup')),
     );
   });
@@ -1483,6 +1579,22 @@ describe('moderators run content, not people', () => {
     await assertSucceeds(
       removeMember(as(ADA), BOB),
     );
+  });
+
+  it('cannot create a ban after trusted account deletion starts', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'accountDeletionLocks', BOB), {
+        startedAt: new Date(),
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      });
+    });
+
+    await assertFails(banMember(as(ADA), BOB));
+
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'accountDeletionLocks', BOB));
+    });
+    await assertSucceeds(banMember(as(ADA), BOB));
   });
 
   it('an admin may not move a colleague into another company', async () => {

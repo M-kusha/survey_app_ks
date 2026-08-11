@@ -6,16 +6,28 @@ import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:echomeet/survey_pages/utilities/survey_answer_keys.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 
+typedef ContentDeletionCallable =
+    Future<Map<String, dynamic>> Function(Map<String, dynamic> payload);
+
 class FirebaseSurveyService {
   FirebaseSurveyService({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions =
-           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west4');
+    ContentDeletionCallable? contentDeletionCallable,
+  }) : _providedFirestore = firestore,
+       _providedFunctions = functions,
+       _deleteContent =
+           contentDeletionCallable ??
+           ((payload) => _firebaseContentDeletion(functions, payload));
 
-  final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
+  final FirebaseFirestore? _providedFirestore;
+  final FirebaseFunctions? _providedFunctions;
+  final ContentDeletionCallable _deleteContent;
+  FirebaseFirestore get _firestore =>
+      _providedFirestore ?? FirebaseFirestore.instance;
+  FirebaseFunctions get _functions =>
+      _providedFunctions ??
+      FirebaseFunctions.instanceFor(region: 'europe-west4');
 
   Future<String> createSurvey(Survey survey) async {
     final requestedSurveyId = survey.id.trim();
@@ -27,33 +39,30 @@ class FirebaseSurveyService {
       'saveSurveyDefinition',
       options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
     );
-    final result = await callable.call<Map<String, dynamic>>(
-      {
-        'action': 'create',
-        'surveyId': requestedSurveyId,
-        'definition': {
-          'surveyName': survey.surveyName,
-          'surveyDescription': survey.surveyDescription,
-          'deadlineMillis': survey.deadline.toUtc().millisecondsSinceEpoch,
-          'timeLimitPerQuestion': survey.timeLimitPerQuestion,
-          'surveyType': survey.surveyType.index,
-          'questions': [
-            for (final source in survey.questions)
-              {
-                'type': source['type'],
-                'question': source['question'],
-                if (source['type'] == 'Single' ||
-                    source['type'] == 'Multiple')
-                  'options': source['options'],
-                if (isTest && source['type'] == 'Single')
-                  'correctAnswer': source['correctAnswer'],
-                if (isTest && source['type'] == 'Multiple')
-                  'correctAnswers': source['correctAnswers'],
-              },
-          ],
-        },
+    final result = await callable.call<Map<String, dynamic>>({
+      'action': 'create',
+      'surveyId': requestedSurveyId,
+      'definition': {
+        'surveyName': survey.surveyName,
+        'surveyDescription': survey.surveyDescription,
+        'deadlineMillis': survey.deadline.toUtc().millisecondsSinceEpoch,
+        'timeLimitPerQuestion': survey.timeLimitPerQuestion,
+        'surveyType': survey.surveyType.index,
+        'questions': [
+          for (final source in survey.questions)
+            {
+              'type': source['type'],
+              'question': source['question'],
+              if (source['type'] == 'Single' || source['type'] == 'Multiple')
+                'options': source['options'],
+              if (isTest && source['type'] == 'Single')
+                'correctAnswer': source['correctAnswer'],
+              if (isTest && source['type'] == 'Multiple')
+                'correctAnswers': source['correctAnswers'],
+            },
+        ],
       },
-    );
+    });
     final data = result.data;
     final surveyId = data['surveyId'];
     if (surveyId is! String || surveyId != requestedSurveyId) {
@@ -66,23 +75,34 @@ class FirebaseSurveyService {
   }
 
   Future<void> deleteSurvey(String surveyId) async {
-    final survey = _firestore.collection('surveys').doc(surveyId);
-    final responses = await survey.collection('participants').get();
-
-    const chunkSize = 400;
-    for (var start = 0; start < responses.docs.length; start += chunkSize) {
-      final batch = _firestore.batch();
-      final end = (start + chunkSize).clamp(0, responses.docs.length);
-      for (final doc in responses.docs.sublist(start, end)) {
-        batch.delete(doc.reference);
-      }
-      await batch.commit();
+    final result = await _deleteContent({
+      'entityType': 'survey',
+      'entityId': surveyId,
+    });
+    if (result['deleted'] != true ||
+        result['entityType'] != 'survey' ||
+        result['entityId'] != surveyId) {
+      throw const FormatException(
+        'The content deletion response was incomplete.',
+      );
     }
+  }
 
-    final batch = _firestore.batch();
-    batch.delete(_firestore.collection('surveyAnswerKeys').doc(surveyId));
-    batch.delete(survey);
-    await batch.commit();
+  static Future<Map<String, dynamic>> _firebaseContentDeletion(
+    FirebaseFunctions? functions,
+    Map<String, dynamic> payload,
+  ) async {
+    final result =
+        await (functions ??
+                FirebaseFunctions.instanceFor(region: 'europe-west4'))
+            .httpsCallable(
+              'deleteContent',
+              options: HttpsCallableOptions(
+                timeout: const Duration(minutes: 2),
+              ),
+            )
+            .call<Map<String, dynamic>>(payload);
+    return result.data;
   }
 
   Future<void> removeUserFromCompany(String userId) async {

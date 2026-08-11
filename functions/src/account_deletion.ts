@@ -19,6 +19,58 @@ export class CompanyOwnerDeletionError extends Error {
   }
 }
 
+type OwnedCompany = {
+  id: string;
+  ref: DocumentReference;
+};
+
+/**
+ * Discovers ownership and establishes every write barrier in one transaction.
+ *
+ * The ownership query is deliberately inside the transaction. Verified
+ * onboarding also reads the account lock transactionally, so either company
+ * creation commits first and is included here, or this lock commits first and
+ * onboarding retries into the locked state.
+ */
+export async function establishAccountDeletionWriteBarrier(
+  db: Pick<Firestore, 'collection' | 'runTransaction'>,
+  uid: string,
+  deleteOwnedCompany: boolean,
+  nowMillis = Date.now(),
+): Promise<OwnedCompany[]> {
+  const accountLock = db.collection('accountDeletionLocks').doc(uid);
+  const ownedCompanyQuery = db
+    .collection('companies')
+    .where('createdBy', '==', uid);
+
+  return db.runTransaction(async (transaction) => {
+    const ownedCompany = await transaction.get(ownedCompanyQuery);
+    if (!ownedCompany.empty && !deleteOwnedCompany) {
+      throw new CompanyOwnerDeletionError();
+    }
+    if (ownedCompany.size > 400) {
+      // Current rules permit a single owned company. Refuse malformed state
+      // rather than splitting the write barrier across transactions.
+      throw new Error('Account owns too many companies for an atomic deletion lock.');
+    }
+
+    transaction.set(accountLock, {
+      startedAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(nowMillis + 2 * 60 * 60 * 1000),
+    });
+    for (const company of ownedCompany.docs) {
+      transaction.update(company.ref, {
+        deletionScheduledFor: Timestamp.fromMillis(nowMillis),
+        deletionRequestedBy: uid,
+      });
+    }
+    return ownedCompany.docs.map((company) => ({
+      id: company.id,
+      ref: company.ref,
+    }));
+  });
+}
+
 /** Callable account deletion requires a reauthentication no more than 5 minutes ago. */
 export function hasRecentAuthentication(
   authTime: unknown,
@@ -46,24 +98,16 @@ export async function deleteUserAccount(
 ): Promise<void> {
   const db = getFirestore();
 
-  // Do not trust the client profile/role. Query the ownership source directly
-  // before performing the first destructive operation.
-  const ownedCompany = await db
-    .collection('companies')
-    .where('createdBy', '==', uid)
-    .get();
-  if (!ownedCompany.empty && options.deleteOwnedCompany !== true) {
-    throw new CompanyOwnerDeletionError();
-  }
-
-  if (ownedCompany.size > 400) {
-    // Current rules permit a single owned company. Refuse malformed legacy
-    // state rather than splitting the write barrier across non-atomic batches.
-    throw new Error('Account owns too many companies for an atomic deletion lock.');
-  }
+  // Do not trust the client profile/role. Ownership is discovered at the same
+  // trusted transaction boundary that stops a concurrent onboarding commit.
+  const ownedCompanies = await establishAccountDeletionWriteBarrier(
+    db,
+    uid,
+    options.deleteOwnedCompany === true,
+  );
 
   const ownedNameLocks = await Promise.all(
-    ownedCompany.docs.map((company) =>
+    ownedCompanies.map((company) =>
       db.collection('companyNames').where('companyId', '==', company.id).get(),
     ),
   );
@@ -73,30 +117,12 @@ export async function deleteUserAccount(
     );
   }
 
-  // Establish both write barriers before enumerating any tenant content. The
-  // account lock blocks every client write from this uid, while an immediately
-  // due company-deletion marker makes companyAcceptsContent/Joins false for all
-  // other sessions. Keeping these writes in one batch closes the orphan race in
-  // which an admin created content after purgeCompany had queried its parents.
-  const lockBatch = db.batch();
-  lockBatch.set(db.collection('accountDeletionLocks').doc(uid), {
-    startedAt: FieldValue.serverTimestamp(),
-    expiresAt: Timestamp.fromMillis(Date.now() + 2 * 60 * 60 * 1000),
-  });
-  for (const company of ownedCompany.docs) {
-    lockBatch.update(company.ref, {
-      deletionScheduledFor: Timestamp.now(),
-      deletionRequestedBy: uid,
-    });
-  }
-  await lockBatch.commit();
-
   // Account deletion is an explicit escape hatch from the normal seven-day
   // company-closure grace period. The client gives owners a separate warning;
   // the server independently proves ownership and deletes every owned tenant
   // before personal cleanup. Multiple documents are handled defensively for
   // malformed legacy data even though current rules permit only one.
-  for (const company of ownedCompany.docs) {
+  for (const company of ownedCompanies) {
     await purgeCompany(company.id);
   }
 

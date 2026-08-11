@@ -25,6 +25,10 @@ import {
   saveAppointmentDefinitionForUser,
 } from './appointment_definition';
 import {
+  ContentDeletionError,
+  deleteContentForUser,
+} from './content_deletion';
+import {
   appointmentConfirmationTransition,
   appointmentIsSettled,
 } from './appointment_state';
@@ -154,6 +158,32 @@ export const saveAppointmentDefinition = onCall(
           error instanceof Error ? error.constructor.name : typeof error,
       });
       throw new HttpsError('internal', 'appointment-definition-incomplete');
+    }
+  },
+);
+
+/** App-Check-protected server cleanup for one survey or appointment. */
+export const deleteContent = onCall(
+  { region, timeoutSeconds: 120, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await deleteContentForUser(request.auth.uid, request.data);
+    } catch (error) {
+      if (error instanceof ContentDeletionError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('content deletion failed closed', {
+        uid: request.auth.uid,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'content-deletion-incomplete');
     }
   },
 );
@@ -489,6 +519,7 @@ export const onAppointmentVoteCreated = onDocumentCreated(
   async (event) => {
     await registerAppointmentParticipant(
       event.params.appointmentId,
+      event.params.participantId,
       event.data?.get('userId'),
     );
   },
