@@ -820,9 +820,14 @@ describe('survey submissions', () => {
 });
 
 describe('survey authoring', () => {
-  it('an admin creates surveys for their own company', async () => {
-    await assertSucceeds(
+  it('staff must create and update surveys through the trusted callable', async () => {
+    await assertFails(
       createSurvey(as(ALICE), 'new-survey', { surveyName: 'New' }),
+    );
+    await assertFails(
+      updateDoc(doc(as(ALICE), 'surveys', 'acme-survey'), {
+        surveyName: 'Direct edit',
+      }),
     );
   });
 
@@ -1189,8 +1194,8 @@ describe('notes are private', () => {
 // people. Enforced here rather than only in the UI, because the UI is a
 // suggestion and this is the rule.
 describe('moderators run content, not people', () => {
-  it('a moderator may write surveys and appointments', async () => {
-    await assertSucceeds(
+  it('a moderator publishes surveys through the backend but may write appointments', async () => {
+    await assertFails(
       createSurvey(as(MOLLY), 'new-survey', {
         surveyName: 'By a moderator',
         createdBy: MOLLY,

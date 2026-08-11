@@ -86,7 +86,7 @@ class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
       surveyDescription: widget.survey.surveyDescription,
       timeCreated: DateTime.now(),
       questions: _questions,
-      id: '',
+      id: widget.survey.id,
       participants: [],
       deadline: widget.survey.deadline,
       timeLimitPerQuestion: widget.survey.timeLimitPerQuestion,

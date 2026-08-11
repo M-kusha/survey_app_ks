@@ -1,51 +1,68 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echomeet/core/membership/member_directory.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/core/profile/profile_image_revision.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:echomeet/survey_pages/utilities/survey_answer_keys.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 
 class FirebaseSurveyService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseSurveyService({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions =
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west4');
+
+  final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   Future<String> createSurvey(Survey survey) async {
-    final document = _firestore.collection('surveys').doc();
-    final uniqueId = document.id;
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId == null) throw StateError('A signed-in author is required.');
-
-    final questions = splitSurveyQuestions(survey.questions);
-
-    Map<String, dynamic> surveyData = {
-      'surveyName': survey.surveyName,
-      'surveyDescription': survey.surveyDescription,
-      'timeCreated': Timestamp.fromDate(survey.timeCreated),
-      'questions': questions.publicQuestions,
-      'id': uniqueId,
-      'participants': survey.participants
-          .map((e) => e.toFirestoreMap())
-          .toList(),
-      'deadline': survey.deadline,
-      'timeLimitPerQuestion': survey.timeLimitPerQuestion,
-      'surveyType': survey.surveyType.index,
-      'companyId': survey.companyId,
-      'responsesRevision': 0,
-
-      'createdBy': userId,
-    };
-
-    final answerKey = _firestore.collection('surveyAnswerKeys').doc(uniqueId);
-    final batch = _firestore.batch();
-    batch.set(document, surveyData);
-    batch.set(answerKey, {
-      'schemaVersion': 1,
-      'surveyId': uniqueId,
-      'companyId': survey.companyId,
-      'questionKeys': questions.privateAnswerKeys,
-    });
-    await batch.commit();
-    return uniqueId;
+    final requestedSurveyId = survey.id.trim();
+    if (!RegExp(r'^[A-Za-z0-9_-]{1,128}$').hasMatch(requestedSurveyId)) {
+      throw ArgumentError('A valid survey id is required.');
+    }
+    final isTest = survey.surveyType == SurveyType.test;
+    final callable = _functions.httpsCallable(
+      'saveSurveyDefinition',
+      options: HttpsCallableOptions(timeout: const Duration(seconds: 30)),
+    );
+    final result = await callable.call<Map<String, dynamic>>(
+      {
+        'action': 'create',
+        'surveyId': requestedSurveyId,
+        'definition': {
+          'surveyName': survey.surveyName,
+          'surveyDescription': survey.surveyDescription,
+          'deadlineMillis': survey.deadline.toUtc().millisecondsSinceEpoch,
+          'timeLimitPerQuestion': survey.timeLimitPerQuestion,
+          'surveyType': survey.surveyType.index,
+          'questions': [
+            for (final source in survey.questions)
+              {
+                'type': source['type'],
+                'question': source['question'],
+                if (source['type'] == 'Single' ||
+                    source['type'] == 'Multiple')
+                  'options': source['options'],
+                if (isTest && source['type'] == 'Single')
+                  'correctAnswer': source['correctAnswer'],
+                if (isTest && source['type'] == 'Multiple')
+                  'correctAnswers': source['correctAnswers'],
+              },
+          ],
+        },
+      },
+    );
+    final data = result.data;
+    final surveyId = data['surveyId'];
+    if (surveyId is! String || surveyId != requestedSurveyId) {
+      throw const FormatException(
+        'The survey publication response was incomplete.',
+      );
+    }
+    survey.id = surveyId;
+    return surveyId;
   }
 
   Future<void> deleteSurvey(String surveyId) async {

@@ -911,29 +911,8 @@ service cloud.firestore {
 
       allow read: if sameCompany(resource.data.companyId);
 
-      // Only admins author surveys, and only inside their own company.
-      allow create: if accountActive()
-        && adminOf(request.resource.data.companyId)
-        && validSurveyDocument(request.resource.data)
-        && existsAfter(
-          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
-        )
-        && getAfter(
-          /databases/$(database)/documents/surveyAnswerKeys/$(surveyId)
-        ).data.companyId == request.resource.data.companyId
-        && request.resource.data.timeCreated <= request.time
-        && request.resource.data.timeCreated
-             >= request.time - duration.value(1, 'd')
-        && request.resource.data.deadline > request.time;
-      allow update: if accountActive()
-        && adminOf(resource.data.companyId)
-        && fieldUnchanged('companyId')
-        // Questions and grading semantics are immutable once published. With no
-        // count query in rules, this is the only fail-closed way to guarantee a
-        // response is always graded against the questions it answered.
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'surveyName', 'surveyDescription', 'deadline', 'timeLimitPerQuestion'
-        ]);
+      // The Admin SDK callable is the only survey-definition writer.
+      allow create, update: if false;
       allow delete: if accountActive()
         && adminOf(resource.data.companyId)
         && !existsAfter(
@@ -1064,20 +1043,7 @@ service cloud.firestore {
       // trusted function against this same document.
       allow read: if accountActive() && adminOf(resource.data.companyId);
 
-      allow create: if accountActive()
-        && adminOf(request.resource.data.companyId)
-        && validAnswerKey(request.resource.data)
-        && existsAfter(
-          /databases/$(database)/documents/surveys/$(surveyId)
-        )
-        && getAfter(
-          /databases/$(database)/documents/surveys/$(surveyId)
-        ).data.companyId == request.resource.data.companyId
-        && getAfter(
-          /databases/$(database)/documents/surveys/$(surveyId)
-        ).data.questions.size() == request.resource.data.questionKeys.size();
-
-      allow update: if false;
+      allow create, update: if false;
 
       allow delete: if accountActive()
         && adminOf(resource.data.companyId)

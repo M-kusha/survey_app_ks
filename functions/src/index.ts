@@ -41,6 +41,10 @@ import {
   parseProfileImageUploadPayload,
   uploadOwnProfileImage,
 } from './profile_images';
+import {
+  SurveyPublicationError,
+  saveSurveyDefinitionForUser,
+} from './survey_publication';
 
 initializeApp();
 
@@ -83,6 +87,36 @@ export const completeOnboarding = onCall(
       companyName: data.companyName,
       companyId: data.companyId,
     });
+  },
+);
+
+/** App-Check-protected boundary for creating one trusted survey definition. */
+export const saveSurveyDefinition = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await saveSurveyDefinitionForUser(
+        request.auth.uid,
+        request.data,
+      );
+    } catch (error) {
+      if (error instanceof SurveyPublicationError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('survey publication failed closed', {
+        uid: request.auth.uid,
+        errorType:
+          error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'survey-publication-incomplete');
+    }
   },
 );
 
