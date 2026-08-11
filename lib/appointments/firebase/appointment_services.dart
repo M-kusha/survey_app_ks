@@ -204,14 +204,15 @@ class AppointmentService {
   }
 
   Future<String> fetchProfileImage(String userId) async {
-    if (userId.isNotEmpty) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('memberDirectory')
-          .doc(userId)
-          .get();
-      return (userDoc.data() as Map<String, dynamic>)['profileImage'] ?? '';
-    }
-    return '';
+    if (userId.isEmpty) return '';
+
+    // Members who registered before the directory existed have no document
+    // here yet. Absent is an ordinary state, not a failure.
+    final member = await FirebaseFirestore.instance
+        .collection('memberDirectory')
+        .doc(userId)
+        .get();
+    return member.data()?['profileImage'] as String? ?? '';
   }
 
   Future<void> confirmTimeSlot(
