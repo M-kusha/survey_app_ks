@@ -7,6 +7,8 @@ import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/admin/survey_analytics.dart';
 import 'package:echomeet/survey_pages/admin/survey_participants.dart';
+import 'package:echomeet/survey_pages/create_survey/step1_create_survey.dart';
+import 'package:echomeet/survey_pages/utilities/survey_duplicate.dart';
 import 'package:echomeet/survey_pages/user_survey/step1_participate_survey.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
 import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
@@ -14,6 +16,7 @@ import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
 
 class SurveyListItem extends StatelessWidget {
   const SurveyListItem({
@@ -228,6 +231,45 @@ class _AdminButton extends StatelessWidget {
     );
   }
 
+  /// Opens the create wizard pre-filled from this survey.
+  ///
+  /// A test's marked answers live in a separate document, so they are fetched
+  /// and merged back before the wizard opens. If that read fails the copy still
+  /// opens, with nothing marked — the author is told, and finishes the key by
+  /// hand. Silently publishing a test whose answers had quietly vanished would
+  /// be far worse than an extra step.
+  Future<void> _duplicate(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    final isTest = survey.surveyType == SurveyType.test;
+
+    final correctIndexes = isTest
+        ? await FirebaseSurveyService().fetchAnswerKeyIndexes(survey.id)
+        : const <Set<int>>[];
+    if (!context.mounted) return;
+
+    if (isTest && correctIndexes.length != survey.questions.length) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('duplicate_survey_keys_missing'.tr())),
+      );
+    }
+
+    await navigator.push(
+      MaterialPageRoute(
+        builder: (context) => Step1CreateSurvey(
+          template: duplicateSurveyTemplate(
+            source: survey,
+            correctIndexes: correctIndexes,
+            name: 'copy_of'.tr(namedArgs: {'name': survey.surveyName}),
+            newId: const Uuid().v4(),
+            deadline: DateTime.now().add(const Duration(days: 7)),
+          ),
+        ),
+      ),
+    );
+    onChanged?.call();
+  }
+
   Future<void> _delete(BuildContext context) async {
     final provider = Provider.of<SurveyDataProvider>(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
@@ -288,6 +330,16 @@ class _AdminButton extends StatelessWidget {
               const Icon(Icons.insights_rounded, size: 18),
               const SizedBox(width: Spacing.md),
               Text('view_results'.tr()),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: () => _duplicate(context),
+          child: Row(
+            children: [
+              const Icon(Icons.copy_all_outlined, size: 18),
+              const SizedBox(width: Spacing.md),
+              Text('duplicate_survey'.tr()),
             ],
           ),
         ),

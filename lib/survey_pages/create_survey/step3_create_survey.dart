@@ -21,7 +21,8 @@ class CreateTrainingSurveyStep3 extends StatefulWidget {
 }
 
 class _CreateTrainingSurveyStep3State extends State<CreateTrainingSurveyStep3> {
-  final _questions = <Map<String, dynamic>>[];
+  /// Empty for a new survey; pre-filled when the author is duplicating one.
+  late final _questions = [...widget.survey.questions];
 
   bool _saving = false;
 
