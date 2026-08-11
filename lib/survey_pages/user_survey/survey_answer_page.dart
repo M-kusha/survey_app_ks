@@ -191,11 +191,25 @@ class _SurveyAnswerPageState extends State<SurveyAnswerPage> {
                   Spacing.lg,
                   Spacing.sm,
                 ),
-                child: _Progress(
-                  step: _isTimed ? _current + 1 : _answered,
-                  total: total,
-                  remaining: _isTimed ? _remaining : null,
-                  limit: widget.survey.timeLimitPerQuestion,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _Progress(
+                      step: _isTimed ? _current + 1 : _answered,
+                      total: total,
+                      remaining: _isTimed ? _remaining : null,
+                      limit: widget.survey.timeLimitPerQuestion,
+                    ),
+                    if (_isTimed) ...[
+                      const SizedBox(height: Spacing.xs),
+                      Text(
+                        'question_timer_ux_only'.tr(),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
               Expanded(

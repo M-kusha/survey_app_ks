@@ -1007,11 +1007,11 @@ service cloud.firestore {
           && request.resource.data.textAnswersReviewed is map
           && request.resource.data.textAnswersReviewed.size() <= 100;
 
+        // A submitted response is a durable record. Staff may remove somebody
+        // else's response, but nobody can erase their own submission.
         allow delete: if accountActive()
-          && (
-            (participantId == uid() && sameCompany(surveyCompanyId()))
-            || adminOf(surveyCompanyId())
-          );
+          && participantId != uid()
+          && adminOf(surveyCompanyId());
       }
     }
 

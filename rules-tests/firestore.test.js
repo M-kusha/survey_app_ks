@@ -664,6 +664,32 @@ describe('survey submissions', () => {
     );
   });
 
+  it('nobody self-deletes a response, while staff can delete another response', async () => {
+    await assertFails(
+      deleteDoc(doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB)),
+    );
+    await assertFails(
+      setDoc(
+        doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB),
+        submissionDocument(BOB),
+      ),
+    );
+
+    await assertSucceeds(
+      setDoc(
+        doc(as(ADA), 'surveys', 'acme-survey', 'participants', ADA),
+        submissionDocument(ADA),
+      ),
+    );
+    await assertFails(
+      deleteDoc(doc(as(ADA), 'surveys', 'acme-survey', 'participants', ADA)),
+    );
+
+    await assertSucceeds(
+      deleteDoc(doc(as(ADA), 'surveys', 'acme-survey', 'participants', BOB)),
+    );
+  });
+
   it('snapshots only the caller canonical avatar path, never a bearer URL', async () => {
     await assertSucceeds(
       setDoc(

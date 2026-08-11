@@ -391,6 +391,7 @@
   "question_count": "{count} questions",
   "question_empty_warning": "Please ensure all questions are filled out. Empty questions cannot be submitted.",
   "question_hint": "Type your question",
+  "question_timer_ux_only": "Screen timer only — it moves to the next question, but is not a submission deadline.",
   "questions_need_attention": "{count} questions need attention",
   "read_rules": "Please read the following rules carefully before starting the test.",
   "register": "Register",

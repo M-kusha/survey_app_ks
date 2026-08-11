@@ -391,6 +391,7 @@
   "question_count": "{count} Fragen",
   "question_empty_warning": "Bitte stellen Sie sicher, dass alle Fragen ausgefüllt sind. Leere Fragen können nicht übermittelt werden.",
   "question_hint": "Frage eingeben",
+  "question_timer_ux_only": "Nur Bildschirm-Timer – er wechselt zur nächsten Frage, ist aber keine Abgabefrist.",
   "questions_need_attention": "{count} Fragen brauchen Aufmerksamkeit",
   "read_rules": "Bitte lesen Sie die folgenden Regeln sorgfältig durch, bevor Sie mit dem Test beginnen.",
   "register": "Registrieren",

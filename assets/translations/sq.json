@@ -391,6 +391,7 @@
   "question_count": "{count} pyetje",
   "question_empty_warning": "Ju lutemi sigurohuni që të gjitha pyetjet janë të plotësuara. Pyetjet e zbrazëta nuk mund të dërgohen.",
   "question_hint": "Shkruani pyetjen",
+  "question_timer_ux_only": "Vetëm kohëmatës në ekran — kalon te pyetja tjetër, por nuk është afat dorëzimi.",
   "questions_need_attention": "{count} pyetje kerkojne vemendje",
   "read_rules": "Ju lutemi lexoni rregullat e mëposhtme me kujdes përpara se të filloni testimin.",
   "register": "Regjistrohu",
