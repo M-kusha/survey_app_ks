@@ -1,7 +1,13 @@
 import { getAuth } from 'firebase-admin/auth';
 import { FieldValue, getFirestore } from 'firebase-admin/firestore';
 import { HttpsError } from 'firebase-functions/v2/https';
-import { createHash } from 'node:crypto';
+
+import {
+  companyNameSlug,
+  writeCompanyCreatedActivity,
+} from './company_privileges';
+
+export { companyNameSlug } from './company_privileges';
 
 const createCompanyIntent = 'createCompany';
 const joinCompanyIntent = 'joinCompany';
@@ -16,25 +22,6 @@ export type OnboardingResult = {
   companyId: string;
   membership: 'active' | 'pending';
 };
-
-/** Canonical, server-owned key used by the company-name uniqueness lock. */
-export function companyNameSlug(name: string): string {
-  // Keep the exact ASCII transform used by released clients. Changing this to
-  // transliterate accents would miss existing locks (for example Müller was
-  // historically stored as m-ller, not muller) and reopen duplicate names.
-  const legacyCompatible = name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  if (legacyCompatible) return legacyCompatible;
-
-  const unicodeName = name.trim().normalize('NFKC').toLocaleLowerCase('en-US');
-  if (!/[\p{L}\p{N}]/u.test(unicodeName)) return '';
-  return unicodeName
-    ? `unicode-${createHash('sha256').update(unicodeName).digest('hex')}`
-    : '';
-}
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
@@ -119,6 +106,8 @@ export async function finalizePendingOnboarding(
       const companyRef = db.collection('companies').doc();
       const directoryRef = db.collection('companyDirectory').doc(companyRef.id);
       const memberRef = db.collection('memberDirectory').doc(uid);
+      const activityId = db.collection('companies').doc().id;
+      const timestamp = FieldValue.serverTimestamp();
 
       transaction.create(nameLockRef, {
         companyId: companyRef.id,
@@ -127,7 +116,7 @@ export async function finalizePendingOnboarding(
       transaction.create(companyRef, {
         name,
         createdBy: uid,
-        createdAt: FieldValue.serverTimestamp(),
+        createdAt: timestamp,
         joinPolicy: 'open',
       });
       transaction.create(directoryRef, { name, joinPolicy: 'open' });
@@ -146,6 +135,17 @@ export async function finalizePendingOnboarding(
         pendingCompanyName: FieldValue.delete(),
         pendingCompanyId: FieldValue.delete(),
       });
+      writeCompanyCreatedActivity(
+        {
+          create: (path, data) => transaction.create(db.doc(path), data),
+        },
+        {
+          id: activityId,
+          companyId: companyRef.id,
+          actorUid: uid,
+          occurredAt: timestamp,
+        },
+      );
 
       return {
         completed: true,

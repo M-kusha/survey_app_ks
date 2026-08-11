@@ -21,6 +21,10 @@ import {
   administerCompanyForUser,
 } from './company_administration';
 import {
+  CompanyCreationError,
+  createCompanyForCurrentUser as createCompanyForCurrentUserOperation,
+} from './company_privileges';
+import {
   registerAppointmentParticipant,
   unregisterAppointmentParticipant,
 } from './appointment_participants';
@@ -234,6 +238,36 @@ export const uploadProfileImage = onCall(
         error: error instanceof Error ? error.message : String(error),
       });
       throw new HttpsError('internal', 'profile-image-upload-incomplete');
+    }
+  },
+);
+
+/** Lets an existing companyless account create a company and become owner. */
+export const createCompanyForCurrentUser = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await createCompanyForCurrentUserOperation(
+        request.auth.uid,
+        request.auth.token.auth_time,
+        request.data,
+      );
+    } catch (error) {
+      if (error instanceof CompanyCreationError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('company creation failed closed', {
+        uid: request.auth.uid,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'company-creation-incomplete');
     }
   },
 );

@@ -49,6 +49,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | Export | Kind / source |
 | --- | --- |
 | `completeOnboarding` | Auth + App Check callable; finalizes a verified private onboarding intent |
+| `createCompanyForCurrentUser` | Recent-Auth + App Check callable; creates a company for an eligible companyless account and makes it owner |
 | `uploadProfileImage` | Auth + App Check callable; sanitizes and stores the caller's avatar |
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
 | `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |

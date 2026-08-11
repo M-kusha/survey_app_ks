@@ -4,6 +4,7 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/membership/company_admin_service.dart';
 import 'package:echomeet/core/membership/company_browser.dart';
 import 'package:echomeet/core/membership/membership.dart';
+import 'package:echomeet/core/membership/company_privilege_service.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/settings/banned_members.dart';
 import 'package:echomeet/core/layout/page_body.dart';
@@ -13,6 +14,7 @@ import 'package:echomeet/login/login.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:echomeet/settings/administrative_activity.dart';
 import 'package:echomeet/settings/biometrics_options.dart';
+import 'package:echomeet/settings/create_company.dart';
 import 'package:echomeet/settings/delete_account.dart';
 import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/settings/notifications_options.dart';
@@ -267,6 +269,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     final membership = _membership;
     final companyId = membership?.companyId ?? '';
     final inCompany = companyId.isNotEmpty;
+    final canCreateCompany = membership?.state == MembershipState.noCompany;
     final activeCompanyAdmin = _canManagePeople && membership?.isActive == true;
 
     return SettingsGroup(
@@ -292,6 +295,14 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               ? _leaveCompany
               : () => _openBrowser(),
         ),
+
+        if (canCreateCompany)
+          SettingsTile(
+            icon: Icons.add_business_rounded,
+            title: 'create_company'.tr(),
+            subtitle: 'create_company_settings_hint'.tr(),
+            onTap: _openCreateCompany,
+          ),
 
         if (_isSuperAdmin && inCompany)
           SettingsTile(
@@ -462,6 +473,24 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
       MaterialPageRoute(builder: (context) => const CompanyBrowserPage()),
     );
     if (mounted) await _load();
+  }
+
+  Future<void> _openCreateCompany() async {
+    final receipt = await Navigator.push<CompanyCreationReceipt>(
+      context,
+      MaterialPageRoute(builder: (context) => const CreateCompanyPage()),
+    );
+    if (receipt == null || !mounted) return;
+
+    _sessionKey = null;
+    await Future.wait<void>([
+      context.read<MembershipProvider>().refresh(),
+      context.read<UserDataProvider>().loadCurrentUser(),
+    ]);
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    UIUtils.showSnackBar(context, 'create_company_success'.tr());
   }
 
   Widget _buildAccountGroup() {

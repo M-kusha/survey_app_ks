@@ -17,6 +17,7 @@ class AppTextField extends StatefulWidget {
     this.onSubmitted,
     this.trailing,
     this.enabled = true,
+    this.maxLength,
   });
 
   final String label;
@@ -31,6 +32,7 @@ class AppTextField extends StatefulWidget {
   final ValueChanged<String>? onSubmitted;
   final Widget? trailing;
   final bool enabled;
+  final int? maxLength;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -106,6 +108,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 focusNode: _focusNode,
                 obscureText: widget.obscure,
                 enabled: widget.enabled,
+                maxLength: widget.maxLength,
                 keyboardType: widget.keyboardType,
                 textInputAction: widget.textInputAction,
                 autofillHints: widget.autofillHints,
