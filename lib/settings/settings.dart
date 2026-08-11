@@ -4,6 +4,7 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/membership/company_admin_service.dart';
 import 'package:echomeet/core/membership/company_browser.dart';
 import 'package:echomeet/core/membership/membership.dart';
+import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/settings/banned_members.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/localization/app_locales.dart';
@@ -254,6 +255,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               _buildCompanyGroup(),
               _buildAccountGroup(),
               _buildPreferencesGroup(),
+              _buildPrivacyGroup(),
               _buildDangerGroup(),
               const SizedBox(height: Spacing.xxl),
             ],
@@ -517,6 +519,28 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
               : 'delete_account_hint'.tr(),
           tint: scheme.error,
           onTap: _confirmDelete,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPrivacyGroup() {
+    return SettingsGroup(
+      title: 'privacy_and_data'.tr(),
+      children: [
+        SettingsTile(
+          icon: Icons.privacy_tip_outlined,
+          title: 'privacy_policy_link'.tr(),
+          subtitle: 'privacy_policy_link_hint'.tr(),
+          onTap: () =>
+              Navigator.pushNamed(context, PublicRoutePaths.privacyPolicy),
+        ),
+        SettingsTile(
+          icon: Icons.manage_accounts_outlined,
+          title: 'account_deletion_info_link'.tr(),
+          subtitle: 'account_deletion_info_link_hint'.tr(),
+          onTap: () =>
+              Navigator.pushNamed(context, PublicRoutePaths.accountDeletion),
         ),
       ],
     );

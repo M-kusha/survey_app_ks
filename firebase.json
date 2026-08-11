@@ -16,7 +16,25 @@
   "hosting": {
     "public": "build/web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [{ "source": "**", "destination": "/index.html" }],
+    "rewrites": [
+      {
+        "source": "/privacy-policy",
+        "destination": "/privacy-policy/index.html"
+      },
+      {
+        "source": "/privacy-policy/**",
+        "destination": "/privacy-policy/index.html"
+      },
+      {
+        "source": "/account-deletion",
+        "destination": "/account-deletion/index.html"
+      },
+      {
+        "source": "/account-deletion/**",
+        "destination": "/account-deletion/index.html"
+      },
+      { "source": "**", "destination": "/index.html" }
+    ],
     "headers": [
       {
         "source": "**",
@@ -34,6 +52,18 @@
       },
       {
         "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "/privacy-policy/**",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
+        "source": "/account-deletion/**",
         "headers": [
           { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
         ]

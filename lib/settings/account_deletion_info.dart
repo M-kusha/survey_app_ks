@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -46,6 +47,12 @@ class AccountDeletionInfoPage extends StatelessWidget {
                 title: 'account_deletion_owner_title'.tr(),
                 body: 'account_deletion_owner_body'.tr(),
               ),
+              const SizedBox(height: Spacing.md),
+              _InfoSection(
+                icon: Icons.lock_person_outlined,
+                title: 'account_deletion_access_title'.tr(),
+                body: 'account_deletion_access_body'.tr(),
+              ),
               const SizedBox(height: Spacing.xl),
               FilledButton.icon(
                 onPressed: () => Navigator.pushNamed(
@@ -61,6 +68,14 @@ class AccountDeletionInfoPage extends StatelessWidget {
                           : 'account_deletion_sign_in')
                       .tr(),
                 ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(
+                  context,
+                  PublicRoutePaths.privacyPolicy,
+                ),
+                child: Text('privacy_policy_link'.tr()),
               ),
             ],
           ),

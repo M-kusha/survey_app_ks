@@ -222,12 +222,13 @@ a real sender name and reply-to address.
 ### Legal and public deletion page
 
 **[EXTERNAL / MANUAL - legal/release owner]** Approve the operator/controller
-identity, support contact, privacy-policy URL, retention/backup statement,
+identity, support contact, approved privacy-policy copy, retention/backup statement,
 terms if required, Apple App Privacy answers, and Google Play Data Safety
-answers. After Hosting deployment, verify in a signed-out browser that
-`https://echomeet-app.web.app/#/account-deletion` (or the approved final custom
-domain equivalent) is public, localized, navigable, and matches the store
-listing. Source code is not legal approval.
+answers and the production origin. After Hosting deployment, verify in a
+signed-out browser that the approved origin plus `/privacy-policy/` and
+`/account-deletion/` are public, localized, refreshable, navigable, and match
+the store listing. Do not infer or prerecord a production hostname from the
+Firebase project ID. Source code is not legal approval.
 
 ## Gate 2 - enter maintenance and take recoverable backups
 
@@ -605,7 +606,7 @@ Firestore, Storage metadata, and visible client state after each action.
 | Push | Android/iOS/web permission and registration; foreground, background, tap, and cold-start routing; locale; invalid-token pruning; no false join notifications from the avatar migration |
 | App Check | valid attestation on web, Android, and iOS; no debug provider/token in release; callable rejection without valid token |
 | Web CSP | reCAPTCHA/App Check, FCM worker, PDF preview, and an actual print from the deployed origin; no CSP violations |
-| Public/legal | signed-out account-deletion URL, privacy/terms/support links, store declarations, and approved operator details |
+| Public/legal | approved-origin `/privacy-policy/` and `/account-deletion/` signed-out URLs, privacy/terms/support links where approved, store declarations, and approved operator details |
 
 Review logs for account-deletion failures, migration conflicts, Storage
 permission anomalies, App Check invalid/unknown traffic, Eventarc retries,

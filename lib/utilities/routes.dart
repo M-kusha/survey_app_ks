@@ -1,6 +1,7 @@
 import 'package:echomeet/appointments/create/step1_create_appointment.dart';
 import 'package:echomeet/appointments/create/step2_create_appointment.dart';
 import 'package:echomeet/appointments/create/step3_create_appointment.dart';
+import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/login/login.dart';
 import 'package:echomeet/login/session_access.dart';
 import 'package:echomeet/register/register_1step.dart';
@@ -9,6 +10,7 @@ import 'package:echomeet/register/register_logics.dart';
 import 'package:echomeet/register/registered_sucesfully.dart';
 import 'package:echomeet/reset_password/reset_password.dart';
 import 'package:echomeet/settings/account_deletion_info.dart';
+import 'package:echomeet/settings/privacy_policy_info.dart';
 import 'package:echomeet/settings/settings.dart';
 import 'package:echomeet/survey_pages/create_survey/step1_create_survey.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
@@ -27,7 +29,10 @@ class AppRoutes {
         return Register1step(registerLogic: logic);
       },
       '/reset_password': (context) => const ResetPasswordPage(),
-      '/account-deletion': (context) => const AccountDeletionInfoPage(),
+      PublicRoutePaths.accountDeletion: (context) =>
+          const AccountDeletionInfoPage(),
+      PublicRoutePaths.privacyPolicy: (context) =>
+          const PrivacyPolicyInfoPage(),
       '/home': (context) => _protected(context, const BottomNavigation()),
       '/survey': (context) =>
           _protected(context, const QuestionarySurveyPageUI()),

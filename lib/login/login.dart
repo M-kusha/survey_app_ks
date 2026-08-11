@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/core/notifications/notification_navigation.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
@@ -77,13 +78,7 @@ class LoginPageState extends State<LoginPage> {
           _buildCard(),
           const SizedBox(height: Spacing.lg),
           _buildRegisterLink(),
-          Center(
-            child: TextButton(
-              onPressed: () =>
-                  Navigator.pushNamed(context, '/account-deletion'),
-              child: Text('account_deletion_info_link'.tr()),
-            ),
-          ),
+          const PublicLegalLinks(),
         ],
       ),
     );
@@ -344,6 +339,32 @@ class LoginPageState extends State<LoginPage> {
     Navigator.pushReplacementNamed(context, '/home');
     WidgetsBinding.instance.addPostFrameCallback(
       (_) => NotificationNavigation.appReady(),
+    );
+  }
+}
+
+/// Signed-out links to the two public legal and account-data resources.
+class PublicLegalLinks extends StatelessWidget {
+  const PublicLegalLinks({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        children: [
+          TextButton(
+            onPressed: () =>
+                Navigator.pushNamed(context, PublicRoutePaths.privacyPolicy),
+            child: Text('privacy_policy_link'.tr()),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.pushNamed(context, PublicRoutePaths.accountDeletion),
+            child: Text('account_deletion_info_link'.tr()),
+          ),
+        ],
+      ),
     );
   }
 }
