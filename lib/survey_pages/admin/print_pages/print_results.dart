@@ -98,7 +98,7 @@ class PDFResults extends StatelessWidget {
               PdfKit.stat('result'.tr(), statusLabel, tint: statusTint),
             ]),
 
-          for (var i = 0; i < survey.questions.length; i++) _question(i),
+          for (var i = 0; i < survey.questions.length; i++) ..._question(i),
         ],
       ),
     );
@@ -106,29 +106,24 @@ class PDFResults extends StatelessWidget {
     return pdf;
   }
 
-  pw.Widget _question(int index) {
+  List<pw.Widget> _question(int index) {
     final question = survey.questions[index];
     final key = SurveyScorer.answerKey(index);
     final answer = participant.surveyAnswers[key] ?? const [];
     final type = QuestionType.parse(question['type']);
     final text = (question['question'] as String? ?? '').trim();
 
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 14),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          PdfKit.questionHeading(index + 1, text),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(left: 22),
-            child: switch (type) {
-              QuestionType.text => _textAnswer(index, answer),
-              _ => _options(question, answer),
-            },
-          ),
-        ],
-      ),
-    );
+    return [
+      PdfKit.questionHeading(index + 1, text),
+      if (type == QuestionType.text)
+        ..._textAnswer(index, answer)
+      else
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 22),
+          child: _options(question, answer),
+        ),
+      pw.SizedBox(height: 14),
+    ];
   }
 
   pw.Widget _options(Map<String, dynamic> question, List<dynamic> answer) {
@@ -164,51 +159,49 @@ class PDFResults extends StatelessWidget {
     );
   }
 
-  pw.Widget _textAnswer(int index, List<dynamic> answer) {
+  List<pw.Widget> _textAnswer(int index, List<dynamic> answer) {
     final written = answer.join(', ').trim();
     final key = '${survey.id}-${SurveyScorer.answerKey(index)}';
     final marked = textQuestionCorrect[key];
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        pw.Container(
-          width: double.infinity,
-          margin: const pw.EdgeInsets.only(top: 4),
-          padding: const pw.EdgeInsets.all(8),
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfKit.rule, width: 0.5),
-            borderRadius: pw.BorderRadius.circular(4),
+    return [
+      pw.Container(
+        width: double.infinity,
+        margin: const pw.EdgeInsets.only(left: 22, top: 4),
+        padding: const pw.EdgeInsets.all(8),
+        decoration: pw.BoxDecoration(
+          border: pw.Border.all(color: PdfKit.rule, width: 0.5),
+          borderRadius: pw.BorderRadius.circular(4),
+        ),
+        child: pw.Text(
+          written.isEmpty ? 'no_answer_given'.tr() : written,
+          overflow: pw.TextOverflow.span,
+          style: pw.TextStyle(
+            fontSize: 10,
+            color: written.isEmpty ? PdfKit.muted : PdfKit.ink,
           ),
+        ),
+      ),
+      if (_isTest)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 22, top: 4),
           child: pw.Text(
-            written.isEmpty ? 'no_answer_given'.tr() : written,
+            switch (marked) {
+              true => 'marked_correct'.tr(),
+              false => 'marked_incorrect'.tr(),
+              null => 'awaiting_review'.tr(),
+            },
             style: pw.TextStyle(
-              fontSize: 10,
-              color: written.isEmpty ? PdfKit.muted : PdfKit.ink,
+              fontSize: 8,
+              fontWeight: pw.FontWeight.bold,
+              color: switch (marked) {
+                true => PdfKit.correct,
+                false => PdfKit.wrong,
+                null => PdfKit.muted,
+              },
             ),
           ),
         ),
-        if (_isTest)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 4),
-            child: pw.Text(
-              switch (marked) {
-                true => 'marked_correct'.tr(),
-                false => 'marked_incorrect'.tr(),
-                null => 'awaiting_review'.tr(),
-              },
-              style: pw.TextStyle(
-                fontSize: 8,
-                fontWeight: pw.FontWeight.bold,
-                color: switch (marked) {
-                  true => PdfKit.correct,
-                  false => PdfKit.wrong,
-                  null => PdfKit.muted,
-                },
-              ),
-            ),
-          ),
-      ],
-    );
+    ];
   }
 }

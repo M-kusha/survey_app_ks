@@ -49,7 +49,7 @@ class PDFAnalytics extends StatelessWidget {
             PdfKit.header(title: survey.surveyName, subtitle: subtitle),
         footer: PdfKit.footer,
         build: (context) => [
-          for (var i = 0; i < survey.questions.length; i++) _question(i),
+          for (var i = 0; i < survey.questions.length; i++) ..._question(i),
           if (survey.questions.isEmpty)
             pw.Text(
               'no_questions_yet'.tr(),
@@ -62,26 +62,22 @@ class PDFAnalytics extends StatelessWidget {
     return pdf;
   }
 
-  pw.Widget _question(int index) {
+  List<pw.Widget> _question(int index) {
     final question = survey.questions[index];
     final type = QuestionType.parse(question['type']);
     final text = (question['question'] as String? ?? '').trim();
 
-    return pw.Container(
-      margin: const pw.EdgeInsets.only(bottom: 16),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          PdfKit.questionHeading(index + 1, text),
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(left: 22, top: 4),
-            child: type == QuestionType.text
-                ? _writtenAnswers(index)
-                : _distribution(index, question),
-          ),
-        ],
-      ),
-    );
+    return [
+      PdfKit.questionHeading(index + 1, text),
+      if (type == QuestionType.text)
+        ..._writtenAnswers(index)
+      else
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 22, top: 4),
+          child: _distribution(index, question),
+        ),
+      pw.SizedBox(height: 16),
+    ];
   }
 
   pw.Widget _distribution(int index, Map<String, dynamic> question) {
@@ -154,7 +150,7 @@ class PDFAnalytics extends StatelessWidget {
     );
   }
 
-  pw.Widget _writtenAnswers(int index) {
+  List<pw.Widget> _writtenAnswers(int index) {
     final key = SurveyScorer.answerKey(index);
 
     final written = [
@@ -166,41 +162,44 @@ class PDFAnalytics extends StatelessWidget {
     ].where((entry) => entry.text.isNotEmpty).toList();
 
     if (written.isEmpty) {
-      return pw.Text(
-        'no_responses_yet'.tr(),
-        style: const pw.TextStyle(fontSize: 9, color: PdfKit.muted),
-      );
+      return [
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 22, top: 4),
+          child: pw.Text(
+            'no_responses_yet'.tr(),
+            style: const pw.TextStyle(fontSize: 9, color: PdfKit.muted),
+          ),
+        ),
+      ];
     }
 
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        for (final entry in written)
-          pw.Container(
-            width: double.infinity,
-            margin: const pw.EdgeInsets.only(bottom: 4),
-            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfKit.rule, width: 0.5),
-              borderRadius: pw.BorderRadius.circular(4),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
+    return [
+      for (final entry in written)
+        pw.Container(
+          width: double.infinity,
+          margin: const pw.EdgeInsets.only(left: 22, top: 4),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfKit.rule, width: 0.5),
+            borderRadius: pw.BorderRadius.circular(4),
+          ),
+          child: pw.RichText(
+            overflow: pw.TextOverflow.span,
+            text: pw.TextSpan(
               children: [
-                pw.Text(
-                  entry.name,
+                pw.TextSpan(
+                  text: '${entry.name}\n',
                   style: const pw.TextStyle(fontSize: 7, color: PdfKit.muted),
                 ),
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  entry.text,
+                pw.TextSpan(
+                  text: entry.text,
                   style: const pw.TextStyle(fontSize: 10, color: PdfKit.ink),
                 ),
               ],
             ),
           ),
-      ],
-    );
+        ),
+    ];
   }
 
   static int _max(int a, int b) => a > b ? a : b;

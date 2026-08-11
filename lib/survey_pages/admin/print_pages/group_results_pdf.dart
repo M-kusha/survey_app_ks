@@ -149,55 +149,38 @@ class GroupResultsPdf extends StatelessWidget {
       fontWeight: isHeader ? pw.FontWeight.bold : pw.FontWeight.normal,
     );
 
-    pw.Widget cell(
-      String value, {
-      double? width,
-      required pw.Alignment alignment,
-      bool drawRightBorder = true,
-    }) {
-      final content = pw.Container(
-        width: width,
-        height: 22,
+    pw.Widget cell(String value, {required pw.Alignment alignment}) {
+      return pw.Container(
         padding: const pw.EdgeInsets.symmetric(horizontal: 5, vertical: 3),
         alignment: alignment,
-        decoration: pw.BoxDecoration(
-          border: pw.Border(
-            right: drawRightBorder ? borderSide : pw.BorderSide.none,
-          ),
-        ),
-        child: pw.FittedBox(
-          fit: pw.BoxFit.scaleDown,
-          alignment: alignment,
-          child: pw.Text(value, maxLines: 1, style: textStyle),
-        ),
+        child: pw.Text(value, style: textStyle),
       );
-
-      return width == null ? pw.Expanded(child: content) : content;
     }
 
-    return pw.Container(
-      height: 22,
-      decoration: pw.BoxDecoration(
-        border: pw.Border(
-          left: borderSide,
-          right: borderSide,
-          top: isHeader ? borderSide : pw.BorderSide.none,
-          bottom: borderSide,
+    return pw.Table(
+      border: pw.TableBorder(
+        left: borderSide,
+        right: borderSide,
+        top: isHeader ? borderSide : pw.BorderSide.none,
+        bottom: borderSide,
+        verticalInside: borderSide,
+      ),
+      columnWidths: const {
+        0: pw.FixedColumnWidth(36),
+        1: pw.FlexColumnWidth(),
+        2: pw.FixedColumnWidth(56),
+        3: pw.FixedColumnWidth(72),
+      },
+      children: [
+        pw.TableRow(
+          children: [
+            cell(values[0], alignment: pw.Alignment.centerLeft),
+            cell(values[1], alignment: pw.Alignment.centerLeft),
+            cell(values[2], alignment: pw.Alignment.centerRight),
+            cell(values[3], alignment: pw.Alignment.centerRight),
+          ],
         ),
-      ),
-      child: pw.Row(
-        children: [
-          cell(values[0], width: 36, alignment: pw.Alignment.centerLeft),
-          cell(values[1], alignment: pw.Alignment.centerLeft),
-          cell(values[2], width: 56, alignment: pw.Alignment.centerRight),
-          cell(
-            values[3],
-            width: 72,
-            alignment: pw.Alignment.centerRight,
-            drawRightBorder: false,
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

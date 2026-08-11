@@ -48,7 +48,6 @@ abstract final class PdfKit {
               children: [
                 pw.Text(
                   title,
-                  maxLines: 2,
                   style: pw.TextStyle(
                     fontSize: 15,
                     fontWeight: pw.FontWeight.bold,
@@ -116,31 +115,28 @@ abstract final class PdfKit {
     ),
   );
 
-  static pw.Widget questionHeading(int number, String question) => pw.Row(
-    crossAxisAlignment: pw.CrossAxisAlignment.start,
-    children: [
-      pw.Container(
-        width: 22,
-        child: pw.Text(
-          '$number.',
+  static pw.Widget questionHeading(int number, String question) => pw.RichText(
+    overflow: pw.TextOverflow.span,
+    text: pw.TextSpan(
+      children: [
+        pw.TextSpan(
+          text: '$number. ',
           style: pw.TextStyle(
             fontSize: 10,
             fontWeight: pw.FontWeight.bold,
             color: muted,
           ),
         ),
-      ),
-      pw.Expanded(
-        child: pw.Text(
-          question,
+        pw.TextSpan(
+          text: question,
           style: pw.TextStyle(
             fontSize: 11,
             fontWeight: pw.FontWeight.bold,
             color: ink,
           ),
         ),
-      ),
-    ],
+      ],
+    ),
   );
 
   static pw.Widget bar(double fraction, {PdfColor fill = chosen}) {
