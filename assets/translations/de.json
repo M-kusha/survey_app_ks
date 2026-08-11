@@ -45,6 +45,7 @@
   "appearance": "Darstellung",
   "appointment_created_successfully": "Ihr Termin wurde erfolgreich erstellt!",
   "appointment_deleted": "Termin gelöscht",
+  "add_to_calendar": "Zum Kalender hinzufügen",
   "appointment_edit": "Bearbeitung",
   "appointment_edit_conflict": "Dieser Termin wurde während der Bearbeitung geändert. Öffne ihn erneut und versuche es noch einmal.",
   "appointment_voted_slots_blocked_title": "Für diese Zeiten wurde bereits abgestimmt",

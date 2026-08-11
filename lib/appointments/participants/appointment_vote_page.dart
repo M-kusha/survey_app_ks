@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/calendar/appointment_ics.dart';
+import 'package:echomeet/appointments/calendar/calendar_download.dart';
 import 'package:echomeet/appointments/edit/appointment_edit.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/participants/vote_slot_card.dart';
@@ -318,6 +320,20 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
     }
   }
 
+  Future<void> _exportCalendar() async {
+    try {
+      await downloadCalendarFile(
+        contents: buildAppointmentIcs(appointment: _appointment),
+        fileName: appointmentIcsFileName(_appointment),
+      );
+    } catch (_) {
+      // A confirmed slot can be withdrawn by an admin between the build and
+      // the tap, and the platform handoff can refuse. Neither should leave the
+      // page in a broken state.
+      if (mounted) UIUtils.showSnackBar(context, 'error_occurred'.tr());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final slots = _appointment.availableTimeSlots;
@@ -327,6 +343,14 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       appBar: AppBar(
         title: Text(_appointment.title, overflow: TextOverflow.ellipsis),
         actions: [
+          if (calendarDownloadSupported &&
+              !_appointmentDeleted &&
+              _confirmedSlot != null)
+            IconButton(
+              tooltip: 'add_to_calendar'.tr(),
+              icon: const Icon(Icons.event_available_outlined),
+              onPressed: _exportCalendar,
+            ),
           if (widget.isAdmin && !_appointmentDeleted)
             IconButton(
               tooltip: 'appointment_edit'.tr(),

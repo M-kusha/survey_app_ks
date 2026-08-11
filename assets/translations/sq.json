@@ -45,6 +45,7 @@
   "appearance": "Pamja",
   "appointment_created_successfully": "Takimi juaj është krijuar me sukses!",
   "appointment_deleted": "Takimi u fshi",
+  "add_to_calendar": "Shto në kalendar",
   "appointment_edit": "Redaktimi",
   "appointment_edit_conflict": "Ky takim ndryshoi ndërsa po e redaktonit. Hapeni përsëri dhe provoni sërish.",
   "appointment_voted_slots_blocked_title": "Oraret kanë tashmë vota",

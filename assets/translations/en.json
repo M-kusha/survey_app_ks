@@ -45,6 +45,7 @@
   "appearance": "Appearance",
   "appointment_created_successfully": "Your Appointment has been created successfully!",
   "appointment_deleted": "Meeting deleted",
+  "add_to_calendar": "Add to calendar",
   "appointment_edit": "Editing",
   "appointment_edit_conflict": "This meeting changed while you were editing. Reopen it and try again.",
   "appointment_voted_slots_blocked_title": "Time already has votes",
