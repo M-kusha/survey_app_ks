@@ -6,6 +6,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'survey_questionary_class.dart';
 
+void applyParticipantDirectorySnapshot(
+  Iterable<Participant> participants,
+  Map<String, String> memberNames,
+) {
+  for (final participant in participants) {
+    participant.resolveDirectoryIdentity(memberNames[participant.userId]);
+  }
+}
+
+void applyParticipantDirectoryError(Iterable<Participant> participants) {
+  for (final participant in participants) {
+    participant.resolveDirectoryIdentity(null);
+  }
+}
+
 class SurveyDataProvider extends ChangeNotifier {
   SurveyDataProvider({FirebaseFirestore? firestore, FirebaseAuth? auth})
     : _firestore = firestore ?? FirebaseFirestore.instance,
@@ -27,6 +42,8 @@ class SurveyDataProvider extends ChangeNotifier {
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _surveysSubscription;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
   _participantsSubscription;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+  _participantMembersSubscription;
   Completer<void>? _firstSurveys;
   Completer<void>? _firstParticipants;
 
@@ -67,8 +84,11 @@ class SurveyDataProvider extends ChangeNotifier {
     ++_participantsGeneration;
     final previousSubscription = _surveysSubscription;
     final previousParticipantsSubscription = _participantsSubscription;
+    final previousParticipantMembersSubscription =
+        _participantMembersSubscription;
     _surveysSubscription = null;
     _participantsSubscription = null;
+    _participantMembersSubscription = null;
     _completeFirstSurveys();
     _completeFirstParticipants();
     _companyId = companyId;
@@ -88,6 +108,8 @@ class SurveyDataProvider extends ChangeNotifier {
       if (previousSubscription != null) previousSubscription.cancel(),
       if (previousParticipantsSubscription != null)
         previousParticipantsSubscription.cancel(),
+      if (previousParticipantMembersSubscription != null)
+        previousParticipantMembersSubscription.cancel(),
     ]);
     if (_disposed || generation != _surveyLoadGeneration) return;
 
@@ -171,26 +193,53 @@ class SurveyDataProvider extends ChangeNotifier {
 
   Future<void> loadParticipants(String surveyId) async {
     if (_participantsSurveyId == surveyId &&
-        _participantsSubscription != null) {
+        _participantsSubscription != null &&
+        _participantMembersSubscription != null) {
       await _firstParticipants?.future;
       return;
     }
 
     final generation = ++_participantsGeneration;
     final previousSubscription = _participantsSubscription;
+    final previousMembersSubscription = _participantMembersSubscription;
     final previousFirst = _firstParticipants;
     _participantsSubscription = null;
+    _participantMembersSubscription = null;
     _firstParticipants = null;
     _participantsSurveyId = surveyId;
     _participants = null;
     if (previousFirst != null && !previousFirst.isCompleted) {
       previousFirst.complete();
     }
-    await previousSubscription?.cancel();
+    await Future.wait([
+      if (previousSubscription != null) previousSubscription.cancel(),
+      if (previousMembersSubscription != null)
+        previousMembersSubscription.cancel(),
+    ]);
     if (_disposed || generation != _participantsGeneration) return;
 
     final firstSnapshot = Completer<void>();
     _firstParticipants = firstSnapshot;
+    var participantsSeen = false;
+    var membersSeen = false;
+    var memberNames = const <String, String>{};
+
+    void applyDirectoryIdentity() {
+      final participants = _participants;
+      if (!membersSeen || participants == null) return;
+      applyParticipantDirectorySnapshot(participants, memberNames);
+    }
+
+    void completeFirstSnapshot() {
+      if (!participantsSeen || !membersSeen || firstSnapshot.isCompleted) {
+        return;
+      }
+      firstSnapshot.complete();
+      if (identical(_firstParticipants, firstSnapshot)) {
+        _firstParticipants = null;
+      }
+    }
+
     _participantsSubscription = _firestore
         .collection('surveys')
         .doc(surveyId)
@@ -206,12 +255,11 @@ class SurveyDataProvider extends ChangeNotifier {
             _participants = snapshot.docs
                 .map((doc) => Participant.fromFirestore(doc.data()))
                 .toList();
+            participantsSeen = true;
+            applyDirectoryIdentity();
             _error = null;
             _notify();
-            if (!firstSnapshot.isCompleted) firstSnapshot.complete();
-            if (identical(_firstParticipants, firstSnapshot)) {
-              _firstParticipants = null;
-            }
+            completeFirstSnapshot();
           },
           onError: (Object error, StackTrace stackTrace) {
             if (_disposed ||
@@ -229,6 +277,54 @@ class SurveyDataProvider extends ChangeNotifier {
             }
           },
         );
+
+    final companyId = _companyId?.trim() ?? '';
+    if (companyId.isEmpty) {
+      membersSeen = true;
+      applyDirectoryIdentity();
+      completeFirstSnapshot();
+    } else {
+      _participantMembersSubscription = _firestore
+          .collection('memberDirectory')
+          .where('companyId', isEqualTo: companyId)
+          .snapshots()
+          .listen(
+            (snapshot) {
+              if (_disposed ||
+                  generation != _participantsGeneration ||
+                  _participantsSurveyId != surveyId) {
+                return;
+              }
+              memberNames = {
+                for (final document in snapshot.docs)
+                  if (document.data()['fullName'] case final String name
+                      when name.trim().isNotEmpty)
+                    document.id: name,
+              };
+              membersSeen = true;
+              applyDirectoryIdentity();
+              _notify();
+              completeFirstSnapshot();
+            },
+            onError: (Object _) {
+              if (_disposed ||
+                  generation != _participantsGeneration ||
+                  _participantsSurveyId != surveyId) {
+                return;
+              }
+              // Fail closed: results remain available, but names do not fall
+              // back to participant-authored or stale snapshot data.
+              memberNames = const {};
+              membersSeen = true;
+              final participants = _participants;
+              if (participants != null) {
+                applyParticipantDirectoryError(participants);
+              }
+              _notify();
+              completeFirstSnapshot();
+            },
+          );
+    }
 
     await firstSnapshot.future;
   }
@@ -384,8 +480,10 @@ class SurveyDataProvider extends ChangeNotifier {
     ++_participantsGeneration;
     final surveysSubscription = _surveysSubscription;
     final participantsSubscription = _participantsSubscription;
+    final participantMembersSubscription = _participantMembersSubscription;
     _surveysSubscription = null;
     _participantsSubscription = null;
+    _participantMembersSubscription = null;
     _completeFirstSurveys();
     _completeFirstParticipants();
     _companyId = null;
@@ -404,6 +502,8 @@ class SurveyDataProvider extends ChangeNotifier {
     await Future.wait([
       if (surveysSubscription != null) surveysSubscription.cancel(),
       if (participantsSubscription != null) participantsSubscription.cancel(),
+      if (participantMembersSubscription != null)
+        participantMembersSubscription.cancel(),
     ]);
   }
 
@@ -438,6 +538,7 @@ class SurveyDataProvider extends ChangeNotifier {
     unawaited(_authSubscription?.cancel());
     unawaited(_surveysSubscription?.cancel());
     unawaited(_participantsSubscription?.cancel());
+    unawaited(_participantMembersSubscription?.cancel());
     super.dispose();
   }
 }

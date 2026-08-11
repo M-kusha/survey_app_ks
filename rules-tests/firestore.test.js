@@ -664,6 +664,15 @@ describe('survey submissions', () => {
     );
   });
 
+  it('a participant cannot claim a colleague\'s display name', async () => {
+    await assertFails(
+      setDoc(
+        doc(as(ALICE), 'surveys', 'acme-survey', 'participants', ALICE),
+        submissionDocument(ALICE, { name: 'Bob' }),
+      ),
+    );
+  });
+
   it('nobody self-deletes a response, while staff can delete another response', async () => {
     await assertFails(
       deleteDoc(doc(as(BOB), 'surveys', 'acme-survey', 'participants', BOB)),
@@ -1034,6 +1043,64 @@ describe('voting on an appointment', () => {
           `${BOB}-${forged.start}-${forged.end}`,
         ),
         voteDocument(BOB, { timeSlot: forged, date: forged.start }),
+      ),
+    );
+  });
+
+  it('a voter cannot claim a colleague\'s display name', async () => {
+    const voteId = `${BOB}-${slot.start}-${slot.end}`;
+    await assertFails(
+      setDoc(
+        doc(as(BOB), 'appointments', appt(), 'participants', voteId),
+        voteDocument(BOB, { userName: 'Alice' }),
+      ),
+    );
+  });
+
+  it('uses the current canonical name for new writes without rewriting history', async () => {
+    const response = doc(
+      as(ALICE),
+      'surveys',
+      'acme-survey',
+      'participants',
+      BOB,
+    );
+    strictEqual((await getDoc(response)).data().name, 'Bob');
+
+    await assertSucceeds(updateMember(as(BOB), BOB, { fullName: 'Robert' }));
+    strictEqual((await getDoc(response)).data().name, 'Bob');
+
+    const voteId = `${BOB}-${slot.start}-${slot.end}`;
+    const vote = doc(
+      as(BOB),
+      'appointments',
+      appt(),
+      'participants',
+      voteId,
+    );
+    await assertFails(setDoc(vote, voteDocument(BOB)));
+    await assertSucceeds(
+      setDoc(vote, voteDocument(BOB, { userName: 'Robert' })),
+    );
+  });
+
+  it('fails closed when the caller has no member-directory projection', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await deleteDoc(doc(ctx.firestore(), 'memberDirectory', ALICE));
+    });
+
+    await assertFails(
+      setDoc(
+        doc(as(ALICE), 'surveys', 'acme-survey', 'participants', ALICE),
+        submissionDocument(ALICE),
+      ),
+    );
+
+    const voteId = `${ALICE}-${slot.start}-${slot.end}`;
+    await assertFails(
+      setDoc(
+        doc(as(ALICE), 'appointments', appt(), 'participants', voteId),
+        voteDocument(ALICE),
       ),
     );
   });

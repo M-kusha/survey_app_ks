@@ -8,10 +8,12 @@ import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_results.dart';
 import 'package:echomeet/survey_pages/utilities/firebase_survey_service.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class ParticipantAnswersPage extends StatefulWidget {
   const ParticipantAnswersPage({
@@ -61,6 +63,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
         .watchParticipant(widget.survey.id, widget.participant.userId)
         .listen((participant) {
           if (participant != null && mounted) {
+            participant.copyDirectoryIdentityFrom(_participant);
             setState(() => _participant = participant);
           }
         });
@@ -140,11 +143,24 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final directoryParticipants = context
+        .watch<SurveyDataProvider>()
+        .participants;
+    if (directoryParticipants != null) {
+      final currentIdentity = directoryParticipants
+          .where((participant) => participant.userId == _participant.userId)
+          .firstOrNull;
+      if (currentIdentity == null) {
+        _participant.resolveDirectoryIdentity(null);
+      } else {
+        _participant.copyDirectoryIdentityFrom(currentIdentity);
+      }
+    }
     final grade = _grade;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_participant.name),
+        title: Text(_participant.displayName('unknown'.tr())),
         actions: [
           IconButton(
             tooltip: 'download_results'.tr(),

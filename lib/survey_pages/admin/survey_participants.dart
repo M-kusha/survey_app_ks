@@ -534,7 +534,7 @@ class _ParticipantRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  participant.name,
+                  participant.displayName('unknown'.tr()),
                   style: theme.textTheme.bodyLarge,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -585,7 +585,7 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final name = participant.name.trim();
+    final name = participant.displayName('unknown'.tr()).trim();
 
     return ClipOval(
       child: SizedBox(

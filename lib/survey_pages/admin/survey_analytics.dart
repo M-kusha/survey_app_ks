@@ -3,9 +3,11 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/print_analytics.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/survey_pages/utilities/survey_questionary_class.dart';
 import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 List<List<int>> countAnswers(
   List<Map<String, dynamic>> questions,
@@ -57,14 +59,16 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final participants =
+        context.watch<SurveyDataProvider>().participants ?? widget.participants;
     final questions = widget.survey.questions;
-    final responded = widget.participants.length;
+    final responded = participants.length;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.survey.surveyName, overflow: TextOverflow.ellipsis),
         actions: [
-          if (widget.participants.isNotEmpty)
+          if (participants.isNotEmpty)
             IconButton(
               tooltip: 'pdf_print'.tr(),
               icon: const Icon(Icons.ios_share_rounded),
@@ -72,7 +76,7 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
                 MaterialPageRoute(
                   builder: (context) => PDFAnalytics(
                     survey: widget.survey,
-                    participants: widget.participants,
+                    participants: participants,
                     answerCounts: _counts,
                   ),
                 ),
@@ -81,7 +85,7 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
         ],
       ),
       body: SafeArea(
-        child: widget.participants.isEmpty
+        child: participants.isEmpty
             ? EmptyState(
                 icon: Icons.insights_outlined,
                 title: 'no_participants_added_yet'.tr(),

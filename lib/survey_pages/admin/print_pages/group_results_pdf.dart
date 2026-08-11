@@ -101,7 +101,7 @@ class GroupResultsPdf extends StatelessWidget {
               return _resultRow(
                 values: [
                   '${i + 1}',
-                  rows[i].name,
+                  rows[i].auditLabel('unknown'.tr()),
                   grade.resultIsFinal
                       ? '${rows[i].score.round()}%'
                       : _nonFinalLabel(grade),

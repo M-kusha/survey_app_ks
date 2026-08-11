@@ -160,7 +160,7 @@ class PDFAnalytics extends StatelessWidget {
     final written = [
       for (final participant in participants)
         (
-          name: participant.name,
+          name: participant.auditLabel('unknown'.tr()),
           text: (participant.surveyAnswers[key] ?? const []).join(', ').trim(),
         ),
     ].where((entry) => entry.text.isNotEmpty).toList();

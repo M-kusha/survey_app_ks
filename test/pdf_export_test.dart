@@ -58,10 +58,9 @@ void main() {
 
   final participant = Participant(
     userId: 'u1',
-    // Non-Latin1 on purpose. The default PDF font has no glyph for these, so
-    // this is the case that proves Inter is actually embedded rather than
-    // silently ignored.
-    name: 'Kushtrim Çabej-Ümlaut',
+    // The response snapshot differs on purpose: authorized rendering must use
+    // the current directory name below, not this historical value.
+    name: 'Historical Çabej-Ümlaut',
     surveyAnswers: {
       'Q0': [0],
       'Q1': [0, 2],
@@ -72,7 +71,20 @@ void main() {
     totalCorrectAnswers: 1,
     gradedQuestionCount: 4,
     gradingStatus: 'final',
-  );
+  )..resolveDirectoryIdentity('Kushtrim Çabej-Ümlaut');
+
+  test('participant export attribution keeps the authoritative UID', () {
+    expect(participant.auditLabel(), 'Kushtrim Çabej-Ümlaut · UID u1');
+    final retained = Participant(
+      userId: 'retained-user',
+      name: 'Historical snapshot',
+      surveyAnswers: const {},
+      score: 0,
+    )..resolveDirectoryIdentity(null);
+    expect(retained.auditLabel(), 'Unknown · UID retained-user');
+    retained.resolveDirectoryIdentity('Current canonical name');
+    expect(retained.auditLabel(), 'Current canonical name · UID retained-user');
+  });
 
   test('theme embeds the app font', () async {
     final theme = await PdfKit.theme();
@@ -143,8 +155,15 @@ void main() {
       textQuestionCorrect: participant.textAnswersReviewed,
     );
 
-    final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await finalizePdfDocument(document), 'participant');
+    final document = await widget.buildDocument(
+      PdfPageFormat.a4,
+      participant.auditLabel(),
+    );
+    final bytes = await finalizePdfDocument(document);
+    expectValidPdf(bytes, 'participant');
+    final text = _extractPdfText(bytes);
+    expect(text, contains('KushtrimÇabej-Ümlaut·UIDu1'));
+    expect(text, isNot(contains('HistoricalÇabej-Ümlaut')));
   });
 
   test('a survey sheet is a valid PDF', () async {
@@ -156,8 +175,15 @@ void main() {
       textQuestionCorrect: const {},
     );
 
-    final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await finalizePdfDocument(document), 'survey');
+    final document = await widget.buildDocument(
+      PdfPageFormat.a4,
+      participant.auditLabel(),
+    );
+    final bytes = await finalizePdfDocument(document);
+    expectValidPdf(bytes, 'survey');
+    final text = _extractPdfText(bytes);
+    expect(text, contains('KushtrimÇabej-Ümlaut·UIDu1'));
+    expect(text, isNot(contains('HistoricalÇabej-Ümlaut')));
   });
 
   test('the analytics report is a valid PDF', () async {
@@ -175,21 +201,25 @@ void main() {
     );
 
     final document = await widget.buildDocument(PdfPageFormat.a4, 'subtitle');
-    expectValidPdf(await finalizePdfDocument(document), 'analytics');
+    final bytes = await finalizePdfDocument(document);
+    expectValidPdf(bytes, 'analytics');
+    final text = _extractPdfText(bytes);
+    expect(text, contains('KushtrimÇabej-Ümlaut·UIDu1'));
+    expect(text, isNot(contains('HistoricalÇabej-Ümlaut')));
   });
 
   test('the multi-page group report is a valid PDF', () async {
-    final participants = List.generate(
-      120,
-      (index) => Participant(
+    final participants = List.generate(120, (index) {
+      final name = 'Teilnehmer $index - Kushtrim Çabej-Ümlaut ë ç';
+      return Participant(
         userId: 'u$index',
-        name: 'Teilnehmer $index - Kushtrim Çabej-Ümlaut ë ç',
+        name: name,
         surveyAnswers: const {},
         score: (index % 101).toDouble(),
         textAnswersReviewed: const {},
         totalCorrectAnswers: index % 4,
-      ),
-    );
+      )..resolveDirectoryIdentity(name);
+    });
     final widget = GroupResultsPdf(
       survey: surveyOf(SurveyType.test),
       participants: participants,
@@ -197,8 +227,35 @@ void main() {
     );
 
     final document = await widget.buildDocument(PdfPageFormat.a4);
-    expectValidPdf(await finalizePdfDocument(document), 'group');
+    final bytes = await finalizePdfDocument(document);
+    expectValidPdf(bytes, 'group');
+    expect(_extractPdfText(bytes), contains('UIDu0'));
   });
+
+  test(
+    'a deleted directory member keeps a neutral label and UID in PDF',
+    () async {
+      final retained = Participant(
+        userId: 'retained-user',
+        name: 'Historical snapshot must not render',
+        surveyAnswers: const {},
+        score: 0,
+        gradingStatus: 'error',
+      )..resolveDirectoryIdentity(null);
+      final document = await GroupResultsPdf(
+        survey: surveyOf(SurveyType.test),
+        participants: [retained],
+        groupLabel: 'Retained results',
+      ).buildDocument(PdfPageFormat.a4);
+      final bytes = await finalizePdfDocument(document);
+
+      expectValidPdf(bytes, 'retained-identity');
+      final text = _extractPdfText(bytes);
+      expect(text, contains('Unknown'));
+      expect(text, contains('UIDretained-user'));
+      expect(text, isNot(contains('Historicalsnapshotmustnotrender')));
+    },
+  );
 
   test('fixtures cover both survey kinds', () {
     // Guards the fixture itself: if `SurveyType` grows a case, this is the
@@ -208,3 +265,4 @@ void main() {
     expect(participant.surveyAnswers.containsKey('Q3'), isFalse);
   });
 }
+

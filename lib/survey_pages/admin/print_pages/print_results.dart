@@ -25,12 +25,15 @@ class PDFResults extends StatelessWidget {
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toLanguageTag();
     final subtitle =
-        '${participant.name} · '
+        '${participant.auditLabel('unknown'.tr())} · '
         '${DateFormat.yMMMd(locale).format(DateTime.now())}';
 
     return PdfViewerPage(
       title: 'pdf_print'.tr(),
-      fileName: pdfFileNameFrom([survey.surveyName, participant.name]),
+      fileName: pdfFileNameFrom([
+        survey.surveyName,
+        participant.displayName('unknown'.tr()),
+      ]),
       build: (format) => buildDocument(format, subtitle),
     );
   }

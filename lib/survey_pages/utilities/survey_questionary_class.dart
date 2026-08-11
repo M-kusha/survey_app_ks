@@ -106,6 +106,8 @@ class Participant {
   int? gradedQuestionCount;
   String? gradingStatus;
   List<Map<String, dynamic>> participations;
+  String? _directoryName;
+  bool _directoryIdentityResolved = false;
 
   Participant({
     required this.userId,
@@ -122,6 +124,33 @@ class Participant {
     this.gradingStatus,
     this.participations = const [],
   });
+
+  /// Applies the current authoritative directory projection. A missing or
+  /// malformed projection is a resolved, neutral identity state.
+  void resolveDirectoryIdentity(Object? fullName) {
+    _directoryIdentityResolved = true;
+    _directoryName = fullName is String && fullName.trim().isNotEmpty
+        ? fullName
+        : null;
+  }
+
+  void copyDirectoryIdentityFrom(Participant other) {
+    _directoryIdentityResolved = other._directoryIdentityResolved;
+    _directoryName = other._directoryName;
+  }
+
+  /// Human-readable current-directory rendering. Until the directory has
+  /// resolved, or when the UID is absent there, the historical snapshot is
+  /// deliberately not exposed.
+  String displayName([String unavailableLabel = 'Unknown']) =>
+      _directoryIdentityResolved && _directoryName != null
+      ? _directoryName!
+      : unavailableLabel;
+
+  /// Human-readable attribution for authorized exports. The name is a
+  /// rule-verified write-time snapshot; the UID remains the audit identity.
+  String auditLabel([String unavailableLabel = 'Unknown']) =>
+      '${displayName(unavailableLabel)} · UID $userId';
 
   Map<String, dynamic> toFirestoreMap() {
     return {

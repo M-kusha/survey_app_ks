@@ -272,6 +272,28 @@ service cloud.firestore {
         && !bannedFrom(companyId);
     }
 
+    // UID is the identity. Display names stored on responses and votes are
+    // historical snapshots, but the client may write only its own current,
+    // active projection from the same company.
+    function callerUsesCanonicalMemberName(companyId, claimedName) {
+      return claimedName is string
+        && exists(
+          /databases/$(database)/documents/memberDirectory/$(uid())
+        )
+        && validMemberProjection(get(
+          /databases/$(database)/documents/memberDirectory/$(uid())
+        ).data)
+        && get(
+          /databases/$(database)/documents/memberDirectory/$(uid())
+        ).data.companyId == companyId
+        && get(
+          /databases/$(database)/documents/memberDirectory/$(uid())
+        ).data.membership == 'active'
+        && get(
+          /databases/$(database)/documents/memberDirectory/$(uid())
+        ).data.fullName == claimedName;
+    }
+
     // ---------- public company directory ----------
 
     // Only this deliberately minimal projection is public; the authoritative
@@ -956,8 +978,7 @@ service cloud.firestore {
               'gradedQuestionCount', 'gradingStatus'
             ])
             && data.userId == uid()
-            && data.name is string
-            && data.name.size() <= 120
+            && callerUsesCanonicalMemberName(surveyCompanyId(), data.name)
             && data.answers is map
             && data.answers.size() <= 100
             // Only the server-side grading trigger may replace these sentinels.
@@ -1202,8 +1223,10 @@ service cloud.firestore {
             && data.keys().hasAll([
               'userName', 'date', 'timeSlot', 'status', 'userId', 'participated'
             ])
-            && data.userName is string
-            && data.userName.size() <= 120
+            && callerUsesCanonicalMemberName(
+              appointmentCompanyId(),
+              data.userName
+            )
             && data.date is string
             && data.timeSlot is map
             && data.timeSlot.keys().hasOnly([
