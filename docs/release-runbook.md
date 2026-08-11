@@ -51,6 +51,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `completeOnboarding` | Auth + App Check callable; finalizes a verified private onboarding intent |
 | `uploadProfileImage` | Auth + App Check callable; sanitizes and stores the caller's avatar |
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
+| `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |
 | `onSurveyCreated` | `surveys/{surveyId}` create notification |
 | `onSurveyResponseCreated` | trusted initial grading from `surveyAnswerKeys` |
 | `onSurveyResponseDeleted` | invalidates live participation state after response deletion |
@@ -68,22 +69,21 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 The supporting modules are `account_deletion.ts`,
 `appointment_participants.ts`, `join_requests.ts`, `messaging.ts`,
 `notification_copy.ts`, `onboarding.ts`, `profile_images.ts`, `purge.ts`,
-`scoring.ts`, and `trusted_scoring.ts`. They are compiled through the single
+`scoring.ts`, `survey_publication.ts`, and `trusted_scoring.ts`. They are
+compiled through the single
 `build` script and are not deployed independently. Server-side image decoding
 and re-encoding uses the exact locked `sharp` 0.35.3 dependency.
 
 ### Operator scripts in `functions/package.json`
 
-All six commands below exist in the current manifest and point to a present
+All four commands below exist in the current manifest and point to a present
 file under `functions/scripts`. A dry-run still reads production.
 
 | npm command | Script | Clean rerun gate | Ordering dependency |
 | --- | --- | --- | --- |
 | `backfill:company-directory` | `backfill_company_directory.js` | `create=0 conflicts=0` | before directory-dependent rules/clients |
-| `backfill:member-directory` | `backfill_member_directory.js` | `create=0 conflicts=0` | after company directory; before avatar migration |
 | `backfill:appointment-expiration` | `backfill_appointment_expiration.js` | future eligible `0`, validation conflicts `0` | reviewed timezone provenance; before reminder/rule rollout |
 | `backfill:appointment-participants` | `backfill_appointment_participants.js` | `backfill=0 conflicts=0` | before rules depend on the cache |
-| `migrate:survey-answer-keys` | `migrate_survey_answer_keys.js` | each phase `actions=0 conflicts=0` | prepare before trusted scorer; sanitize after it |
 | `migrate:avatar-privacy` | `migrate_avatar_privacy.js` | phase-specific zero actions/conflicts | member directory + guarded Functions before access; rules/client before prepare/switch |
 
 ### Existing focused documents
@@ -93,8 +93,6 @@ file under `functions/scripts`. A dry-run still reads production.
 - `appointment-participant-backfill.md`: trusted participant-cache migration.
 - `avatar-privacy-migration.md`: access, prepare, and switch invariants.
 - `company-directory-backfill.md`: public company projection.
-- `member-directory-backfill.md`: private/public member split.
-- `survey-answer-key-migration.md`: private-key prepare/sanitize handover.
 - `verified-onboarding.md`: verified deferred tenant creation/join.
 - `notifications.md`: FCM, region, APNs, VAPID, and scheduled delivery.
 - `email-templates.md`: manual Firebase Auth template copy.
@@ -276,7 +274,7 @@ evidence, or previous deploy artifacts cannot be proven.
 
 ## Gate 3 - production credential and emulator preflight
 
-Enter `functions` once for all migration commands:
+Enter `functions` once for all operator commands:
 
 ```powershell
 Set-Location .\functions
@@ -291,19 +289,18 @@ environment variables is set:
 - `FIREBASE_AUTH_EMULATOR_HOST`
 - `FUNCTIONS_EMULATOR`
 
-Every migration script rejects emulator use in dry-run and apply modes, but the
-operator must still clear the full environment above. Confirm the ADC principal
-and its least-privilege, time-bounded Firestore
-and Storage access. Every command's first output must identify
-`Project=echomeet-app` (and the exact avatar bucket where applicable). Stop on
-any `CONFLICT`, unexpected create/update/delete line, authentication fallback,
-or project mismatch.
+Production modes reject emulator use. Clear the full environment above before
+production work. Confirm the ADC principal and its least-privilege, time-bounded Firestore
+and Storage access. Every command's output must identify the exact production
+project in its header (and the exact avatar bucket where applicable). Stop on
+any conflict/quarantine status, unexpected action, authentication fallback, or
+project mismatch.
 
 For a partial apply, do not restore individual documents by hand and do not
-repeat `--apply` blindly. Rerun the same dry command; the scripts are designed
-to skip exact completed work and expose remaining conflicts.
+repeat `--apply` blindly. Preserve its redacted evidence and rerun the same dry
+command before deciding how to continue.
 
-## Gate 4 - additive and prepare migrations
+## Gate 4 - additive data checks
 
 Run each dry-run, review its complete plan, apply only the approved plan, then
 run the identical dry command again. Do not combine or parallelize migrations.
@@ -318,17 +315,7 @@ npm run backfill:company-directory -- --project echomeet-app
 
 Gate: `create=0 conflicts=0`.
 
-### 4.2 Member directory
-
-```powershell
-npm run backfill:member-directory -- --project echomeet-app
-npm run backfill:member-directory -- --project echomeet-app --apply
-npm run backfill:member-directory -- --project echomeet-app
-```
-
-Gate: `create=0 conflicts=0`. Do not start any avatar phase before this passes.
-
-### 4.3 Appointment expiration timestamps
+### 4.2 Appointment expiration timestamps
 
 First run without a timezone assumption:
 
@@ -350,7 +337,7 @@ Gate: `Future legacy documents eligible: 0` and
 `Validation conflicts: 0`. If the first dry-run needs no assumption, use the
 same three-command sequence without `--assume-time-zone`.
 
-### 4.4 Appointment participant cache
+### 4.3 Appointment participant cache
 
 ```powershell
 npm run backfill:appointment-participants -- --project echomeet-app
@@ -360,18 +347,7 @@ npm run backfill:appointment-participants -- --project echomeet-app
 
 Gate: `backfill=0 conflicts=0`.
 
-### 4.5 Survey answer-key prepare
-
-```powershell
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase prepare
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase prepare --apply
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase prepare
-```
-
-Gate: `actions=0 conflicts=0`. Public keys still exist at this stop point, so
-the old scorer remains recoverable until the later sanitize phase.
-
-### 4.6 Historic verified-owner and name-lock audit
+### 4.4 Historic verified-owner and name-lock audit
 
 **[EXTERNAL / MANUAL - security/data owner]** There is no repository script for
 this read-only audit. Using an approved, project-pinned Admin SDK procedure,
@@ -392,7 +368,7 @@ Return to the repository root:
 Set-Location ..
 ```
 
-## Gate 5 - indexes, trusted Functions, avatar access, then survey sanitize
+## Gate 5 - indexes and the matched backend boundary
 
 ### 5.1 Indexes first
 
@@ -405,39 +381,36 @@ firebase deploy --only firestore:indexes --project echomeet-app
 scope, is fully enabled. A successful CLI submission while an index is still
 building is not a pass.
 
-### 5.2 Trusted Functions
+### 5.2 Deploy the matched Functions and Firestore rules
 
-Deploy through the validated package script:
+Build and deploy the reviewed backend and rules as one release boundary:
 
 ```powershell
 Set-Location .\functions
 npm run deploy
 npm run logs
 Set-Location ..
+firebase deploy --only firestore:rules --project echomeet-app
 ```
 
-`npm run deploy` expands to a build followed by a Functions-only deployment
-pinned to `echomeet-app`. Verify all 15 exports in the inventory, their
-`europe-west4` region, schedules, Eventarc health, and absence of unexpected
-deletions or region duplicates. At this point the new scorer can rely on the
-prepared private keys, the appointment cache triggers are authoritative, and
-the three callables enforce App Check.
+Verify the exact named export inventory above (never a stale numeric count),
+immutable revisions, `europe-west4` region, schedules, Eventarc health, and no
+unexpected deletion or duplicate. Verify `saveSurveyDefinition` is the only
+survey-definition writer, publishes the existing public survey shape and its
+schema-version-1 protected answer key in one transaction, and enforces Auth,
+App Check, active tenant membership, and staff authorization. Direct client
+survey/key creates and updates remain denied. The database is clean, so this
+release performs no survey migration or bulk rewrite.
 
-An all-Functions deploy can recreate or resume Scheduler jobs. Recheck the
-three discovered jobs immediately and keep them paused until Gate 9 resumes
-them intentionally.
+An all-Functions deploy can resume Scheduler jobs; pause all three again until
+the smoke gate. Wait for already-delivered Eventarc invocations to drain before
+evaluating the new revision.
 
-Before continuing, verify that the deployed `onJoinRequested` includes the
-company-ban lookup/guard. Avatar `access` deliberately mirrors a banned user's
-membership to `pending`; without this exact guard, the migration can emit false
-join-request notifications. Also verify the deployed company purge preflights
-the name-lock count before any destructive work, performs child/member cleanup
-first, and then atomically deletes every `companyNames` lock, the
-`companyDirectory` projection, and the company parent in one final batch. A
+Also verify `onJoinRequested` includes the company-ban guard before avatar
+`access`. Verify company purge preflights name-lock count, performs child/member
+cleanup first, and atomically deletes every `companyNames` lock, the
+`companyDirectory` projection, and company parent in its final batch. A
 different deployed revision is a stop condition.
-
-Do not deploy the restrictive Firestore/Storage rules yet. Do not allow survey
-activity during the scorer handover.
 
 ### 5.3 Avatar access phase
 
@@ -455,26 +428,13 @@ Set-Location ..
 Gate: `banActions=0 conflicts=0`, with no join notification caused by the
 migration.
 
-### 5.4 Survey answer-key sanitize
-
-```powershell
-Set-Location .\functions
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase sanitize
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase sanitize --apply
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase sanitize
-Set-Location ..
-```
-
-Gate: `actions=0 conflicts=0`. This is a rollback boundary: after sanitize
-removes public answer keys, an old scorer cannot be redeployed by itself.
-
-## Gate 6 - security rules, then updated clients and Hosting
+## Gate 6 - Storage rules, updated clients, and Hosting
 
 Keep all writes paused for this handover. The rules temporarily make retired
 clients unusable; that is acceptable only inside the already-established
 forced-upgrade maintenance window.
 
-1. Deploy Firestore and Storage rules together from the reviewed commit:
+1. Deploy the same reviewed Firestore and Storage rules together:
 
    ```powershell
    firebase deploy --only "firestore:rules,storage" --project echomeet-app
@@ -497,6 +457,9 @@ forced-upgrade maintenance window.
 5. In a clean signed-out browser and a verified test account, confirm the
    deployed web build receives App Check, registers FCM with the release VAPID
    key, does not serve a stale service worker, and reaches the new Functions.
+
+6. Keep client writes frozen until the signed-out and authenticated web/mobile
+   smoke checks pass against the deployed Functions and rules.
 
 ### Storage-to-Firestore IAM gate
 
@@ -565,11 +528,8 @@ outputs to the release record:
 ```powershell
 Set-Location .\functions
 npm run backfill:company-directory -- --project echomeet-app
-npm run backfill:member-directory -- --project echomeet-app
 npm run backfill:appointment-expiration -- --project echomeet-app
 npm run backfill:appointment-participants -- --project echomeet-app
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase prepare
-npm run migrate:survey-answer-keys -- --project echomeet-app --phase sanitize
 npm run migrate:avatar-privacy -- --project echomeet-app --phase access
 npm run migrate:avatar-privacy -- --project echomeet-app --phase prepare
 npm run migrate:avatar-privacy -- --project echomeet-app --phase switch
@@ -592,7 +552,6 @@ investigate.
 
 Use dedicated non-customer test tenants/accounts and inspect Function logs,
 Firestore, Storage metadata, and visible client state after each action.
-
 | Surface | Required production check |
 | --- | --- |
 | Registration | verification email; no pre-verification company/name lock; verified create/join resumes after app close, login, and web refresh; conflict retry works |
@@ -608,7 +567,7 @@ Firestore, Storage metadata, and visible client state after each action.
 | Web CSP | reCAPTCHA/App Check, FCM worker, PDF preview, and an actual print from the deployed origin; no CSP violations |
 | Public/legal | approved-origin `/privacy-policy/` and `/account-deletion/` signed-out URLs, privacy/terms/support links where approved, store declarations, and approved operator details |
 
-Review logs for account-deletion failures, migration conflicts, Storage
+Review logs for account-deletion failures, operator-script conflicts, Storage
 permission anomalies, App Check invalid/unknown traffic, Eventarc retries,
 scoring fail-closed messages, and duplicate/missing notifications. Resume the
 three Scheduler jobs and verify their next-run times. Re-enable user writes in
@@ -617,7 +576,7 @@ one controlled step only after every owner signs the release record.
 ## Gate 10 - gradual App Check console enforcement
 
 **[EXTERNAL / MANUAL - Firebase owner]** Do this after updated clients are in
-use, not in the migration handover:
+use, not during the backend/rules handover:
 
 1. Monitor App Check valid, invalid, and unknown request metrics separately for
    web, Android, and iOS while Firestore/Storage/Auth enforcement remains off.
@@ -643,16 +602,13 @@ monitoring guidance is at
 
 Rollback always uses the previous reviewed artifact set and the explicit
 `echomeet-app` project. Never mix a previous client with current rules or a
-previous function with a post-migration schema without checking the boundary
+previous function with the current data schema without checking the boundary
 below.
 
 | Last completed boundary | Safe response |
 | --- | --- |
 | Dry-run only | Fix conflicts or abandon the release; production data is unchanged by the script |
 | Directory/expiration/participant backfills | Leave exact additive fields/projections in place; redeploying old clients does not require deleting them |
-| Survey `prepare` only | Private keys may remain; old public keys still exist; previous scorer can be restored if needed |
-| New Functions, before survey `sanitize` | Redeploy the complete previous Functions bundle only after checking triggers/schedules and keeping maintenance active |
-| Survey `sanitize` complete | Do not restore an old scorer alone. Roll forward, or execute a separately rehearsed sensitive-data restore of public keys while writes remain frozen |
 | Avatar `access` complete | Leave synchronized ban fields unless a reviewed ban-state rollback exists; verify membership and notifications before any code rollback |
 | Firestore/Storage rules deployed | A rules-only rollback can reopen fixed vulnerabilities or violate current clients. Redeploy the matched previous Functions/rules/client set or roll forward |
 | Avatar `prepare` complete | Download tokens are revoked. Do not release an old URL-rendering client; roll forward or use the rehearsed object/metadata recovery plan |
@@ -660,7 +616,7 @@ below.
 | Hosting deployed | Redeploy the previous immutable Hosting artifact and verify service-worker/cache behavior; mobile releases cannot be recalled the same way |
 | App Check product enforced | Disable only the affected product's console enforcement if valid users are blocked; preserve other authorization controls |
 
-For any partially committed migration, the first recovery action is its same
+For any partially committed operator script, the first recovery action is its same
 dry-run, not a broad Firestore import. A full import can overwrite valid
 post-export state and requires incident-commander approval, a renewed write
 freeze, and the rehearsed restore plan. Never delete private answer keys,

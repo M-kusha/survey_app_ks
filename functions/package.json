@@ -11,8 +11,6 @@
     "backfill:appointment-participants": "node scripts/backfill_appointment_participants.js",
     "backfill:company-directory": "node scripts/backfill_company_directory.js",
     "migrate:avatar-privacy": "node scripts/migrate_avatar_privacy.js",
-    "migrate:survey-answer-keys": "node scripts/migrate_survey_answer_keys.js",
-    "backfill:member-directory": "node scripts/backfill_member_directory.js",
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.js",
     "test:profile-images-emulator": "npx --yes node@22 node_modules/typescript/bin/tsc && firebase emulators:exec --only auth,firestore,storage --project=echomeet-test --config ../firebase.json \"npx --yes node@22 --test --test-concurrency=1 test/profile_images.emulator.js\"",

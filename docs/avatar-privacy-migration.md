@@ -53,8 +53,9 @@ submissions, appointment voting, bans/unbans, membership changes, and account or
 company deletion. Do not continue while an old mobile client version can still
 write avatar URLs or display them directly.
 
-1. Complete the private member-directory backfill first. Resolve its conflicts
-   and reach `create=0 conflicts=0`.
+1. Confirm the clean database invariant: every eligible private profile has an
+   exact same-UID `memberDirectory` projection and there are no legacy missing
+   projections. Stop instead of attempting a backfill if this check fails.
 2. Authenticate Application Default Credentials with an approved short-lived
    operator identity. Do not download a service-account key. At minimum, scope
    that identity to Firestore document read/write transactions and object
