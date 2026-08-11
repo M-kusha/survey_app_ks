@@ -29,6 +29,10 @@ import {
   transferCompanyOwnershipForUser,
 } from './ownership_transfer';
 import {
+  EmailSyncError,
+  syncVerifiedEmailForUser,
+} from './email_sync';
+import {
   registerAppointmentParticipant,
   unregisterAppointmentParticipant,
 } from './appointment_participants';
@@ -302,6 +306,32 @@ export const transferCompanyOwnership = onCall(
         errorType: error instanceof Error ? error.constructor.name : typeof error,
       });
       throw new HttpsError('internal', 'ownership-transfer-incomplete');
+    }
+  },
+);
+
+/** Copies the caller's live verified Auth email into its private profile. */
+export const syncVerifiedEmail = onCall(
+  { region, enforceAppCheck: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'authentication-required');
+    }
+    if (request.auth.token.email_verified !== true) {
+      throw new HttpsError('failed-precondition', 'email-not-verified');
+    }
+
+    try {
+      return await syncVerifiedEmailForUser(request.auth.uid, request.data);
+    } catch (error) {
+      if (error instanceof EmailSyncError) {
+        throw new HttpsError(error.code, error.message);
+      }
+      logger.error('verified email sync failed closed', {
+        uid: request.auth.uid,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+      });
+      throw new HttpsError('internal', 'verified-email-sync-incomplete');
     }
   },
 );

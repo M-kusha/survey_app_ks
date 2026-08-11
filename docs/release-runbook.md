@@ -51,6 +51,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 | `completeOnboarding` | Auth + App Check callable; finalizes a verified private onboarding intent |
 | `createCompanyForCurrentUser` | Recent-Auth + App Check callable; creates a company for an eligible companyless account and makes it owner |
 | `transferCompanyOwnership` | Recent-Auth + App Check callable; requests or accepts an ownership hand-off to an active member |
+| `syncVerifiedEmail` | Auth + App Check callable; copies the caller's live verified Auth email into its private profile and records a PII-free company event when applicable |
 | `uploadProfileImage` | Auth + App Check callable; sanitizes and stores the caller's avatar |
 | `deleteMyAccount` | Recent-Auth + App Check callable; trusted retryable account erasure |
 | `saveSurveyDefinition` | Auth + App Check callable; atomically publishes a public survey and its protected answer key |
@@ -73,7 +74,7 @@ Every target is v2 and must appear in `europe-west4` after deployment.
 
 The supporting modules are `account_deletion.ts`, `activity_log.ts`,
 `appointment_definition.ts`, `appointment_participants.ts`,
-`company_administration.ts`, `content_deletion.ts`,
+`company_administration.ts`, `content_deletion.ts`, `email_sync.ts`,
 `appointment_state.ts`, `join_requests.ts`, `messaging.ts`,
 `notification_copy.ts`, `onboarding.ts`, `ownership_transfer.ts`,
 `profile_images.ts`, `purge.ts`, `scoring.ts`, `survey_publication.ts`, and

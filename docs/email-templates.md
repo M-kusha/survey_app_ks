@@ -17,6 +17,7 @@ lands in spam.
 | --- | --- |
 | `%LINK%` | The one-time action link. Required — the mail is useless without it. |
 | `%EMAIL%` | The recipient's address. |
+| `%NEW_EMAIL%` | The new sign-in address in the old-address security notice. |
 | `%DISPLAY_NAME%` | Their name, if the account has one. |
 | `%APP_NAME%` | The project's public-facing name. |
 
@@ -55,6 +56,11 @@ a routine mail and an alarming one.
 
 ## Email address verification
 
+This template is sent to the **new** address by the app's
+`verifyBeforeUpdateEmail` flow. Following its link verifies the new address and
+makes it the account's primary sign-in address. It is separate from the
+old-address revoke notice in the next section.
+
 **Subject**
 
 ```
@@ -71,8 +77,8 @@ receive notifications about surveys and meetings:
 
 %LINK%
 
-If you didn't create an EchoMeet account, you can ignore this — the address will
-not be used.
+If you did not create an EchoMeet account or request this address change, ignore
+this message — no change occurs without the link.
 
 — EchoMeet
 ```
@@ -82,7 +88,7 @@ not be used.
 **Subject**
 
 ```
-Your EchoMeet sign-in address is changing
+Your EchoMeet sign-in address was changed
 ```
 
 **Body**
@@ -90,17 +96,22 @@ Your EchoMeet sign-in address is changing
 ```
 Hello %DISPLAY_NAME%,
 
-The address used to sign in to your EchoMeet account is being changed to
-%EMAIL%. Confirm it here:
+The address used to sign in to your EchoMeet account was changed to
+%NEW_EMAIL%.
+
+If you made this change, no action is needed.
+
+If you did not make this change, use this security link immediately to restore
+your previous sign-in address:
 
 %LINK%
 
-If you did not ask for this, do not click the link — contact your company
-administrator straight away, because somebody may have access to your account.
+After restoring the address, change your password because somebody may have
+access to your account.
 
 — EchoMeet
 ```
 
-This one is sent to the **old** address, which is what makes it the most
-security-relevant of the three: it is the last message that reaches the real
-owner if an account has been taken over.
+This one is sent to the **old** address. It is a security/revert notice, not a
+confirmation request: `%NEW_EMAIL%` identifies the replacement address and
+`%LINK%` reverses an unauthorized change.

@@ -8,6 +8,7 @@ import 'package:echomeet/core/membership/company_privilege_service.dart';
 import 'package:echomeet/core/membership/ownership_transfer_service.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/settings/banned_members.dart';
+import 'package:echomeet/settings/change_email.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/localization/app_locales.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
@@ -605,6 +606,13 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     return SettingsGroup(
       title: 'account'.tr(),
       children: [
+        SettingsTile(
+          icon: Icons.alternate_email_rounded,
+          title: 'change_email'.tr(),
+          subtitle: 'change_email_hint'.tr(),
+          onTap: () => _open(const ChangeEmailPage()),
+        ),
+
         SettingsTile(
           icon: Icons.lock_outline_rounded,
           title: 'change_password'.tr(),

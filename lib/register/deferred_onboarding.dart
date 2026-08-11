@@ -6,6 +6,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/notifications/notification_navigation.dart';
+import 'package:echomeet/core/security/email_change_service.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/core/widgets/aurora_background.dart';
 import 'package:echomeet/core/widgets/glass_panel.dart';
@@ -57,14 +58,19 @@ class DeferredOnboardingService {
     FirebaseAuth? auth,
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
+    EmailChangeService? emailChangeService,
   }) : _auth = auth ?? FirebaseAuth.instance,
        _firestore = firestore ?? FirebaseFirestore.instance,
        _functions =
-           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west4');
+           functions ?? FirebaseFunctions.instanceFor(region: 'europe-west4'),
+       _emailChangeService =
+           emailChangeService ??
+           EmailChangeService(auth: auth, functions: functions);
 
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
+  final EmailChangeService _emailChangeService;
 
   Future<DeferredOnboardingIntent?> loadIntent() async {
     final user = _auth.currentUser;
@@ -82,6 +88,11 @@ class DeferredOnboardingService {
       );
     }
     await refreshed!.getIdToken(true);
+    try {
+      await _emailChangeService.syncAfterAuthenticationRefresh();
+    } on EmailChangeException {
+      throw const OnboardingCompletionException(OnboardingFailure.retryable);
+    }
 
     final snapshot = await _firestore.collection('users').doc(user.uid).get();
     final data = snapshot.data();
