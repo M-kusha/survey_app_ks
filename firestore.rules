@@ -1055,7 +1055,14 @@ service cloud.firestore {
           && data.questionKeys.size() <= 100;
       }
 
-      allow read: if false;
+      // Staff only, and only inside their own company.
+      //
+      // They wrote these answers, and reviewing a submission means showing
+      // which option was right. Participants are refused, which is the part
+      // that matters: the key stays unreadable to anyone who could still be
+      // sitting the test. Grading is unaffected either way - that runs in a
+      // trusted function against this same document.
+      allow read: if accountActive() && adminOf(resource.data.companyId);
 
       allow create: if accountActive()
         && adminOf(request.resource.data.companyId)

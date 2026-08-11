@@ -859,18 +859,36 @@ describe('survey authoring', () => {
     );
   });
 
-  it('published questions contain no grading key and private keys are unreadable', async () => {
+  it('published questions carry no grading key', async () => {
     const survey = await getDoc(doc(as(BOB), 'surveys', 'acme-survey'));
     const question = survey.data().questions[0];
     strictEqual(Object.hasOwn(question, 'correctAnswer'), false);
     strictEqual(Object.hasOwn(question, 'correctAnswers'), false);
+  });
 
+  it('private answer keys are readable by staff and nobody else', async () => {
+    // Staff review submissions, which means showing which option was right.
+    await assertSucceeds(
+      getDoc(doc(as(ALICE), 'surveyAnswerKeys', 'acme-survey')),
+    );
+    await assertSucceeds(
+      getDoc(doc(as(MOLLY), 'surveyAnswerKeys', 'acme-survey')),
+    );
+
+    // The part that matters: anyone who could still be sitting the test.
     await assertFails(
       getDoc(doc(as(BOB), 'surveyAnswerKeys', 'acme-survey')),
     );
     await assertFails(
-      getDoc(doc(as(ALICE), 'surveyAnswerKeys', 'acme-survey')),
+      getDoc(doc(as(CAROL), 'surveyAnswerKeys', 'acme-survey')),
     );
+
+    // Another company's key stays closed even to an owner.
+    await assertFails(
+      getDoc(doc(as(ALICE), 'surveyAnswerKeys', 'rival-survey')),
+    );
+
+    // And no sweeping the collection to find them.
     await assertFails(getDocs(collection(as(ALICE), 'surveyAnswerKeys')));
   });
 

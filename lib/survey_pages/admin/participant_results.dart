@@ -34,6 +34,10 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   StreamSubscription<Participant?>? _participantSubscription;
   late Participant _participant;
 
+  /// Correct option indexes per question. Empty until the answer key loads,
+  /// and for surveys, which have no right answer to mark.
+  List<Set<int>> _answerKey = const [];
+
   bool _saving = false;
 
   bool get _isTest => widget.survey.surveyType != SurveyType.survey;
@@ -60,7 +64,19 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
             setState(() => _participant = participant);
           }
         });
+    if (_isTest) unawaited(_loadAnswerKey());
   }
+
+  Future<void> _loadAnswerKey() async {
+    final key = await _service.fetchAnswerKeyIndexes(widget.survey.id);
+    if (!mounted || key.isEmpty) return;
+    setState(() => _answerKey = key);
+  }
+
+  /// The answer key is the only source. Nothing here reads grading fields off
+  /// the survey document, because members can read that document.
+  Set<int> _correctFor(int index) =>
+      index < _answerKey.length ? _answerKey[index] : const <int>{};
 
   @override
   void dispose() {
@@ -159,6 +175,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                         _participant.surveyAnswers[SurveyScorer.answerKey(i)] ??
                         const [],
                     isTest: _isTest,
+                    correct: _correctFor(i),
                     verdict: _participant
                         .textAnswersReviewed['${widget.survey.id}-${SurveyScorer.answerKey(i)}'],
                     busy: _saving,
@@ -263,6 +280,7 @@ class _QuestionCard extends StatelessWidget {
     required this.question,
     required this.answer,
     required this.isTest,
+    required this.correct,
     required this.verdict,
     required this.busy,
     required this.onReview,
@@ -272,6 +290,7 @@ class _QuestionCard extends StatelessWidget {
   final Map<String, dynamic> question;
   final List<dynamic> answer;
   final bool isTest;
+  final Set<int> correct;
 
   final bool? verdict;
 
@@ -318,7 +337,12 @@ class _QuestionCard extends StatelessWidget {
                     busy: busy,
                     onReview: onReview,
                   )
-                : _Options(question: question, answer: answer),
+                : _Options(
+                    question: question,
+                    answer: answer,
+                    isTest: isTest,
+                    correct: correct,
+                  ),
           ),
         ],
       ),
@@ -327,19 +351,32 @@ class _QuestionCard extends StatelessWidget {
 }
 
 class _Options extends StatelessWidget {
-  const _Options({required this.question, required this.answer});
+  const _Options({
+    required this.question,
+    required this.answer,
+    required this.isTest,
+    required this.correct,
+  });
 
   final Map<String, dynamic> question;
   final List<dynamic> answer;
+  final bool isTest;
+  final Set<int> correct;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final app = context.appColors;
 
     final options = (question['options'] as List<dynamic>? ?? const [])
         .map((option) => '$option')
         .toList();
+
+    // Surveys have no right answer, and an empty key means it has not loaded
+    // yet or the caller was refused it. Either way, fall back to showing only
+    // what they picked rather than marking everything wrong.
+    final graded = isTest && correct.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -347,11 +384,54 @@ class _Options extends StatelessWidget {
         for (var i = 0; i < options.length; i++)
           () {
             final picked = answer.contains(i);
-            final color = picked ? scheme.primary : scheme.outline;
-            final icon = picked
-                ? Icons.radio_button_checked_rounded
-                : Icons.radio_button_unchecked_rounded;
-            final label = picked ? 'chosen' : null;
+            final isRight = correct.contains(i);
+
+            // `lostMark` is the red border: a point that was thrown away,
+            // either by picking a wrong option or by leaving a right one
+            // untouched. Both need to be findable at a glance.
+            final (color, icon, label, tone, lostMark) = switch ((
+              graded,
+              picked,
+              isRight,
+            )) {
+              (true, true, true) => (
+                app.success,
+                Icons.check_circle_rounded,
+                'chosen_correct',
+                StatusTone.positive,
+                false,
+              ),
+              (true, true, false) => (
+                scheme.error,
+                Icons.cancel_rounded,
+                'chosen_wrong',
+                StatusTone.danger,
+                true,
+              ),
+              (true, false, true) => (
+                app.success,
+                Icons.check_circle_outline_rounded,
+                'missed',
+                StatusTone.danger,
+                true,
+              ),
+              (false, true, _) => (
+                scheme.primary,
+                Icons.radio_button_checked_rounded,
+                'chosen',
+                StatusTone.info,
+                false,
+              ),
+              _ => (
+                scheme.outline,
+                Icons.radio_button_unchecked_rounded,
+                null,
+                StatusTone.neutral,
+                false,
+              ),
+            };
+
+            final border = lostMark ? scheme.error : color;
 
             return Container(
               margin: const EdgeInsets.only(bottom: Spacing.sm),
@@ -362,8 +442,10 @@ class _Options extends StatelessWidget {
                     ? color.withValues(alpha: 0.12)
                     : Colors.transparent,
                 border: Border.all(
-                  color: color.withValues(alpha: picked ? 0.65 : 0.18),
-                  width: picked ? 1.5 : 1,
+                  color: border.withValues(
+                    alpha: picked || lostMark ? 0.65 : 0.18,
+                  ),
+                  width: picked || lostMark ? 1.5 : 1,
                 ),
               ),
               child: IntrinsicHeight(
@@ -396,10 +478,7 @@ class _Options extends StatelessWidget {
                             ),
                             if (label != null) ...[
                               const SizedBox(width: Spacing.sm),
-                              StatusPill(
-                                label: label.tr(),
-                                tone: StatusTone.info,
-                              ),
+                              StatusPill(label: label.tr(), tone: tone),
                             ],
                           ],
                         ),

@@ -85,6 +85,24 @@ class FirebaseSurveyService {
         .update({'textAnswersReviewed': textAnswersReviewed});
   }
 
+  /// The correct option indexes for each question, for the review screen.
+  ///
+  /// Only company staff can read this; rules reject everyone else, so a
+  /// participant cannot pull the answers before submitting. Returns an empty
+  /// list when the read is refused or the survey predates answer keys, which
+  /// the caller renders as an unmarked review rather than as a failure.
+  Future<List<Set<int>>> fetchAnswerKeyIndexes(String surveyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('surveyAnswerKeys')
+          .doc(surveyId)
+          .get();
+      return readAnswerKeyIndexes(snapshot.data());
+    } on FirebaseException {
+      return const [];
+    }
+  }
+
   Stream<Participant?> watchParticipant(
     String surveyId,
     String participantId,
