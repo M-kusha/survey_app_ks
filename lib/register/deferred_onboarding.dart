@@ -245,13 +245,9 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
   Future<void> _uploadPendingProfileImage() async {
     final registration = context.read<RegisterLogic>();
     if (!registration.hasPendingProfileImage) return;
-    final uploaded = await registration.uploadPendingProfileImage();
-    if (uploaded || !mounted) return;
-    UIUtils.showSnackBar(
-      context,
-      'error_updating_profile_image'.tr(),
-      isError: true,
-    );
+    final result = await registration.uploadPendingProfileImage();
+    if (result.succeeded || !mounted) return;
+    UIUtils.showSnackBar(context, result.errorKey!.tr(), isError: true);
   }
 
   Future<void> _signOut() async {

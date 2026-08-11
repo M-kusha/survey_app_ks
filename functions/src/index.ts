@@ -35,7 +35,10 @@ import { finalizePendingOnboarding } from './onboarding';
 import { joinRequestCompanyId } from './join_requests';
 import {
   InvalidProfileImageError,
+  ProfileImageAuthorizationError,
+  ProfileImageRevisionError,
   ProfileImageStateError,
+  parseProfileImageUploadPayload,
   uploadOwnProfileImage,
 } from './profile_images';
 
@@ -103,23 +106,18 @@ export const uploadProfileImage = onCall(
       throw new HttpsError('failed-precondition', 'email-not-verified');
     }
 
-    const data =
-      request.data != null && typeof request.data === 'object'
-        ? (request.data as Record<string, unknown>)
-        : null;
-    if (
-      data == null ||
-      Object.keys(data).length !== 1 ||
-      !Object.prototype.hasOwnProperty.call(data, 'jpegBase64')
-    ) {
-      throw new HttpsError('invalid-argument', 'invalid-profile-image');
-    }
-
     try {
-      return await uploadOwnProfileImage(request.auth.uid, data.jpegBase64);
+      const upload = parseProfileImageUploadPayload(request.data);
+      return await uploadOwnProfileImage(request.auth.uid, upload);
     } catch (error) {
       if (error instanceof InvalidProfileImageError) {
-        throw new HttpsError('invalid-argument', 'invalid-profile-image');
+        throw new HttpsError('invalid-argument', error.message);
+      }
+      if (error instanceof ProfileImageAuthorizationError) {
+        throw new HttpsError('permission-denied', error.message);
+      }
+      if (error instanceof ProfileImageRevisionError) {
+        throw new HttpsError('aborted', error.message);
       }
       if (error instanceof ProfileImageStateError) {
         throw new HttpsError('failed-precondition', error.message);

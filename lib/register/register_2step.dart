@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/profile/profile_image_sanitizer.dart';
+import 'package:echomeet/core/profile/profile_image_upload_error.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/register/register_3step.dart';
 import 'package:echomeet/register/register_logics.dart';
@@ -55,11 +56,11 @@ class _Register2stepState extends State<Register2step> {
       final image = await sanitizeProfileImage(picked);
       if (!mounted) return;
       setState(() => _logic.setProfileImage(image));
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       UIUtils.showSnackBar(
         context,
-        'error_updating_profile_image'.tr(),
+        profileImageUploadErrorKey(error).tr(),
         isError: true,
       );
     }

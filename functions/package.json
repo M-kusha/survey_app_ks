@@ -15,6 +15,7 @@
     "backfill:member-directory": "node scripts/backfill_member_directory.js",
     "build": "tsc",
     "test": "npm run build && node --test test/*.test.js",
+    "test:profile-images-emulator": "npx --yes node@22 node_modules/typescript/bin/tsc && firebase emulators:exec --only auth,firestore,storage --project=echomeet-test --config ../firebase.json \"npx --yes node@22 --test --test-concurrency=1 test/profile_images.emulator.js\"",
     "watch": "tsc --watch",
     "serve": "npm run build && firebase emulators:start --only functions",
     "deploy": "npm run build && firebase deploy --only functions --project echomeet-app",

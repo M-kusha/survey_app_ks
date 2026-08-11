@@ -11,6 +11,17 @@ void main() {
     expect(readProfileImageRevision(maximumProfileImageRevision + 1), 0);
   });
 
+  test('optimistic uploads reject malformed stored revisions', () {
+    expect(validatedProfileImageRevision(null), 0);
+    expect(validatedProfileImageRevision(7), 7);
+    expect(validatedProfileImageRevision(-1), isNull);
+    expect(validatedProfileImageRevision(1.5), isNull);
+    expect(
+      validatedProfileImageRevision(maximumProfileImageRevision + 1),
+      isNull,
+    );
+  });
+
   test('participant snapshots retain the avatar revision', () {
     final participant = Participant.fromFirestore({
       'userId': 'alice',

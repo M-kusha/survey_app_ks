@@ -6,6 +6,7 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/core/profile/profile_image_sanitizer.dart';
 import 'package:echomeet/core/profile/profile_image_revision.dart';
+import 'package:echomeet/core/profile/profile_image_upload_error.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -30,7 +31,16 @@ class _ProfileSectionState extends State<ProfileSection> {
       .doc(widget.userId)
       .snapshots();
 
-  Future<void> _pickAndUpload() async {
+  Future<void> _pickAndUpload(int? expectedRevision) async {
+    if (expectedRevision == null) {
+      UIUtils.showSnackBar(
+        context,
+        'profile_image_account_unavailable'.tr(),
+        isError: true,
+      );
+      return;
+    }
+
     final picked = await ImagePicker().pickImage(
       source: ImageSource.gallery,
       maxWidth: 1600,
@@ -45,21 +55,28 @@ class _ProfileSectionState extends State<ProfileSection> {
       final bytes = await sanitizeProfileImage(picked);
       final result = await FirebaseFunctions.instanceFor(region: 'europe-west4')
           .httpsCallable('uploadProfileImage')
-          .call<Map<String, dynamic>>({'jpegBase64': base64Encode(bytes)});
+          .call<Map<String, dynamic>>({
+            'jpegBase64': base64Encode(bytes),
+            'expectedRevision': expectedRevision,
+          });
       if (result.data['path'] != profileImagePathFor(widget.userId)) {
         throw StateError('Unexpected profile image path.');
       }
       final revision = result.data['revision'];
-      if (revision is! int || revision < 1) {
+      if (revision is! int || revision != expectedRevision + 1) {
         throw StateError('Unexpected profile image revision.');
       }
 
       if (!mounted) return;
       setState(() => _avatarRevision = revision);
       UIUtils.showSnackBar(context, 'profile_image_uploaded'.tr());
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
-      UIUtils.showSnackBar(context, 'error_updating_profile_image'.tr());
+      UIUtils.showSnackBar(
+        context,
+        profileImageUploadErrorKey(error).tr(),
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -79,9 +96,10 @@ class _ProfileSectionState extends State<ProfileSection> {
 
         final stored = (data?['profileImage'] as String?)?.trim();
         final image = (stored == null || stored.isEmpty) ? null : stored;
-        final profileImageRevision = readProfileImageRevision(
-          data?['profileImageRevision'],
-        );
+        final validatedRevision = data == null
+            ? null
+            : validatedProfileImageRevision(data['profileImageRevision']);
+        final profileImageRevision = validatedRevision ?? 0;
         final role = data?['role'] as String?;
 
         return Container(
@@ -99,7 +117,7 @@ class _ProfileSectionState extends State<ProfileSection> {
                 url: image,
                 uploading: _uploading,
                 initials: _initialsOf(name),
-                onTap: _pickAndUpload,
+                onTap: () => _pickAndUpload(validatedRevision),
                 avatarRevision: _avatarRevision,
                 profileImageRevision: profileImageRevision,
               ),

@@ -5,6 +5,8 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
+import 'package:echomeet/core/profile/profile_image_revision.dart';
+import 'package:echomeet/core/profile/profile_image_upload_error.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:flutter/material.dart';
 
@@ -44,13 +46,15 @@ class RegisterLogic {
 
   String? selectedCompanyName;
   Uint8List? _pendingProfileImage;
-  Future<bool>? _profileImageUpload;
+  int? _pendingProfileImageExpectedRevision;
+  Future<ProfileImageUploadResult>? _profileImageUpload;
 
   Uint8List? get pendingProfileImage => _pendingProfileImage;
   bool get hasPendingProfileImage => _pendingProfileImage != null;
 
   void setProfileImage(Uint8List image) {
     _pendingProfileImage = image;
+    _pendingProfileImageExpectedRevision = null;
   }
 
   void resetForRegistration() {
@@ -61,33 +65,78 @@ class RegisterLogic {
     companyNameController.clear();
     selectedCompanyName = null;
     _pendingProfileImage = null;
+    _pendingProfileImageExpectedRevision = null;
   }
 
-  Future<bool> uploadPendingProfileImage() {
-    if (_pendingProfileImage == null) return Future.value(true);
+  Future<ProfileImageUploadResult> uploadPendingProfileImage() {
+    if (_pendingProfileImage == null) {
+      return Future.value(const ProfileImageUploadResult.success());
+    }
     return _profileImageUpload ??= _uploadPendingProfileImage().whenComplete(
       () => _profileImageUpload = null,
     );
   }
 
-  Future<bool> _uploadPendingProfileImage() async {
+  Future<ProfileImageUploadResult> _uploadPendingProfileImage() async {
     final user = _auth.currentUser;
     final image = _pendingProfileImage;
-    if (user == null || user.emailVerified != true || image == null) {
-      return false;
+    if (user == null) {
+      return const ProfileImageUploadResult.failed(
+        'profile_image_sign_in_again',
+      );
     }
-
+    if (user.emailVerified != true) {
+      return const ProfileImageUploadResult.failed(
+        'profile_image_verify_email',
+      );
+    }
+    if (image == null) {
+      return const ProfileImageUploadResult.success();
+    }
     try {
+      var expectedRevision = _pendingProfileImageExpectedRevision;
+      if (expectedRevision == null) {
+        final profile = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get(const GetOptions(source: Source.server));
+        if (!profile.exists) {
+          return const ProfileImageUploadResult.failed(
+            'profile_image_account_unavailable',
+          );
+        }
+        expectedRevision = validatedProfileImageRevision(
+          profile.data()?['profileImageRevision'],
+        );
+        if (expectedRevision == null) {
+          return const ProfileImageUploadResult.failed(
+            'profile_image_account_unavailable',
+          );
+        }
+        _pendingProfileImageExpectedRevision = expectedRevision;
+      }
       final result = await FirebaseFunctions.instanceFor(region: 'europe-west4')
           .httpsCallable('uploadProfileImage')
-          .call<Map<String, dynamic>>({'jpegBase64': base64Encode(image)});
-      if (result.data['path'] != profileImagePathFor(user.uid)) return false;
+          .call<Map<String, dynamic>>({
+            'jpegBase64': base64Encode(image),
+            'expectedRevision': expectedRevision,
+          });
+      if (result.data['path'] != profileImagePathFor(user.uid)) {
+        return const ProfileImageUploadResult.failed(
+          'error_updating_profile_image',
+        );
+      }
       final revision = result.data['revision'];
-      if (revision is! int || revision < 1) return false;
+      if (revision is! int || revision != expectedRevision + 1) {
+        return const ProfileImageUploadResult.failed(
+          'error_updating_profile_image',
+        );
+      }
       _pendingProfileImage = null;
-      return true;
-    } catch (_) {
-      return false;
+      _pendingProfileImageExpectedRevision = null;
+      return const ProfileImageUploadResult.success();
+    } catch (error) {
+      return ProfileImageUploadResult.failed(profileImageUploadErrorKey(error));
     }
   }
 

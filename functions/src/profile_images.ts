@@ -1,12 +1,12 @@
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Transaction } from 'firebase-admin/firestore';
+import {
+  DocumentReference,
+  getFirestore,
+  Transaction,
+} from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { randomUUID } from 'node:crypto';
-import * as sharpModule from 'sharp';
-
-// This functions package is compiled as CommonJS. Sharp 0.35 publishes a
-// callable CommonJS export but describes it as a default export to TypeScript.
-const sharp = sharpModule as unknown as typeof sharpModule.default;
+import sharp = require('sharp');
 
 const maximumInputBytes = 5 * 1024 * 1024;
 const maximumRollbackBytes = 15 * 1024 * 1024;
@@ -18,8 +18,8 @@ export const profileImagePathFor = (uid: string): string =>
   `profile_images/${uid}/avatar.jpg`;
 
 export class InvalidProfileImageError extends Error {
-  constructor() {
-    super('invalid-profile-image');
+  constructor(message = 'invalid-profile-image') {
+    super(message);
     this.name = 'InvalidProfileImageError';
   }
 }
@@ -29,6 +29,72 @@ export class ProfileImageStateError extends Error {
     super(message);
     this.name = 'ProfileImageStateError';
   }
+}
+
+export class ProfileImageAuthorizationError extends Error {
+  constructor(message: 'company-banned' | 'company-membership-inactive') {
+    super(message);
+    this.name = 'ProfileImageAuthorizationError';
+  }
+}
+
+export class ProfileImageRevisionError extends Error {
+  constructor() {
+    super('stale-profile-image-revision');
+    this.name = 'ProfileImageRevisionError';
+  }
+}
+
+export type ProfileImageInputFormat = 'jpeg' | 'png';
+
+export type ParsedProfileImageUpload = {
+  imageBase64: string;
+  format: ProfileImageInputFormat;
+  expectedRevision: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasExactlyKeys(
+  value: Record<string, unknown>,
+  expected: readonly string[],
+): boolean {
+  const actual = Object.keys(value).sort();
+  const wanted = [...expected].sort();
+  return (
+    actual.length === wanted.length &&
+    actual.every((key, index) => key === wanted[index])
+  );
+}
+
+export function parseProfileImageUploadPayload(
+  raw: unknown,
+): ParsedProfileImageUpload {
+  if (!isRecord(raw)) throw new InvalidProfileImageError('profile-image-request-invalid');
+
+  const format = Object.prototype.hasOwnProperty.call(raw, 'jpegBase64')
+    ? 'jpeg'
+    : Object.prototype.hasOwnProperty.call(raw, 'pngBase64')
+      ? 'png'
+      : null;
+  const formatKey = format === 'jpeg' ? 'jpegBase64' : 'pngBase64';
+  if (
+    format == null ||
+    !hasExactlyKeys(raw, [formatKey, 'expectedRevision']) ||
+    typeof raw[formatKey] !== 'string' ||
+    !Number.isInteger(raw.expectedRevision) ||
+    (raw.expectedRevision as number) < 0 ||
+    (raw.expectedRevision as number) > maximumProfileImageRevision
+  ) {
+    throw new InvalidProfileImageError('profile-image-request-invalid');
+  }
+  return {
+    imageBase64: raw[formatKey] as string,
+    format,
+    expectedRevision: raw.expectedRevision as number,
+  };
 }
 
 export function nextProfileImageRevision(current: unknown): number {
@@ -47,6 +113,54 @@ function invalidImage(): never {
   throw new InvalidProfileImageError();
 }
 
+const forbiddenEmbeddedPayloads = [
+  Buffer.from('<script', 'ascii'),
+  Buffer.from('</script', 'ascii'),
+  Buffer.from('javascript:', 'ascii'),
+  Buffer.from('<!doctype', 'ascii'),
+  Buffer.from('<html', 'ascii'),
+  Buffer.from('%pdf-', 'ascii'),
+  Buffer.from([0x70, 0x6b, 0x03, 0x04]),
+];
+
+function containsForbiddenEmbeddedPayload(input: Buffer): boolean {
+  const lower = Buffer.from(input.toString('latin1').toLowerCase(), 'latin1');
+  return forbiddenEmbeddedPayloads.some((signature) =>
+    lower.includes(signature),
+  );
+}
+
+function decodedImageFormat(input: Buffer): ProfileImageInputFormat {
+  if (containsForbiddenEmbeddedPayload(input)) return invalidImage();
+
+  if (
+    input.length >= 4 &&
+    input[0] === 0xff &&
+    input[1] === 0xd8 &&
+    input[2] === 0xff &&
+    input[input.length - 2] === 0xff &&
+    input[input.length - 1] === 0xd9
+  ) {
+    return 'jpeg';
+  }
+
+  const pngSignature = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+  ]);
+  const pngEnd = Buffer.from([
+    0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+    0xae, 0x42, 0x60, 0x82,
+  ]);
+  if (
+    input.length >= pngSignature.length + pngEnd.length &&
+    input.subarray(0, pngSignature.length).equals(pngSignature) &&
+    input.subarray(-pngEnd.length).equals(pngEnd)
+  ) {
+    return 'png';
+  }
+  return invalidImage();
+}
+
 /**
  * Strictly decodes the callable payload and re-encodes it as a bounded JPEG.
  *
@@ -55,32 +169,31 @@ function invalidImage(): never {
  * bandwidth, but is not part of the security guarantee.
  */
 export async function sanitizeProfileImagePayload(
-  jpegBase64: unknown,
+  imageBase64: unknown,
+  expectedFormat: ProfileImageInputFormat = 'jpeg',
 ): Promise<Buffer> {
   if (
-    typeof jpegBase64 !== 'string' ||
-    jpegBase64.length === 0 ||
-    jpegBase64.length > maximumBase64Length ||
-    jpegBase64.length % 4 !== 0 ||
-    !/^[A-Za-z0-9+/]+={0,2}$/.test(jpegBase64)
+    typeof imageBase64 !== 'string' ||
+    imageBase64.length === 0 ||
+    imageBase64.length > maximumBase64Length ||
+    imageBase64.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(imageBase64)
   ) {
     return invalidImage();
   }
 
-  const input = Buffer.from(jpegBase64, 'base64');
+  const input = Buffer.from(imageBase64, 'base64');
   if (
     input.length === 0 ||
-    input.length >= maximumInputBytes ||
-    input.toString('base64') !== jpegBase64 ||
-    input.length < 4 ||
-    input[0] !== 0xff ||
-    input[1] !== 0xd8 ||
-    input[2] !== 0xff ||
-    input[input.length - 2] !== 0xff ||
-    input[input.length - 1] !== 0xd9
+    input.length > maximumInputBytes ||
+    input.toString('base64') !== imageBase64 ||
+    input.length < 4
   ) {
     return invalidImage();
   }
+
+  const decodedFormat = decodedImageFormat(input);
+  if (decodedFormat !== expectedFormat) return invalidImage();
 
   try {
     const image = sharp(input, {
@@ -90,11 +203,13 @@ export async function sanitizeProfileImagePayload(
     });
     const metadata = await image.metadata();
     if (
-      metadata.format !== 'jpeg' ||
+      metadata.format !== decodedFormat ||
       metadata.width == null ||
       metadata.height == null ||
       metadata.width < 1 ||
       metadata.height < 1 ||
+      metadata.width > maximumDimension ||
+      metadata.height > maximumDimension ||
       (metadata.pages != null && metadata.pages !== 1)
     ) {
       return invalidImage();
@@ -118,7 +233,7 @@ export async function sanitizeProfileImagePayload(
 
     if (
       output.length === 0 ||
-      output.length >= maximumInputBytes ||
+      output.length > maximumInputBytes ||
       output[0] !== 0xff ||
       output[1] !== 0xd8 ||
       output[output.length - 2] !== 0xff ||
@@ -148,88 +263,133 @@ function hasOnlyProjectionFields(data: Record<string, unknown>): boolean {
 function assertMatchingProjection(
   profile: Record<string, unknown>,
   member: Record<string, unknown> | undefined,
-): void {
+): { companyId: string; revision: number; membership: unknown } {
   const companyId =
     typeof profile.companyId === 'string' ? profile.companyId.trim() : '';
-  if (companyId.length === 0) {
-    if (member != null) throw new ProfileImageStateError();
-    return;
-  }
-
-  const revision = profile.profileImageRevision;
   if (
-    revision != null &&
-    (!Number.isInteger(revision) ||
-      (revision as number) < 0 ||
-      (revision as number) > maximumProfileImageRevision)
+    companyId.length === 0 ||
+    companyId.length > 128 ||
+    companyId.includes('/') ||
+    profile.companyId !== companyId
   ) {
-    throw new ProfileImageStateError();
+    throw new ProfileImageStateError('company-membership-unavailable');
   }
 
+  const storedRevision = profile.profileImageRevision;
+  const revision = storedRevision ?? 0;
+  if (
+    !Number.isInteger(revision) ||
+    (revision as number) < 0 ||
+    (revision as number) > maximumProfileImageRevision
+  ) {
+    throw new ProfileImageStateError('profile-revision-unavailable');
+  }
+
+  const membership = profile.membership;
   if (
     member == null ||
     !hasOnlyProjectionFields(member) ||
     member.fullName !== profile.fullName ||
     member.companyId !== profile.companyId ||
     member.role !== profile.role ||
-    member.membership !== (profile.membership ?? 'active') ||
-    member.profileImageRevision !== revision
+    member.membership !== membership ||
+    member.profileImage !== profile.profileImage ||
+    member.profileImageRevision !== storedRevision
   ) {
-    throw new ProfileImageStateError();
+    throw new ProfileImageStateError('member-projection-mismatch');
   }
+  return { companyId, revision: revision as number, membership };
 }
 
-async function assertProfileWritable(uid: string): Promise<void> {
+type WritableProfileState = {
+  profile: Record<string, unknown>;
+  revision: number;
+  user: DocumentReference;
+  member: DocumentReference;
+};
+
+async function writableProfileState(
+  uid: string,
+  transaction: Transaction,
+): Promise<WritableProfileState> {
   const db = getFirestore();
   const user = db.collection('users').doc(uid);
   const member = db.collection('memberDirectory').doc(uid);
   const lock = db.collection('accountDeletionLocks').doc(uid);
-  const [lockSnapshot, userSnapshot, memberSnapshot] = await db.getAll(
+  const [lockSnapshot, userSnapshot, memberSnapshot] = await transaction.getAll(
     lock,
     user,
     member,
   );
   if (lockSnapshot.exists || !userSnapshot.exists) {
-    throw new ProfileImageStateError();
+    throw new ProfileImageStateError('profile-unavailable');
   }
-  assertMatchingProjection(
-    userSnapshot.data() ?? {},
+
+  const profile = userSnapshot.data() ?? {};
+  const projection = assertMatchingProjection(
+    profile,
     memberSnapshot.exists ? memberSnapshot.data() : undefined,
   );
+  const company = db.collection('companies').doc(projection.companyId);
+  const ban = company.collection('bans').doc(uid);
+  const [companySnapshot, banSnapshot] = await transaction.getAll(company, ban);
+  if (!companySnapshot.exists) {
+    throw new ProfileImageStateError('company-unavailable');
+  }
+  const companyData = companySnapshot.data() ?? {};
+  if (Object.prototype.hasOwnProperty.call(companyData, 'deletionScheduledFor')) {
+    throw new ProfileImageStateError('company-closing');
+  }
+  if (banSnapshot.exists) {
+    throw new ProfileImageAuthorizationError('company-banned');
+  }
+  if (projection.membership !== 'active') {
+    throw new ProfileImageAuthorizationError('company-membership-inactive');
+  }
+  return {
+    profile,
+    revision: projection.revision,
+    user,
+    member,
+  };
+}
+
+async function assertExpectedRevision(
+  uid: string,
+  expectedRevision: number,
+): Promise<void> {
+  const db = getFirestore();
+  await db.runTransaction(async (transaction: Transaction) => {
+    const state = await writableProfileState(uid, transaction);
+    if (state.revision !== expectedRevision) {
+      throw new ProfileImageRevisionError();
+    }
+    nextProfileImageRevision(state.revision);
+  });
 }
 
 async function synchronizeProfileReference(
   uid: string,
   path: string,
+  expectedRevision: number,
 ): Promise<number> {
   const db = getFirestore();
-  const user = db.collection('users').doc(uid);
-  const member = db.collection('memberDirectory').doc(uid);
-  const lock = db.collection('accountDeletionLocks').doc(uid);
 
   return db.runTransaction(async (transaction: Transaction) => {
-    const [lockSnapshot, userSnapshot, memberSnapshot] =
-      await transaction.getAll(lock, user, member);
-    if (lockSnapshot.exists || !userSnapshot.exists) {
-      throw new ProfileImageStateError();
+    const state = await writableProfileState(uid, transaction);
+    if (state.revision !== expectedRevision) {
+      throw new ProfileImageRevisionError();
     }
 
-    const profile = userSnapshot.data() ?? {};
-    assertMatchingProjection(
-      profile,
-      memberSnapshot.exists ? memberSnapshot.data() : undefined,
-    );
-    const revision = nextProfileImageRevision(profile.profileImageRevision);
-    transaction.update(user, {
+    const revision = nextProfileImageRevision(state.revision);
+    transaction.update(state.user, {
       profileImage: path,
       profileImageRevision: revision,
     });
-    if (memberSnapshot.exists) {
-      transaction.update(member, {
-        profileImage: path,
-        profileImageRevision: revision,
-      });
-    }
+    transaction.update(state.member, {
+      profileImage: path,
+      profileImageRevision: revision,
+    });
     return revision;
   });
 }
@@ -280,10 +440,10 @@ async function deleteIfAccountClosing(
 /** Stores only a canonical private path; it never creates a download token. */
 export async function uploadOwnProfileImage(
   uid: string,
-  jpegBase64: unknown,
+  upload: ParsedProfileImageUpload,
 ): Promise<{ path: string; revision: number }> {
   if (uid.length < 1 || uid.length > 128 || uid.includes('/')) {
-    throw new ProfileImageStateError();
+    throw new ProfileImageStateError('profile-unavailable');
   }
 
   let authUser;
@@ -291,7 +451,7 @@ export async function uploadOwnProfileImage(
     authUser = await getAuth().getUser(uid);
   } catch (error) {
     if ((error as { code?: unknown } | null)?.code === 'auth/user-not-found') {
-      throw new ProfileImageStateError();
+      throw new ProfileImageStateError('profile-unavailable');
     }
     throw error;
   }
@@ -299,10 +459,13 @@ export async function uploadOwnProfileImage(
     throw new ProfileImageStateError('verified-account-required');
   }
 
-  const bytes = await sanitizeProfileImagePayload(jpegBase64);
-  await assertProfileWritable(uid);
-
+  const bytes = await sanitizeProfileImagePayload(
+    upload.imageBase64,
+    upload.format,
+  );
   const path = profileImagePathFor(uid);
+  await assertExpectedRevision(uid, upload.expectedRevision);
+
   const bucket = getStorage().bucket();
   const file = bucket.file(path);
   let previous:
@@ -326,6 +489,7 @@ export async function uploadOwnProfileImage(
       .download();
     const customMetadata = { ...(metadata.metadata ?? {}) };
     delete customMetadata.firebaseStorageDownloadTokens;
+    delete customMetadata.profileImageUploadAttempt;
     previous = {
       bytes: previousBytes,
       cacheControl: metadata.cacheControl ?? 'private, max-age=3600',
@@ -339,16 +503,24 @@ export async function uploadOwnProfileImage(
   }
 
   const uploadAttemptId = randomUUID();
-  await file.save(bytes, {
-    resumable: false,
-    validation: 'crc32c',
-    preconditionOpts: { ifGenerationMatch: previous?.generation ?? 0 },
-    metadata: {
-      contentType: 'image/jpeg',
-      cacheControl: 'private, max-age=3600',
-      metadata: { profileImageUploadAttempt: uploadAttemptId },
-    },
-  });
+  try {
+    await file.save(bytes, {
+      resumable: false,
+      validation: 'crc32c',
+      preconditionOpts: { ifGenerationMatch: previous?.generation ?? 0 },
+      metadata: {
+        contentType: 'image/jpeg',
+        cacheControl: 'private, max-age=3600',
+        metadata: { profileImageUploadAttempt: uploadAttemptId },
+      },
+    });
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    if (code === 412 || code === '412') {
+      throw new ProfileImageRevisionError();
+    }
+    throw error;
+  }
   // Resolve from GCS rather than file.metadata, which can be absent after save
   // or can still contain metadata read for the previous generation.
   const [uploadedMetadata] = await file.getMetadata();
@@ -357,7 +529,7 @@ export async function uploadOwnProfileImage(
   ) {
     // Our generation has already been superseded, so there is no mutation from
     // this invocation left at the live canonical path to roll back.
-    throw new ProfileImageStateError('uploaded-generation-superseded');
+    throw new ProfileImageRevisionError();
   }
   const uploadedGeneration = String(uploadedMetadata.generation ?? '');
   if (!uploadedGeneration) {
@@ -417,7 +589,11 @@ export async function uploadOwnProfileImage(
       throw new ProfileImageStateError('download-token-not-revoked');
     }
 
-    revision = await synchronizeProfileReference(uid, path);
+    revision = await synchronizeProfileReference(
+      uid,
+      path,
+      upload.expectedRevision,
+    );
   } catch (error) {
     if (!(await deleteIfAccountClosing(uid, uploadedGeneration))) {
       await restorePreviousObject();
@@ -426,7 +602,7 @@ export async function uploadOwnProfileImage(
   }
 
   if (await deleteIfAccountClosing(uid, uploadedGeneration)) {
-    throw new ProfileImageStateError();
+    throw new ProfileImageStateError('profile-unavailable');
   }
   return { path, revision };
 }
