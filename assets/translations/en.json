@@ -47,6 +47,8 @@
   "appointment_deleted": "Meeting deleted",
   "appointment_edit": "Editing",
   "appointment_edit_conflict": "This meeting changed while you were editing. Reopen it and try again.",
+  "appointment_voted_slots_blocked_title": "Time already has votes",
+  "appointment_voted_slots_blocked_body": "These organizer times already have votes and cannot be removed:\n{slots}",
   "appointment_id": "Click to copy your appointment ID:",
   "appointment_id_copied": "Appointment ID copied to clipboard",
   "appointment_needs_a_time": "Add at least one time.",

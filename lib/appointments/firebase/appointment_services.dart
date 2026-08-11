@@ -63,6 +63,8 @@ class AppointmentService {
     } on FirebaseFunctionsException catch (error) {
       if (error.code == 'aborted') throw const AppointmentEditConflict();
       if (error.code == 'not-found') throw const AppointmentEditMissing();
+      final blockedRemoval = parseVotedSlotRemovalError(error);
+      if (blockedRemoval != null) throw blockedRemoval;
       rethrow;
     }
   }

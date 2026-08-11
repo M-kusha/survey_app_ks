@@ -1,7 +1,14 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/create/time_slot_editor.dart';
+import 'package:echomeet/appointments/edit/appointment_edit_conflict.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+class _FunctionError extends FirebaseFunctionsException {
+  _FunctionError(String code, String message, dynamic details)
+    : super(code: code, message: message, details: details);
+}
 
 Appointment definition({int revision = 0, String? confirmedSlotId}) {
   final start = DateTime.utc(2026, 9, 1, 9);
@@ -94,6 +101,79 @@ void main() {
       },
     );
     expect(service.createAppointment(definition()), throwsA(isA<StateError>()));
+  });
+
+  test('maps only the exact canonical voted-slot removal error', () async {
+    final service = AppointmentService(
+      definitionCallable: (_) async => throw _FunctionError(
+        'failed-precondition',
+        'appointment-voted-slot-removal-blocked',
+        {
+          'blockedSlotIds': ['slot-a', 'slot-z'],
+        },
+      ),
+    );
+    final appointment = definition(revision: 1)
+      ..appointmentId = 'appointment-a';
+
+    await expectLater(
+      service.updateAppointment(appointment: appointment, reopenVoting: false),
+      throwsA(
+        isA<AppointmentVotedSlotRemovalBlocked>().having(
+          (error) => error.blockedSlotIds,
+          'blockedSlotIds',
+          ['slot-a', 'slot-z'],
+        ),
+      ),
+    );
+  });
+
+  test('rejects malformed voted-slot removal details', () {
+    expect(
+      parseVotedSlotRemovalError(
+        _FunctionError('aborted', 'appointment-voted-slot-removal-blocked', {
+          'blockedSlotIds': ['slot-a'],
+        }),
+      ),
+      isNull,
+    );
+    expect(
+      parseVotedSlotRemovalError(
+        _FunctionError('failed-precondition', 'different-message', {
+          'blockedSlotIds': ['slot-a'],
+        }),
+      ),
+      isNull,
+    );
+    for (final details in [
+      null,
+      <String, dynamic>{},
+      {'blockedSlotIds': <String>[]},
+      {
+        'blockedSlotIds': ['slot-z', 'slot-a'],
+      },
+      {
+        'blockedSlotIds': ['slot-a', 'slot-a'],
+      },
+      {
+        'blockedSlotIds': ['bad/id'],
+      },
+      {
+        'blockedSlotIds': ['slot-a'],
+        'extra': true,
+      },
+    ]) {
+      expect(
+        parseVotedSlotRemovalError(
+          _FunctionError(
+            'failed-precondition',
+            'appointment-voted-slot-removal-blocked',
+            details,
+          ),
+        ),
+        isNull,
+      );
+    }
   });
 
   test('retiming creates a new slot identity while no-op edit retains it', () {

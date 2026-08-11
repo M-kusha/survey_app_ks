@@ -150,7 +150,7 @@ export const saveAppointmentDefinition = onCall(
       );
     } catch (error) {
       if (error instanceof AppointmentDefinitionError) {
-        throw new HttpsError(error.code, error.message);
+        throw new HttpsError(error.code, error.message, error.details);
       }
       logger.error('appointment definition failed closed', {
         uid: request.auth.uid,

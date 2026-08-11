@@ -24,6 +24,7 @@ class MemoryStore {
   constructor({ failCommit = false } = {}) {
     this.documents = new Map();
     this.failCommit = failCommit;
+    this.collectionReads = [];
   }
 
   set(path, data) { this.documents.set(path, copy(data)); }
@@ -32,6 +33,14 @@ class MemoryStore {
     const writes = [];
     const transaction = {
       get: async (path) => this.get(path),
+      list: async (path) => {
+        this.collectionReads.push(path);
+        const prefix = `${path}/`;
+        return [...this.documents]
+          .filter(([documentPath]) =>
+            documentPath.startsWith(prefix) && !documentPath.slice(prefix.length).includes('/'))
+          .map(([, data]) => copy(data));
+      },
       create: (path, data) => writes.push({ kind: 'create', path, data: copy(data) }),
       set: (path, data) => writes.push({ kind: 'set', path, data: copy(data) }),
     };
@@ -45,6 +54,59 @@ class MemoryStore {
       next.set(write.path, write.data);
     }
     this.documents = next;
+    return result;
+  }
+}
+
+class ConcurrentVoteStore extends MemoryStore {
+  constructor() {
+    super();
+    this.concurrentVote = undefined;
+    this.transactionAttempts = 0;
+  }
+
+  armVoteBeforeNextCommit(path, vote) {
+    this.concurrentVote = { path, vote: copy(vote) };
+    this.transactionAttempts = 0;
+  }
+
+  async runTransaction(operation) {
+    this.transactionAttempts += 1;
+    const snapshot = new Map(
+      [...this.documents].map(([path, data]) => [path, copy(data)]),
+    );
+    const writes = [];
+    const transaction = {
+      get: async (path) => copy(snapshot.get(path)),
+      list: async (path) => {
+        this.collectionReads.push(path);
+        const prefix = `${path}/`;
+        return [...snapshot]
+          .filter(([documentPath]) =>
+            documentPath.startsWith(prefix) &&
+            !documentPath.slice(prefix.length).includes('/'))
+          .map(([, data]) => copy(data));
+      },
+      create: (path, data) =>
+        writes.push({ kind: 'create', path, data: copy(data) }),
+      set: (path, data) =>
+        writes.push({ kind: 'set', path, data: copy(data) }),
+    };
+    const result = await operation(transaction);
+
+    if (this.concurrentVote) {
+      const { path, vote } = this.concurrentVote;
+      this.concurrentVote = undefined;
+      this.set(path, vote);
+      return this.runTransaction(operation);
+    }
+
+    for (const write of writes) {
+      if (write.kind === 'create' && this.documents.has(write.path)) {
+        throw new Error(`already exists: ${write.path}`);
+      }
+      this.set(write.path, write.data);
+    }
     return result;
   }
 }
@@ -100,11 +162,12 @@ function dependencies(store, overrides = {}) {
   };
 }
 
-async function expectDefinitionError(operation, code, message) {
+async function expectDefinitionError(operation, code, message, details) {
   await assert.rejects(operation, (error) => {
     assert.equal(error instanceof AppointmentDefinitionError, true);
     assert.equal(error.code, code);
     assert.equal(error.message, message);
+    assert.deepEqual(error.details, details);
     return true;
   });
 }
@@ -239,6 +302,7 @@ test('update is revision-safe, preserves identity and rejects retained slot reti
   assert.equal(edited.createdAt.toMillis(), nowMillis);
   assert.equal(edited.confirmedSlotId, 'slot_early');
   assert.deepEqual(edited.participantUserIds, ['voter_1']);
+  assert.deepEqual(store.collectionReads, []);
 
   await expectDefinitionError(
     () => saveAppointmentDefinitionForUser(uid, updateRequest(2), dependencies(store)),
@@ -253,6 +317,114 @@ test('update is revision-safe, preserves identity and rejects retained slot reti
     ),
     'invalid-argument', 'appointment-slot-id-reused',
   );
+});
+
+test('allows unvoted removal and ignores votes on retained slots', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  await createAppointment(store);
+  store.set(`appointments/${appointmentId}/participants/vote_late`, {
+    userId: 'voter_1', userName: 'Voter', slotId: 'slot_late',
+    status: 'joined', participated: true,
+  });
+  const onlyLate = definition({ slots: [definition().slots[0]] });
+
+  assert.deepEqual(await saveAppointmentDefinitionForUser(
+    uid, updateRequest(1, { definition: onlyLate }), dependencies(store),
+  ), { appointmentId, revision: 2 });
+  assert.deepEqual(store.get(`appointments/${appointmentId}`).slotIds, ['slot_late']);
+  assert.deepEqual(store.collectionReads, [`appointments/${appointmentId}/participants`]);
+});
+
+test('a simple input reorder retains every slot without reading votes', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  await createAppointment(store);
+  store.collectionReads.length = 0;
+
+  const chronological = [...definition().slots].reverse();
+  assert.deepEqual(chronological.map((slot) => slot.slotId), [
+    'slot_early', 'slot_late',
+  ]);
+  assert.deepEqual(await saveAppointmentDefinitionForUser(
+    uid,
+    updateRequest(1, { definition: definition({ slots: chronological }) }),
+    dependencies(store),
+  ), { appointmentId, revision: 2 });
+  assert.deepEqual(store.get(`appointments/${appointmentId}`).slotIds, [
+    'slot_early', 'slot_late',
+  ]);
+  assert.deepEqual(store.collectionReads, []);
+});
+
+test('a concurrent vote commits first, retries the edit, and blocks its slot removal', async () => {
+  const store = new ConcurrentVoteStore();
+  seedStaff(store);
+  await createAppointment(store);
+  const appointmentPath = `appointments/${appointmentId}`;
+  store.collectionReads.length = 0;
+  store.armVoteBeforeNextCommit(`${appointmentPath}/participants/racing_vote`, {
+    userId: 'racing_voter', userName: 'Racing voter', slotId: 'slot_early',
+    status: 'joined', participated: true,
+  });
+  const onlyLate = definition({ slots: [definition().slots[0]] });
+
+  await expectDefinitionError(
+    () => saveAppointmentDefinitionForUser(
+      uid, updateRequest(1, { definition: onlyLate }), dependencies(store),
+    ),
+    'failed-precondition', 'appointment-voted-slot-removal-blocked',
+    { blockedSlotIds: ['slot_early'] },
+  );
+  assert.equal(store.transactionAttempts, 2);
+  assert.deepEqual(store.collectionReads, [
+    `${appointmentPath}/participants`,
+    `${appointmentPath}/participants`,
+  ]);
+  assert.equal(store.get(appointmentPath).revision, 1);
+  assert.equal(
+    store.get(`${appointmentPath}/participants/racing_vote`).slotId,
+    'slot_early',
+  );
+});
+
+test('blocks voted removals with sorted ids after revision validation', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  const slots = [
+    { slotId: 'slot_z', startAtMillis: nowMillis + 120_000, endAtMillis: nowMillis + 180_000 },
+    { slotId: 'slot_a', startAtMillis: nowMillis + 240_000, endAtMillis: nowMillis + 300_000 },
+    { slotId: 'slot_keep', startAtMillis: nowMillis + 360_000, endAtMillis: nowMillis + 420_000 },
+  ];
+  await createAppointment(store, createRequest({ definition: definition({ slots }) }));
+  const path = `appointments/${appointmentId}`;
+  const appointment = store.get(path);
+  appointment.revision = 2;
+  store.set(path, appointment);
+  for (const [documentId, slotId] of [['vote_z', 'slot_z'], ['vote_a', 'slot_a']]) {
+    store.set(`${path}/participants/${documentId}`, {
+      userId: documentId, userName: 'Voter', slotId, status: 'joined', participated: true,
+    });
+  }
+  const keepOnly = definition({ slots: [slots[2]] });
+
+  await expectDefinitionError(
+    () => saveAppointmentDefinitionForUser(
+      uid, updateRequest(1, { definition: keepOnly }), dependencies(store),
+    ),
+    'aborted', 'appointment-revision-conflict',
+  );
+  assert.deepEqual(store.collectionReads, []);
+
+  await expectDefinitionError(
+    () => saveAppointmentDefinitionForUser(
+      uid, updateRequest(2, { definition: keepOnly }), dependencies(store),
+    ),
+    'failed-precondition', 'appointment-voted-slot-removal-blocked',
+    { blockedSlotIds: ['slot_a', 'slot_z'] },
+  );
+  assert.deepEqual(store.collectionReads, [`${path}/participants`]);
+  assert.equal(store.get(path).revision, 2);
 });
 
 test('active staff cannot update an appointment owned by another tenant', async () => {

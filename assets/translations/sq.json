@@ -47,6 +47,8 @@
   "appointment_deleted": "Takimi u fshi",
   "appointment_edit": "Redaktimi",
   "appointment_edit_conflict": "Ky takim ndryshoi ndërsa po e redaktonit. Hapeni përsëri dhe provoni sërish.",
+  "appointment_voted_slots_blocked_title": "Oraret kanë tashmë vota",
+  "appointment_voted_slots_blocked_body": "Këto orare kanë tashmë vota dhe nuk mund të hiqen (zona kohore e organizatorit):\n{slots}",
   "appointment_id": "Kliko për të kopjuar ID-në e takimit tuaj:",
   "appointment_id_copied": "ID e Takimit u kopjua në të papastër",
   "appointment_needs_a_time": "Shtoni te pakten nje orar.",

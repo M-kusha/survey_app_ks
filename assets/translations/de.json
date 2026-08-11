@@ -47,6 +47,8 @@
   "appointment_deleted": "Termin gelöscht",
   "appointment_edit": "Bearbeitung",
   "appointment_edit_conflict": "Dieser Termin wurde während der Bearbeitung geändert. Öffne ihn erneut und versuche es noch einmal.",
+  "appointment_voted_slots_blocked_title": "Für diese Zeiten wurde bereits abgestimmt",
+  "appointment_voted_slots_blocked_body": "Diese Zeiten haben bereits Stimmen und können nicht entfernt werden (Zeitzone des Organisators):\n{slots}",
   "appointment_id": "Klicken Sie hier, um Ihre Termin-ID zu kopieren:",
   "appointment_id_copied": "Termin-ID in die Zwischenablage kopiert",
   "appointment_needs_a_time": "Fuege mindestens eine Zeit hinzu.",

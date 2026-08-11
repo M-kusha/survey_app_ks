@@ -47,8 +47,13 @@ export type SaveAppointmentDefinitionResult = {
   appointmentId: string;
   revision: number;
 };
+type AppointmentDefinitionErrorDetails = { blockedSlotIds: string[] };
 export class AppointmentDefinitionError extends Error {
-  constructor(readonly code: ErrorCode, message: string) {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+    readonly details?: AppointmentDefinitionErrorDetails,
+  ) {
     super(message);
     this.name = 'AppointmentDefinitionError';
   }
@@ -56,6 +61,7 @@ export class AppointmentDefinitionError extends Error {
 
 interface AppointmentTransaction {
   get(path: string): Promise<Record<string, unknown> | undefined>;
+  list(path: string): Promise<Record<string, unknown>[]>;
   create(path: string, data: Record<string, unknown>): void;
   set(path: string, data: Record<string, unknown>): void;
 }
@@ -65,8 +71,12 @@ export type AppointmentDefinitionDependencies = {
   nowMillis?: () => number;
 };
 
-function fail(code: ErrorCode, message: string): never {
-  throw new AppointmentDefinitionError(code, message);
+function fail(
+  code: ErrorCode,
+  message: string,
+  details?: AppointmentDefinitionErrorDetails,
+): never {
+  throw new AppointmentDefinitionError(code, message, details);
 }
 function invalid(): never {
   throw new Error('appointment-definition-invalid');
@@ -165,6 +175,10 @@ async function runFirestoreTransaction<T>(
     get: async (path) => {
       const snapshot = await transaction.get(firestore.doc(path));
       return snapshot.exists ? snapshot.data() : undefined;
+    },
+    list: async (path) => {
+      const snapshot = await transaction.get(firestore.collection(path));
+      return snapshot.docs.map((document) => document.data());
     },
     create: (path, data) => transaction.create(firestore.doc(path), data),
     set: (path, data) => transaction.set(firestore.doc(path), data),
@@ -332,6 +346,27 @@ export async function saveAppointmentDefinitionForUser(
     const confirmedSlotId = request.reopenVoting ? null : existing.confirmedSlotId;
     if (confirmedSlotId && !request.definition.slots.some((slot) => slot.slotId === confirmedSlotId)) {
       fail('failed-precondition', 'appointment-confirmed-slot-removed');
+    }
+    const requestedSlotIds = new Set(request.definition.slots.map((slot) => slot.slotId));
+    const removedSlotIds = new Set(
+      existing.slots.map((slot) => slot.slotId).filter((slotId) => !requestedSlotIds.has(slotId)),
+    );
+    if (removedSlotIds.size > 0) {
+      const votes = await transaction.list(`${path}/participants`);
+      const blockedSlotIds = [...new Set(votes.map((vote) => {
+        try {
+          return identifier(vote.slotId);
+        } catch {
+          return fail('failed-precondition', 'appointment-state-invalid');
+        }
+      }).filter((slotId) => removedSlotIds.has(slotId)))].sort();
+      if (blockedSlotIds.length > 0) {
+        fail(
+          'failed-precondition',
+          'appointment-voted-slot-removal-blocked',
+          { blockedSlotIds },
+        );
+      }
     }
     const revision = existing.revision + 1;
     transaction.set(path, canonicalDocument(

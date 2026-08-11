@@ -7,6 +7,7 @@ import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
@@ -74,6 +75,25 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
     return widget.appointment.availableTimeSlots
         .where((slot) => slot.slotId == confirmedId)
         .firstOrNull;
+  }
+
+  String _originalSlotLabel(TimeSlot slot) {
+    final startOffset = appointmentUtcOffset(
+      slot.startAt,
+      widget.appointment.zoneId,
+    );
+    final endOffset = appointmentUtcOffset(
+      slot.endAt,
+      widget.appointment.zoneId,
+    );
+    final range = formatAppointmentRange(
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      zoneId: widget.appointment.zoneId,
+      locale: context.locale.toLanguageTag(),
+    );
+    return '$range (${widget.appointment.zoneId}, $startOffset'
+        '${startOffset == endOffset ? '' : ' → $endOffset'})';
   }
 
   Future<void> _pickDeadline() async {
@@ -164,6 +184,42 @@ class AppointmentEditPageState extends State<AppointmentEditPage> {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'appointment_updated'.tr());
       Navigator.pop(context, true);
+    } on AppointmentVotedSlotRemovalBlocked catch (error) {
+      if (!mounted) return;
+      final originalSlots = {
+        for (final slot in widget.appointment.availableTimeSlots)
+          slot.slotId: slot,
+      };
+      final blockedSlots = error.blockedSlotIds
+          .map((slotId) => originalSlots[slotId])
+          .toList();
+      if (blockedSlots.any((slot) => slot == null)) {
+        UIUtils.showSnackBar(context, 'error_occurred'.tr());
+        return;
+      }
+      final labels = blockedSlots
+          .cast<TimeSlot>()
+          .map(_originalSlotLabel)
+          .join('\n');
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('appointment_voted_slots_blocked_title'.tr()),
+          content: SingleChildScrollView(
+            child: Text(
+              'appointment_voted_slots_blocked_body'.tr(
+                namedArgs: {'slots': labels},
+              ),
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: Text('ok'.tr()),
+            ),
+          ],
+        ),
+      );
     } on AppointmentEditConflict {
       if (!mounted) return;
       UIUtils.showSnackBar(context, 'appointment_edit_conflict'.tr());
