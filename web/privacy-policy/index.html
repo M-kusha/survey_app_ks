@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="robots" content="noindex, nofollow">
+    <meta name="robots" content="index, follow">
     <meta name="theme-color" content="#075b9d">
-    <title>Privacy information · EchoMeet</title>
+    <title>Privacy policy · EchoMeet</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="stylesheet" href="/legal/legal.css">
     <script defer src="/legal/legal.js"></script>
   </head>
   <body
     data-legal-page="privacy-policy"
-    data-release-status="owner-input-required"
+    data-release-status="published"
     data-title-key="privacy_title"
   >
     <div class="shell">
@@ -27,30 +27,84 @@
       </header>
 
       <main>
-        <p class="eyebrow" data-i18n="privacy_eyebrow">Privacy publication</p>
-        <div class="status" data-i18n="privacy_status">Owner and legal approval required</div>
-        <h1 data-i18n="privacy_title">Privacy information</h1>
+        <p class="eyebrow" data-i18n="privacy_eyebrow">Privacy policy</p>
+        <h1 data-i18n="privacy_title">Privacy policy</h1>
+        <p class="effective" data-i18n="privacy_effective">In effect from 12 August 2026</p>
         <p class="lead" data-i18n="privacy_intro">
-          This source checkout does not contain owner- and legal-approved details required to publish a privacy policy. This technical page is not an approved privacy policy.
+          EchoMeet lets a company run surveys and tests, agree on meeting times, and keep private notes. It is a personal project published to demonstrate the software rather than a commercial service, and this policy describes exactly what it does with your data — nothing is collected for advertising, analytics or resale.
         </p>
 
         <div class="card-grid">
           <section class="card">
-            <h2 data-i18n="privacy_source_title">What the application source handles</h2>
-            <p data-i18n="privacy_source_body">
-              The application source handles sign-in email, name, birth date, company membership and role, an optional profile photo, notification token and locale, private notes, survey or test responses and scores, appointment votes, and company administration records.
+            <h2 data-i18n="privacy_operator_title">Who is responsible</h2>
+            <p data-i18n="privacy_operator_body">
+              EchoMeet is operated by Kushtrim Mulliqi, acting as an individual and as the controller of the data described here. For any question about your data, or to exercise any of the rights below, write to kushtrim.mulliqi@outlook.com. Messages are answered by the same person who wrote the software.
             </p>
           </section>
           <section class="card">
-            <h2 data-i18n="privacy_owner_title">Information still required</h2>
-            <p data-i18n="privacy_owner_body">
-              Before release, the operator must approve its identity and contact details, data-use purposes and legal bases, retention and backup practices, service-provider disclosures, user rights, and the policy's effective date.
+            <h2 data-i18n="privacy_collect_title">What is collected</h2>
+            <p data-i18n="privacy_collect_body">
+              To create an account: your email address, your name, and your date of birth. Your password is never stored by EchoMeet — Firebase Authentication holds it and only ever confirms whether a sign-in attempt matches. While you use the app: which company you belong to, your role and approval state there, an optional profile photo, a notification token for each device you allow notifications on, your preferred notification language, your private notes, your answers and scores in surveys and tests, and which meeting times you said you can attend. Administrative actions inside a company — approvals, role changes, removals, bans — are recorded with who did them and when.
             </p>
           </section>
           <section class="card">
-            <h2 data-i18n="privacy_deletion_title">Account deletion</h2>
-            <p data-i18n="privacy_deletion_body">
-              EchoMeet includes an in-app deletion request. The public instructions explain how to reach it without asking for an account identifier.
+            <h2 data-i18n="privacy_not_collected_title">What is never collected</h2>
+            <p data-i18n="privacy_not_collected_body">
+              No location, no contacts, no advertising identifier, no browsing or usage history. EchoMeet contains no analytics SDK, no crash-reporting SDK and no advertising SDK — you can verify this in the dependency list of the published source. Your data is never sold, rented, or shared for anyone else’s marketing, and no profile is built about you.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_purpose_title">Why, and on what legal basis</h2>
+            <p data-i18n="privacy_purpose_body">
+              Your email, name and company membership exist to provide the account and the shared workspace you asked for — that is performance of a contract (GDPR Article 6(1)(b)). Your date of birth is collected at registration as part of that profile. Security measures — verifying the app itself, enforcing per-document access rules, honouring bans — rest on legitimate interests (Article 6(1)(f)): without them one member could read another company’s answers. Push notifications are sent only after you allow them on your device, and you can withdraw that at any time in your device settings or in EchoMeet’s own notification preferences.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_visibility_title">Who can see what</h2>
+            <p data-i18n="privacy_visibility_body">
+              Your notes are private to you; no administrator and no other member can read them. Your name and profile photo are visible to the members of your company, because a survey result or a meeting vote is meaningless without knowing whose it is. Your answers to a survey or test, and your score, are visible to the administrators and moderators of that company. Your meeting votes are visible to members of that company. Nothing you do is visible to members of any other company, and none of it is public.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_scoring_title">Automatic scoring</h2>
+            <p data-i18n="privacy_scoring_body">
+              Answers to a test are compared against the answer key on the server, and a score is calculated automatically. Written answers are marked by a person — an administrator or moderator of your company — not by the software. No automated decision is made about you beyond that score, and the score has no effect outside the app.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_processors_title">Who processes it</h2>
+            <p data-i18n="privacy_processors_body">
+              EchoMeet runs on Google’s Firebase platform and Google is its only processor. Sign-in uses Firebase Authentication; the database is Cloud Firestore, located in Google’s multi-region for Europe; profile photos are in Cloud Storage; server logic runs as Cloud Functions in the Netherlands (europe-west4); notifications go through Firebase Cloud Messaging and your device’s own push service; the website is on Firebase Hosting. Firebase App Check confirms that requests come from the genuine app, using reCAPTCHA in the browser and Play Integrity on Android, which means Google receives signals about the browser or device making the request. Google may process data outside the European Economic Area under the safeguards set out in its own terms.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_security_title">How it is protected</h2>
+            <p data-i18n="privacy_security_body">
+              Every connection is encrypted in transit. Access is decided by rules evaluated on Google’s servers, per document, not by the app on your phone — so a modified client cannot read what it is not entitled to. An email address must be verified before it can join a company. Grading material for tests is stored apart from the questions members can read, and scores are computed on the server so an answer key never reaches a participant’s device.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_retention_title">How long it is kept</h2>
+            <p data-i18n="privacy_retention_body">
+              Your data is kept while your account exists. When you request deletion, EchoMeet removes your sign-in, your profile, your photo, your notification tokens, your notes, your survey and test participation, your meeting votes, and any ban records naming you; surveys and meetings you created for a company can remain for that company with your authorship marker removed. Closing a company schedules it for deletion seven days later, at which point its surveys, tests, answers and meetings are deleted — its members are released, not deleted, and keep their accounts and notes. Deletion removes these records from the live database; copies held inside Google’s infrastructure for operational resilience expire on Google’s own schedule.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_rights_title">Your rights</h2>
+            <p data-i18n="privacy_rights_body">
+              You may ask for a copy of your data, correct it, have it erased, restrict or object to its processing, and receive it in a portable form. Your name, birth date and notification settings are editable in the app, results can be exported as PDF, and deletion can be requested from Settings without asking anyone. For anything else, write to kushtrim.mulliqi@outlook.com. If you are in the European Economic Area or the United Kingdom you may also complain to your national data-protection authority.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_children_title">Children</h2>
+            <p data-i18n="privacy_children_body">
+              EchoMeet is not intended for children under 16 and is not directed at them. If you are under 16, please do not create an account. If you believe a child has registered, write to the address above and the account will be deleted.
+            </p>
+          </section>
+          <section class="card">
+            <h2 data-i18n="privacy_changes_title">Changes to this policy</h2>
+            <p data-i18n="privacy_changes_body">
+              The text published on this page is always the current one, and the date at the top changes whenever it does. There is no earlier version that still applies.
             </p>
           </section>
         </div>
@@ -62,7 +116,7 @@
       </main>
 
       <footer data-i18n="privacy_footer">
-        Publication status: owner input required. No legal commitment is implied by this page.
+        Privacy policy for EchoMeet · Kushtrim Mulliqi · kushtrim.mulliqi@outlook.com
       </footer>
     </div>
   </body>

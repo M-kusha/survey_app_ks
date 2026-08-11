@@ -106,26 +106,11 @@ h1 {
   line-height: 1.65;
 }
 
-.status {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
-  padding: 8px 12px;
-  border: 1px solid #d49a25;
-  border-radius: 999px;
-  background: #fff4d8;
-  color: #694400;
-  font-size: 0.8rem;
-  font-weight: 800;
-}
-
-.status::before {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #c47c00;
-  content: "";
+.effective {
+  margin: 16px 0 0;
+  color: #526b81;
+  font-size: 0.86rem;
+  font-weight: 700;
 }
 
 .card-grid {
@@ -220,6 +205,7 @@ footer {
   .lead,
   .card p,
   .card li,
+  .effective,
   footer {
     color: #b2c4d5;
   }
@@ -240,12 +226,6 @@ footer {
     border-color: #2b88cf;
     background: #2b88cf;
     color: #061525;
-  }
-
-  .status {
-    border-color: #8b6525;
-    background: #382b13;
-    color: #f4d899;
   }
 
   .button.secondary {

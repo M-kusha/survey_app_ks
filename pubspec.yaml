@@ -49,6 +49,10 @@ dependencies:
   # combination cannot assemble - `flutter build apk` fails resolving the jni
   # plugin directory. The 10.x line uses ordinary platform channels.
   share_plus: ^10.1.4
+  # Opens the published privacy policy in a browser. Already resolved through
+  # printing, so declaring it adds no plugin to the native build - it only makes
+  # the dependency visible, the same reason `web` is declared above.
+  url_launcher: ^6.3.2
   # share_plus needs path_provider to stage the shared file. Its Android
   # implementation moved to JNI at 2.3.0, and this Flutter and Gradle
   # combination cannot resolve the jni plugin directory - `flutter build apk`
