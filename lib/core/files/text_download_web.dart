@@ -4,20 +4,21 @@ import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
-/// Saves the calendar file through an anchor download.
+/// Saves the file through an anchor download.
 ///
-/// The Blob carries `text/calendar` so the browser and the operating system
-/// offer it to a calendar application rather than guessing from the extension
-/// alone. UTF-8 is explicit because appointment titles carry German and
-/// Albanian characters.
-Future<void> downloadCalendarFile({
+/// The Blob carries the MIME type so the browser and the operating system offer
+/// it to the right application rather than guessing from the extension alone.
+/// UTF-8 is explicit because the content carries German and Albanian
+/// characters.
+Future<void> downloadTextFile({
   required String contents,
   required String fileName,
+  required String mimeType,
 }) async {
   final bytes = Uint8List.fromList(utf8.encode(contents));
   final blob = web.Blob(
     <JSAny>[bytes.toJS].toJS,
-    web.BlobPropertyBag(type: 'text/calendar;charset=utf-8'),
+    web.BlobPropertyBag(type: '$mimeType;charset=utf-8'),
   );
 
   final url = web.URL.createObjectURL(blob);

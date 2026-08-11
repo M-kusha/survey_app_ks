@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/calendar/appointment_ics.dart';
-import 'package:echomeet/appointments/calendar/calendar_download.dart';
+import 'package:echomeet/core/files/text_download.dart';
 import 'package:echomeet/appointments/edit/appointment_edit.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/participants/appointment_participants_page.dart';
@@ -323,9 +323,10 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
 
   Future<void> _exportCalendar() async {
     try {
-      await downloadCalendarFile(
+      await downloadTextFile(
         contents: buildAppointmentIcs(appointment: _appointment),
         fileName: appointmentIcsFileName(_appointment),
+        mimeType: 'text/calendar',
       );
     } catch (_) {
       // A confirmed slot can be withdrawn by an admin between the build and

@@ -6,8 +6,11 @@ import 'package:echomeet/core/membership/company_browser.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/membership/company_privilege_service.dart';
 import 'package:echomeet/core/membership/ownership_transfer_service.dart';
+import 'package:echomeet/core/files/text_download.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/settings/banned_members.dart';
+import 'package:echomeet/settings/data_export.dart';
+import 'package:echomeet/settings/data_export_service.dart';
 import 'package:echomeet/settings/change_email.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/localization/app_locales.dart';
@@ -48,6 +51,40 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
   String? _sessionKey;
   bool _loadScheduled = false;
   int _loadGeneration = 0;
+  bool _exporting = false;
+
+  /// Assembles every record this account can read and hands it to the platform
+  /// as a JSON file.
+  ///
+  /// Reading is done here rather than in a trusted function because every read
+  /// is one this user is already entitled to make. A server-side exporter would
+  /// be a new endpoint that answers "give me everything about a person", which
+  /// is worth avoiding when nothing needs it.
+  Future<void> _downloadMyData() async {
+    if (_userId.isEmpty) return;
+    setState(() => _exporting = true);
+
+    final messenger = ScaffoldMessenger.of(context);
+    final locale = Localizations.localeOf(context).toLanguageTag();
+    final generatedAt = DateTime.now();
+
+    try {
+      final contents = await DataExportService(locale: locale).buildExport(
+        userId: _userId,
+        companyId: _membership?.companyId ?? '',
+        now: generatedAt,
+      );
+      await downloadTextFile(
+        contents: contents,
+        fileName: dataExportFileName(generatedAt),
+        mimeType: 'application/json',
+      );
+    } catch (_) {
+      messenger.showSnackBar(SnackBar(content: Text('error_occurred'.tr())));
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -718,6 +755,15 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
     return SettingsGroup(
       title: 'privacy_and_data'.tr(),
       children: [
+        SettingsTile(
+          icon: Icons.download_outlined,
+          title: 'download_my_data'.tr(),
+          subtitle: _exporting
+              ? 'download_my_data_working'.tr()
+              : 'download_my_data_hint'.tr(),
+          showChevron: false,
+          onTap: _exporting ? null : _downloadMyData,
+        ),
         SettingsTile(
           icon: Icons.privacy_tip_outlined,
           title: 'privacy_policy_link'.tr(),
