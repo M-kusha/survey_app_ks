@@ -23,6 +23,7 @@ import 'package:echomeet/utilities/routes.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
@@ -79,6 +80,33 @@ Future<void> main() async {
   PushService().observeAuthentication();
 }
 
+/// The note editor's own translations, falling back to English.
+///
+/// flutter_quill ships no Albanian, and its delegate answers `isSupported`
+/// honestly - so on `sq` the framework skips it, every toolbar button asks for
+/// an instance that was never loaded, and the editor screen dies. Claiming
+/// support for everything and loading English for the gaps costs a few
+/// untranslated tooltips instead of the whole screen.
+class _QuillLocalizations
+    extends LocalizationsDelegate<FlutterQuillLocalizations> {
+  const _QuillLocalizations();
+
+  static const _fallback = Locale('en');
+
+  LocalizationsDelegate<FlutterQuillLocalizations> get _inner =>
+      FlutterQuillLocalizations.delegate;
+
+  @override
+  bool isSupported(Locale locale) => true;
+
+  @override
+  Future<FlutterQuillLocalizations> load(Locale locale) =>
+      _inner.load(_inner.isSupported(locale) ? locale : _fallback);
+
+  @override
+  bool shouldReload(_QuillLocalizations old) => false;
+}
+
 class _StartupFailureApp extends StatelessWidget {
   const _StartupFailureApp();
 
@@ -122,7 +150,13 @@ class MyApp extends StatelessWidget {
         navigatorKey: NotificationNavigation.navigatorKey,
         routes: AppRoutes.routes(),
         locale: context.locale,
-        localizationsDelegates: context.localizationDelegates,
+        // The note editor's toolbar reads its own tooltips from a delegate the
+        // package ships separately. Without it every toolbar button throws
+        // while building, which takes the whole editor screen down.
+        localizationsDelegates: [
+          ...context.localizationDelegates,
+          const _QuillLocalizations(),
+        ],
         supportedLocales: context.supportedLocales,
         debugShowCheckedModeBanner: false,
         theme: theme,
