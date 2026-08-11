@@ -6,6 +6,7 @@ import 'package:echomeet/core/notifications/notification_navigation.dart';
 import 'package:echomeet/core/notifications/notification_locale_service.dart';
 import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/core/security/app_check_bootstrap.dart';
+import 'package:echomeet/core/security/app_check_startup_gate.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/time/device_time_zone.dart';
@@ -38,7 +39,6 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    await AppCheckBootstrap.activate();
     await UserPreferences.init();
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting();
@@ -56,33 +56,38 @@ Future<void> main() async {
   }
 
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider<FontSizeProvider>(
-          create: (context) => FontSizeProvider(),
+    EasyLocalization(
+      supportedLocales: AppLocales.supported,
+      path: AppLocales.path,
+      fallbackLocale: AppLocales.fallback,
+      saveLocale: true,
+      child: AppCheckStartupGate(
+        activate: AppCheckBootstrap.activate,
+        onActivated: () => PushService().observeAuthentication(),
+        child: MultiProvider(
+          providers: [
+            ChangeNotifierProvider<FontSizeProvider>(
+              create: (context) => FontSizeProvider(),
+            ),
+            ChangeNotifierProvider(create: (_) => DeviceTimeZone()),
+            Provider<AppointmentService>(create: (_) => AppointmentService()),
+            Provider<FirebaseServices>(create: (_) => FirebaseServices()),
+            Provider<RegisterLogic>(create: (_) => RegisterLogic()),
+            ChangeNotifierProvider(create: (context) => SurveyDataProvider()),
+            ChangeNotifierProvider(
+              create: (context) => AppointmentDataProvider(),
+            ),
+            ChangeNotifierProvider(create: (_) => MembershipProvider()),
+            ChangeNotifierProvider(create: (_) => SessionAccess()),
+            ChangeNotifierProvider(
+              create: (_) => UserDataProvider()..loadCurrentUser(),
+            ),
+          ],
+          child: MyApp(savedThemeMode: savedThemeMode),
         ),
-        ChangeNotifierProvider(create: (_) => DeviceTimeZone()),
-        Provider<AppointmentService>(create: (_) => AppointmentService()),
-        Provider<FirebaseServices>(create: (_) => FirebaseServices()),
-        Provider<RegisterLogic>(create: (_) => RegisterLogic()),
-        ChangeNotifierProvider(create: (context) => SurveyDataProvider()),
-        ChangeNotifierProvider(create: (context) => AppointmentDataProvider()),
-        ChangeNotifierProvider(create: (_) => MembershipProvider()),
-        ChangeNotifierProvider(create: (_) => SessionAccess()),
-        ChangeNotifierProvider(
-          create: (_) => UserDataProvider()..loadCurrentUser(),
-        ),
-      ],
-      child: EasyLocalization(
-        supportedLocales: AppLocales.supported,
-        path: AppLocales.path,
-        fallbackLocale: AppLocales.fallback,
-        saveLocale: true,
-        child: MyApp(savedThemeMode: savedThemeMode),
       ),
     ),
   );
-  PushService().observeAuthentication();
 }
 
 /// The note editor's own translations, falling back to English.

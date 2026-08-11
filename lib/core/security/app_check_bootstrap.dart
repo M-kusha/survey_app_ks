@@ -1,6 +1,41 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
 
+typedef AppCheckActivation = Future<void> Function();
+
+/// Runs App Check activation at most once, while allowing a failed activation
+/// to be tried again.
+///
+/// Keeping this small boundary injectable makes the concurrency contract
+/// testable without contacting Firebase.
+class AppCheckActivationCoordinator {
+  AppCheckActivationCoordinator(this._activateProvider);
+
+  final AppCheckActivation _activateProvider;
+  Future<void>? _inFlight;
+  bool _activated = false;
+
+  bool get isActivated => _activated;
+
+  Future<void> activate() {
+    if (_activated) return Future<void>.value();
+    final current = _inFlight;
+    if (current != null) return current;
+
+    late final Future<void> flight;
+    flight = _activate().whenComplete(() {
+      if (identical(_inFlight, flight)) _inFlight = null;
+    });
+    _inFlight = flight;
+    return flight;
+  }
+
+  Future<void> _activate() async {
+    await _activateProvider();
+    _activated = true;
+  }
+}
+
 abstract final class AppCheckBootstrap {
   static const _webSiteKey = String.fromEnvironment(
     'FIREBASE_APP_CHECK_WEB_KEY',
@@ -9,7 +44,12 @@ abstract final class AppCheckBootstrap {
     'FIREBASE_APP_CHECK_DEBUG_TOKEN',
   );
 
-  static Future<void> activate() async {
+  static final AppCheckActivationCoordinator _coordinator =
+      AppCheckActivationCoordinator(_activateProvider);
+
+  static Future<void> activate() => _coordinator.activate();
+
+  static Future<void> _activateProvider() async {
     final debugToken = _debugToken.isEmpty ? null : _debugToken;
 
     if (!kDebugMode &&
