@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:adaptive_theme/adaptive_theme.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/core/notifications/notification_navigation.dart';
@@ -344,25 +345,46 @@ class LoginPageState extends State<LoginPage> {
 }
 
 /// Signed-out links to the two public legal and account-data resources.
+/// The two pages that have to be reachable without an account.
+///
+/// These were full-size `TextButton`s in a `Wrap`, so on a narrow screen they
+/// stacked into two tall blocks that read as primary actions competing with
+/// signing in. They are references, not things anybody came here to do, so they
+/// now sit on one quiet line. The tap target stays finger-sized; only the ink
+/// is smaller.
 class PublicLegalLinks extends StatelessWidget {
   const PublicLegalLinks({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final style = theme.textTheme.bodySmall?.copyWith(
+      color: scheme.onSurfaceVariant,
+      decoration: TextDecoration.underline,
+      decorationColor: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+    );
+
+    Widget link(String labelKey, String route) => InkWell(
+      onTap: () => Navigator.pushNamed(context, route),
+      borderRadius: BorderRadius.circular(Radii.sm),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.sm,
+          vertical: Spacing.md,
+        ),
+        child: Text(labelKey.tr(), style: style),
+      ),
+    );
+
     return Center(
       child: Wrap(
         alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          TextButton(
-            onPressed: () =>
-                Navigator.pushNamed(context, PublicRoutePaths.privacyPolicy),
-            child: Text('privacy_policy_link'.tr()),
-          ),
-          TextButton(
-            onPressed: () =>
-                Navigator.pushNamed(context, PublicRoutePaths.accountDeletion),
-            child: Text('account_deletion_info_link'.tr()),
-          ),
+          link('privacy_policy_link', PublicRoutePaths.privacyPolicy),
+          Text('·', style: style?.copyWith(decoration: TextDecoration.none)),
+          link('account_deletion_info_link', PublicRoutePaths.accountDeletion),
         ],
       ),
     );

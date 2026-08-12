@@ -213,7 +213,7 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                   ),
                 )
               else ...[
-                _Summary(survey: widget.survey, participants: participants),
+                ParticipantsSummary(survey: widget.survey, participants: participants),
                 const SizedBox(height: Spacing.md),
                 _Filters(
                   selected: _filter,
@@ -296,8 +296,14 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 }
 
-class _Summary extends StatelessWidget {
-  const _Summary({required this.survey, required this.participants});
+/// How a test went, at a glance: the average, the pass split, and any
+/// exceptions that actually occurred.
+class ParticipantsSummary extends StatelessWidget {
+  const ParticipantsSummary({
+    super.key,
+    required this.survey,
+    required this.participants,
+  });
 
   final Survey survey;
   final List<Participant> participants;
@@ -324,56 +330,124 @@ class _Summary extends StatelessWidget {
     final processing = grades.where((grade) => grade.isProcessing).length;
     final errors = grades.where((grade) => grade.hasGradingError).length;
 
+    // Six figures used to be laid out in a fixed three-by-two grid whether or
+    // not they had anything to report, so a healthy test showed one number and
+    // five zeros under labels like "grading errors". The average is the figure
+    // that always means something; the rest are exceptions, and an exception
+    // worth a place on screen is one that actually happened.
+    final band = average == null ? null : ScoreBand.of(average);
+    final averageColour = band == null
+        ? theme.colorScheme.onSurfaceVariant
+        : _colourFor(context, band);
+
+    final exceptions = <({String label, int count, Color colour})>[
+      if (pending > 0)
+        (label: 'awaiting_review'.tr(), count: pending, colour: app.warning),
+      if (processing > 0)
+        (label: 'grading_processing'.tr(), count: processing, colour: app.info),
+      if (errors > 0)
+        (
+          label: 'grading_errors'.tr(),
+          count: errors,
+          colour: theme.colorScheme.error,
+        ),
+    ];
+
     return ContentCard(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _Figure(
-                label: 'average'.tr(),
-                value: average == null ? '—' : '${average.round()}%',
-                color: average == null
-                    ? theme.colorScheme.onSurfaceVariant
-                    : _colourFor(context, ScoreBand.of(average)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'average'.tr().toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      average == null ? '—' : '${average.round()}%',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        color: averageColour,
+                        height: 1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              _Divider(),
-              _Figure(
-                label: 'passed'.tr(),
-                value: '$passed',
-                color: app.success,
-              ),
-              _Divider(),
-              _Figure(
-                label: 'not_passed'.tr(),
-                value: '$failed',
-                color: theme.colorScheme.error,
-              ),
+              // Nothing has finished grading yet, so a pass split would be two
+              // more zeros. The average already reads "—"; the exceptions below
+              // say what is actually happening.
+              if (passed + failed > 0) ...[
+                _Tally(
+                  count: passed,
+                  label: 'passed'.tr(),
+                  colour: app.success,
+                ),
+                const SizedBox(width: Spacing.lg),
+                _Tally(
+                  count: failed,
+                  label: 'not_passed'.tr(),
+                  colour: theme.colorScheme.error,
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: Spacing.md),
-          Divider(height: 1, color: theme.colorScheme.outlineVariant),
-          const SizedBox(height: Spacing.md),
-          Row(
-            children: [
-              _Figure(
-                label: 'awaiting_review'.tr(),
-                value: '$pending',
-                color: app.warning,
+          if (passed + failed > 0) ...[
+            const SizedBox(height: Spacing.md),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: SizedBox(
+                height: 5,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (passed > 0)
+                      Expanded(flex: passed, child: ColoredBox(color: app.success)),
+                    if (failed > 0)
+                      Expanded(
+                        flex: failed,
+                        child: ColoredBox(color: theme.colorScheme.error),
+                      ),
+                  ],
+                ),
               ),
-              _Divider(),
-              _Figure(
-                label: 'grading_processing'.tr(),
-                value: '$processing',
-                color: app.info,
-              ),
-              _Divider(),
-              _Figure(
-                label: 'grading_errors'.tr(),
-                value: '$errors',
-                color: theme.colorScheme.error,
-              ),
-            ],
-          ),
+            ),
+          ],
+          if (exceptions.isNotEmpty) ...[
+            const SizedBox(height: Spacing.md),
+            Wrap(
+              spacing: Spacing.md,
+              runSpacing: Spacing.sm,
+              children: [
+                for (final exception in exceptions)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 7,
+                        width: 7,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: exception.colour,
+                        ),
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      Text(
+                        '${exception.count} ${exception.label}',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -389,51 +463,44 @@ Color _colourFor(BuildContext context, ScoreBand band) {
   };
 }
 
-class _Figure extends StatelessWidget {
-  const _Figure({
+
+/// A count with its label beneath, sized to sit beside the average rather than
+/// compete with it.
+class _Tally extends StatelessWidget {
+  const _Tally({
+    required this.count,
     required this.label,
-    required this.value,
-    required this.color,
+    required this.colour,
   });
 
+  final int count;
   final String label;
-  final String value;
-  final Color color;
+  final Color colour;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: theme.textTheme.headlineSmall?.copyWith(color: color),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          '$count',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: colour,
+            height: 1,
           ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
-}
-
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 32,
-    color: Theme.of(context).colorScheme.outlineVariant,
-  );
 }
 
 class _Filters extends StatelessWidget {
@@ -449,6 +516,12 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Six chips were offered unconditionally, so a test with no errors and
+    // nothing pending still showed "Grading errors 0" and wrapped onto a second
+    // and third row. A filter that would empty the list is not a choice worth
+    // offering; "All" always stays, and the current selection stays even if its
+    // count has just dropped to zero, so the chips cannot vanish under the tap
+    // that selected them.
     return Wrap(
       spacing: Spacing.sm,
       runSpacing: Spacing.sm,
@@ -461,11 +534,14 @@ class _Filters extends StatelessWidget {
           (ParticipantFilter.processing, 'grading_processing'),
           (ParticipantFilter.error, 'grading_errors'),
         ])
-          ChoiceChip(
-            label: Text('${labelKey.tr()} ${counts[filter] ?? 0}'),
-            selected: selected == filter,
-            onSelected: (_) => onChanged(filter),
-          ),
+          if (filter == ParticipantFilter.all ||
+              selected == filter ||
+              (counts[filter] ?? 0) > 0)
+            ChoiceChip(
+              label: Text('${labelKey.tr()} ${counts[filter] ?? 0}'),
+              selected: selected == filter,
+              onSelected: (_) => onChanged(filter),
+            ),
       ],
     );
   }

@@ -136,6 +136,10 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
           participant: _participant,
           survey: widget.survey,
           textQuestionCorrect: _participant.textAnswersReviewed,
+          // Already loaded for the review screen. Without it the export marked
+          // only which option was picked, so a printed test could not be told
+          // apart from a printed survey.
+          correctIndexes: _answerKey,
         ),
       ),
     );
@@ -245,45 +249,71 @@ class _Summary extends StatelessWidget {
 
     return ContentCard(
       accent: tone,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: tone,
-              height: 1,
-            ),
-          ),
-          const SizedBox(width: Spacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (grade.scoreAvailable)
-                  Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // `headlineMedium` in the display face put a ~30px bold number
+              // beside 13px body text and a pill, which crowded the row and
+              // made a two-digit percentage the loudest thing on the page.
+              // `titleLarge` still leads without shouting.
+              Text(
+                grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: tone,
+                  height: 1,
+                ),
+              ),
+              if (grade.scoreAvailable) ...[
+                const SizedBox(width: Spacing.md),
+                Expanded(
+                  child: Text(
                     'correct_of_total'.tr(
                       namedArgs: {
                         'correct': '${grade.correctCount}',
                         'total': '${grade.gradedCount}',
                       },
                     ),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: theme.textTheme.bodySmall,
                   ),
-                if (!grade.resultIsFinal) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    statusLabel,
-                    style: theme.textTheme.bodySmall?.copyWith(color: tone),
-                  ),
-                ],
-              ],
-            ),
+                ),
+              ] else
+                const Spacer(),
+              const SizedBox(width: Spacing.sm),
+              // The status was printed twice: once under the fraction and again
+              // in this pill. The pill is the one that carries a colour, so it
+              // is the one that stays.
+              StatusPill(label: statusLabel, tone: statusTone),
+            ],
           ),
-          StatusPill(label: statusLabel, tone: statusTone),
+          if (grade.scoreAvailable) ...[
+            const SizedBox(height: Spacing.md),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(3),
+              child: SizedBox(
+                height: 5,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      flex: grade.percentage.round().clamp(0, 100),
+                      child: ColoredBox(color: tone),
+                    ),
+                    Expanded(
+                      flex: 100 - grade.percentage.round().clamp(0, 100),
+                      child: ColoredBox(
+                        color: theme.colorScheme.outlineVariant.withValues(
+                          alpha: 0.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

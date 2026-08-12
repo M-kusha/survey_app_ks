@@ -13,13 +13,24 @@ class PDFResults extends StatelessWidget {
     required this.participant,
     required this.survey,
     required this.textQuestionCorrect,
+    this.correctIndexes = const [],
   });
 
   final Participant participant;
   final Survey survey;
   final Map<String, bool> textQuestionCorrect;
 
+  /// The correct option indexes per question, as the review screen shows them.
+  ///
+  /// Empty for a survey, and empty when the key could not be read — in both
+  /// cases the export falls back to marking only what was picked, rather than
+  /// marking every option wrong.
+  final List<Set<int>> correctIndexes;
+
   bool get _isTest => survey.surveyType != SurveyType.survey;
+
+  Set<int> _correctFor(int index) =>
+      index < correctIndexes.length ? correctIndexes[index] : const <int>{};
 
   @override
   Widget build(BuildContext context) {
@@ -120,16 +131,27 @@ class PDFResults extends StatelessWidget {
       else
         pw.Padding(
           padding: const pw.EdgeInsets.only(left: 22),
-          child: _options(question, answer),
+          child: _options(question, answer, _correctFor(index)),
         ),
       pw.SizedBox(height: 14),
     ];
   }
 
-  pw.Widget _options(Map<String, dynamic> question, List<dynamic> answer) {
+  pw.Widget _options(
+    Map<String, dynamic> question,
+    List<dynamic> answer,
+    Set<int> correct,
+  ) {
     final options = (question['options'] as List<dynamic>? ?? const [])
         .map((option) => '$option')
         .toList();
+
+    // The export marked only what was picked, in one blue tone, so a printed
+    // test looked identical to a printed survey and told a reviewer nothing
+    // about whether the answer was right. This is the same four states the
+    // review screen shows, and `PdfKit.row` already had the fill and lost-mark
+    // parameters for it.
+    final graded = _isTest && correct.isNotEmpty;
 
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -137,14 +159,45 @@ class PDFResults extends StatelessWidget {
         for (var i = 0; i < options.length; i++)
           () {
             final picked = answer.contains(i);
-            final chip = picked ? PdfKit.chosen : PdfKit.rule;
-            final tag = picked ? 'chosen'.tr() : null;
+            final isRight = correct.contains(i);
+
+            final (chip, fill, tagKey, lostMark) = switch ((
+              graded,
+              picked,
+              isRight,
+            )) {
+              (true, true, true) => (
+                PdfKit.correct,
+                PdfKit.correctFill,
+                'chosen_correct',
+                false,
+              ),
+              (true, true, false) => (
+                PdfKit.wrong,
+                PdfKit.wrongFill,
+                'chosen_wrong',
+                true,
+              ),
+              // A right answer left untouched is a mark thrown away, so it
+              // carries the red border without being filled as a wrong pick.
+              (true, false, true) => (
+                PdfKit.correct,
+                null,
+                'missed',
+                true,
+              ),
+              (true, false, false) => (PdfKit.rule, null, null, false),
+              (false, true, _) => (PdfKit.chosen, null, 'chosen', false),
+              (false, false, _) => (PdfKit.rule, null, null, false),
+            };
 
             return PdfKit.row(
               text: options[i],
-              tag: tag,
+              tag: tagKey?.tr(),
               chipColor: chip,
+              fill: fill,
               picked: picked,
+              lostMark: lostMark,
             );
           }(),
         if (answer.isEmpty)

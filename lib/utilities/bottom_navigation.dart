@@ -2,6 +2,8 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/main_screen/appointments_dashboard.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/membership/app_banner.dart';
+import 'package:echomeet/core/membership/membership.dart';
+import 'package:echomeet/core/profile/authenticated_profile_image.dart';
 import 'package:echomeet/notes/notes_main.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/widgets/language_button.dart';
@@ -9,7 +11,9 @@ import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/core/widgets/theme_toggle_button.dart';
 import 'package:echomeet/settings/settings.dart';
 import 'package:echomeet/survey_pages/main_sruvey/survey_main.dart';
+import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 class _Destination {
   const _Destination(this.icon, this.selectedIcon, this.labelKey);
@@ -163,14 +167,21 @@ class _BottomNavigationState extends State<BottomNavigation> {
           labelType: extended
               ? NavigationRailLabelType.none
               : NavigationRailLabelType.all,
+          // Who you are, then where you can go, then the controls. The rail
+          // used to open with the product's own logo — which the person using
+          // it already knows — and nothing anywhere said which account they
+          // were signed in as.
           leading: Padding(
             padding: const EdgeInsets.fromLTRB(
-              Spacing.md,
+              Spacing.sm,
               Spacing.lg,
-              Spacing.md,
-              Spacing.xl,
+              Spacing.sm,
+              Spacing.lg,
             ),
-            child: _RailBrand(extended: extended),
+            child: _RailProfile(
+              extended: extended,
+              onTap: () => _onDestinationSelected(_destinations.length - 1),
+            ),
           ),
           destinations: [
             for (final destination in _destinations)
@@ -235,6 +246,12 @@ class _RailFooter extends StatelessWidget {
         ),
 
         if (extended)
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.md),
+            child: _RailBrand(extended: extended),
+          ),
+
+        if (extended)
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -256,6 +273,108 @@ class _RailFooter extends StatelessWidget {
   }
 }
 
+/// The signed-in account, at the top of the rail.
+///
+/// Collapsed it is the avatar alone; extended it carries the name and the
+/// company. Tapping it goes to settings, which is where everything about the
+/// account lives, so the obvious gesture does the obvious thing.
+class _RailProfile extends StatelessWidget {
+  const _RailProfile({required this.extended, required this.onTap});
+
+  final bool extended;
+  final VoidCallback onTap;
+
+  static String _initials(String? name) {
+    final parts = (name ?? '')
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
+    return (parts.first.characters.first + parts.last.characters.first)
+        .toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final user = context.watch<UserDataProvider>().currentUser;
+    final membership = context.watch<MembershipProvider>().membership;
+
+    final avatar = ClipOval(
+      child: Container(
+        height: 38,
+        width: 38,
+        color: scheme.primaryContainer,
+        alignment: Alignment.center,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: Text(
+                _initials(user?.name),
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+            ),
+            if (user?.profileImage case final stored?)
+              if (stored.trim().isNotEmpty)
+                AuthenticatedProfileImage(
+                  storedReference: stored,
+                  refreshKey: user?.profileImageRevision,
+                ),
+          ],
+        ),
+      ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(Radii.md),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.sm),
+          child: extended
+              ? Row(
+                  children: [
+                    avatar,
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            user?.name ?? 'unknown'.tr(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall,
+                          ),
+                          if (membership?.companyName case final company?)
+                            Text(
+                              company,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                )
+              : avatar,
+        ),
+      ),
+    );
+  }
+}
+
+/// The wordmark, at the foot of the rail where it belongs.
 class _RailBrand extends StatelessWidget {
   const _RailBrand({required this.extended});
 
@@ -267,10 +386,10 @@ class _RailBrand extends StatelessWidget {
     final scheme = theme.colorScheme;
 
     final glyph = Container(
-      height: 34,
-      width: 34,
+      height: 26,
+      width: 26,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(8),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -280,7 +399,7 @@ class _RailBrand extends StatelessWidget {
       child: Icon(
         Icons.calendar_month_rounded,
         color: scheme.onPrimary,
-        size: 19,
+        size: 15,
       ),
     );
 
@@ -290,12 +409,13 @@ class _RailBrand extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         glyph,
-        const SizedBox(width: Spacing.md),
+        const SizedBox(width: Spacing.sm),
         Text(
           'app_title'.tr(),
-          style: theme.textTheme.titleMedium?.copyWith(
+          style: theme.textTheme.labelMedium?.copyWith(
             fontFamily: AppTheme.displayFontFamily,
             fontWeight: FontWeight.w700,
+            color: scheme.onSurfaceVariant,
             letterSpacing: -0.2,
           ),
         ),
