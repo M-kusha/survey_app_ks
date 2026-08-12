@@ -5,24 +5,44 @@ import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:flutter/material.dart';
 
+/// What a tab shows instead of its content when the account cannot use it.
+///
+/// This has no `child`. It used to take one and return it whenever the
+/// membership was null — and both callers passed `SizedBox.shrink()`, because
+/// the gate is meant to *replace* the page, not wrap it. A null membership is
+/// not "everything is fine": `MembershipProvider` leaves it null and records an
+/// error when the read fails, so a transient Firestore failure rendered an
+/// empty box. That is a blank screen with no message, no retry, and nothing in
+/// the console once the error has scrolled past.
+///
+/// Every branch below returns something a person can act on.
 class CompanyGate extends StatelessWidget {
   const CompanyGate({
     super.key,
     required this.membership,
     required this.onChanged,
-    required this.child,
   });
 
   final Membership? membership;
 
   final Future<void> Function() onChanged;
 
-  final Widget child;
-
   @override
   Widget build(BuildContext context) {
     final membership = this.membership;
-    if (membership == null || membership.isActive) return child;
+
+    // Unknown, because the read failed. Offering "find a company" here would
+    // tell somebody who is in one that they are not, so this says only what is
+    // true: it could not be loaded, try again.
+    if (membership == null) {
+      return _Gate(
+        icon: Icons.cloud_off_rounded,
+        title: 'error_occurred'.tr(),
+        body: 'membership_unavailable_body'.tr(),
+        actionLabel: 'retry'.tr(),
+        onAction: () => onChanged(),
+      );
+    }
 
     return switch (membership.state) {
       MembershipState.pending => _Gate(

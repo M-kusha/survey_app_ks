@@ -226,11 +226,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     if (!_isLoading &&
         !membershipState.loading &&
         membership?.isActive != true) {
-      return CompanyGate(
-        membership: membership,
-        onChanged: _load,
-        child: const SizedBox.shrink(),
-      );
+      return CompanyGate(membership: membership, onChanged: _load);
     }
 
     return Scaffold(

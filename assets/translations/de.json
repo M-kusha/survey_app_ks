@@ -349,6 +349,7 @@
   "maybe_participate_participants": "Teilnehmer, die vielleicht teilnehmen werden",
   "member": "Mitglied",
   "member_data_erased": "Die Daten wurden gelöscht",
+  "membership_unavailable_body": "Ihre Unternehmenszugehörigkeit konnte nicht geladen werden, daher lässt sich dies noch nicht anzeigen. Prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
   "missed": "Verpasst",
   "more": "Mehr",
   "more_slots": "+{count} weitere",

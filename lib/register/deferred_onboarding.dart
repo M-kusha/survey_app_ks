@@ -200,8 +200,23 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
   void initState() {
     super.initState();
     _companyNameController.addListener(_nameChanged);
-    if (_completed) return;
+    if (_completed) {
+      // Nothing left to finish, but the work `_finish` schedules still has to
+      // happen: a notification tap waiting to be replayed once a navigator
+      // exists, and a profile photo chosen during registration that has not
+      // been uploaded yet. Skipping straight to the child dropped both.
+      _scheduleReadyWork();
+      return;
+    }
     unawaited(_resume());
+  }
+
+  void _scheduleReadyWork() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      NotificationNavigation.appReady();
+      unawaited(_uploadPendingProfileImage());
+    });
   }
 
   void _nameChanged() {
@@ -269,10 +284,7 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
       _loading = false;
       _failure = null;
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationNavigation.appReady();
-      unawaited(_uploadPendingProfileImage());
-    });
+    _scheduleReadyWork();
   }
 
   Future<void> _uploadPendingProfileImage() async {

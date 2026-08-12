@@ -349,6 +349,7 @@
   "maybe_participate_participants": "Participants who maybe will participate",
   "member": "Member",
   "member_data_erased": "Their data was erased",
+  "membership_unavailable_body": "Your company membership could not be loaded, so this cannot be shown yet. Check your connection and try again.",
   "missed": "Missed",
   "more": "More",
   "more_slots": "+{count} more",

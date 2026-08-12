@@ -214,7 +214,6 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
       return CompanyGate(
         membership: membership,
         onChanged: _load,
-        child: const SizedBox.shrink(),
       );
     }
 

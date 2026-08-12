@@ -349,6 +349,7 @@
   "maybe_participate_participants": "Pjesëmarrësit që ndoshta do të marrin pjesë",
   "member": "Anëtar",
   "member_data_erased": "Të dhënat u fshinë",
+  "membership_unavailable_body": "Anëtarësimi juaj në kompani nuk u lexua dot, kështu që kjo nuk mund të shfaqet ende. Kontrolloni lidhjen dhe provoni përsëri.",
   "missed": "Nuk u zgjodh",
   "more": "Më shumë",
   "more_slots": "+{count} te tjera",
