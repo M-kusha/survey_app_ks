@@ -37,7 +37,6 @@ abstract final class AppTheme {
         space: Spacing.lg,
       ),
       appBarTheme: AppBarTheme(
-        // Matches the page so there is no seam where the bar ends.
         backgroundColor: scheme.pageSurface,
         foregroundColor: scheme.onSurface,
         surfaceTintColor: scheme.surfaceTint,
@@ -203,8 +202,7 @@ abstract final class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.navSurface,
-        // Matches the rail, so the phone and the desktop agree on what
-        // "selected" looks like.
+
         indicatorColor: scheme.primary.withValues(alpha: 0.14),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -228,11 +226,7 @@ abstract final class AppTheme {
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: scheme.navSurface,
-        // The selected destination now carries the accent colour, on both the
-        // icon and the label. Material's default pairs `onSecondaryContainer`
-        // with a pale pill, which is a very dark navy on very pale blue — it
-        // reads as black, so the only colour in the whole rail was the pill
-        // itself and the nav looked switched off.
+
         indicatorColor: scheme.primary.withValues(alpha: 0.14),
         selectedIconTheme: IconThemeData(color: scheme.primary, size: 24),
         unselectedIconTheme: IconThemeData(
@@ -366,46 +360,22 @@ abstract final class AppTheme {
   }
 }
 
-/// Which tone the page is, and which tone sits on top of it.
-///
-/// Material 3's light surfaces are all within a few percent of white, so the
-/// default arrangement — a card on `surface` — renders #F3F3FA on #F9F9FF, a
-/// contrast ratio of 1.05. The card is invisible; only its hairline border
-/// suggests anything is there, and a screen of them reads as empty. Light mode
-/// therefore tints the page and lifts cards to white, which is the relationship
-/// the eye already knows as "card on a page".
-///
-/// Dark mode keeps Material's direction. There a lighter panel on a darker page
-/// already separates, and inverting it would sink cards below the page for no
-/// gain.
 extension AppSurfaces on ColorScheme {
   bool get _isDark => brightness == Brightness.dark;
 
-  /// Behind everything: scaffolds, app bars, the canvas.
   Color get pageSurface => _isDark ? surface : surfaceContainer;
 
-  /// Cards, sheets and anything meant to read as raised off the page.
   Color get cardSurface =>
       _isDark ? surfaceContainerLow : surfaceContainerLowest;
 
-  /// A card whose content is finished or expired: present, but not competing.
   Color get mutedCardSurface =>
       _isDark ? surfaceContainerLowest : surfaceContainer;
 
-  /// Behind the navigation, bottom bar and rail alike.
-  ///
-  /// A faint wash of the accent rather than plain grey. With a neutral bar the
-  /// only colour in the navigation was the selected pill, so the whole strip
-  /// read as switched off until you tapped something. Kept to a few percent —
-  /// enough to tint, not enough to compete with the selected destination or to
-  /// move the contrast of the labels drawn on it.
   Color get navSurface => Color.alphaBlend(
     primary.withValues(alpha: _isDark ? 0.10 : 0.06),
     _isDark ? surfaceContainerLow : surfaceContainer,
   );
 
-  /// Cards carry a real shadow in light mode. In dark mode a shadow is a
-  /// darker smudge on an already dark page, so tone alone does the work.
   double get cardElevation => _isDark ? 0 : 1;
 }
 

@@ -36,17 +36,8 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   StreamSubscription<Participant?>? _participantSubscription;
   late Participant _participant;
 
-  /// Correct option indexes per question. Empty until the answer key loads,
-  /// and for surveys, which have no right answer to mark.
   List<Set<int>> _answerKey = const [];
 
-  /// True while a test's answer key is still in flight.
-  ///
-  /// Without this the first frames of a test rendered as a survey: no key yet
-  /// means nothing is marked correct, which the option rows read as "just show
-  /// what they picked" — a blue tag. A quarter of a second later the key landed
-  /// and the whole list repainted red and green. Nothing was duplicated; the
-  /// screen was answering a question it did not have the data for yet.
   late bool _answerKeyPending = _isTest;
 
   bool _saving = false;
@@ -82,17 +73,13 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   Future<void> _loadAnswerKey() async {
     final key = await _service.fetchAnswerKeyIndexes(widget.survey.id);
     if (!mounted) return;
-    // Cleared even when the read came back empty or was refused, so a test
-    // whose key cannot be loaded settles on "unmarked" instead of waiting for
-    // something that is never going to arrive.
+
     setState(() {
       if (key.isNotEmpty) _answerKey = key;
       _answerKeyPending = false;
     });
   }
 
-  /// The answer key is the only source. Nothing here reads grading fields off
-  /// the survey document, because members can read that document.
   Set<int> _correctFor(int index) =>
       index < _answerKey.length ? _answerKey[index] : const <int>{};
 
@@ -121,8 +108,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
     setState(() {
       _saving = true;
       _participant.textAnswersReviewed = reviews;
-      // The old score belongs to the previous review map. Never present it as
-      // final while the trusted Function is recomputing the result.
+
       _participant.gradingStatus = 'processing';
     });
 
@@ -151,9 +137,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
           participant: _participant,
           survey: widget.survey,
           textQuestionCorrect: _participant.textAnswersReviewed,
-          // Already loaded for the review screen. Without it the export marked
-          // only which option was picked, so a printed test could not be told
-          // apart from a printed survey.
+
           correctIndexes: _answerKey,
         ),
       ),
@@ -271,10 +255,6 @@ class _Summary extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // `headlineMedium` in the display face put a ~30px bold number
-              // beside 13px body text and a pill, which crowded the row and
-              // made a two-digit percentage the loudest thing on the page.
-              // `titleLarge` still leads without shouting.
               Text(
                 grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -298,9 +278,7 @@ class _Summary extends StatelessWidget {
               ] else
                 const Spacer(),
               const SizedBox(width: Spacing.sm),
-              // The status was printed twice: once under the fraction and again
-              // in this pill. The pill is the one that carries a colour, so it
-              // is the one that stays.
+
               StatusPill(label: statusLabel, tone: statusTone),
             ],
           ),
@@ -355,7 +333,6 @@ class _QuestionCard extends StatelessWidget {
   final bool isTest;
   final Set<int> correct;
 
-  /// The answer key has not arrived yet, so no verdict can be shown.
   final bool keyPending;
 
   final bool? verdict;
@@ -442,9 +419,6 @@ class _Options extends StatelessWidget {
         .map((option) => '$option')
         .toList();
 
-    // Surveys have no right answer, and a key that came back empty or refused
-    // means there is nothing to mark against. Either way, fall back to showing
-    // only what they picked rather than marking everything wrong.
     final graded = isTest && correct.isNotEmpty;
 
     return Column(
@@ -455,14 +429,6 @@ class _Options extends StatelessWidget {
             final picked = answer.contains(i);
             final isRight = correct.contains(i);
 
-            // `lostMark` is the red border: a point that was thrown away,
-            // either by picking a wrong option or by leaving a right one
-            // untouched. Both need to be findable at a glance.
-            // A test whose key is still loading gets no verdict at all — not
-            // even the blue "their answer" a survey would show, which is what
-            // flashed for a quarter of a second before the real marking landed.
-            // A wrong answer shown confidently and corrected a moment later is
-            // worse than one shown a moment late.
             final (color, icon, label, tone, lostMark) = keyPending
                 ? (
                     scheme.outline,

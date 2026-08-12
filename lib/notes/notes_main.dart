@@ -151,10 +151,6 @@ class TodoListState extends State<TodoList> {
   }
 
   Future<void> _delete(NoteItem note) async {
-    // Deleting used to happen the instant the icon was pressed, with only an
-    // undo snackbar to catch it. Undo is still there — the grace period is what
-    // lets other devices reconcile an offline deletion — but a note is somebody
-    // 's writing, and a mis-tap should not be the last word on it.
     final confirmed = await confirmDestructive(
       context,
       icon: Icons.delete_outline_rounded,
@@ -168,8 +164,7 @@ class TodoListState extends State<TodoList> {
 
     final deletion = PendingNoteDeletion(
       noteId: note.id,
-      // Other devices wait long enough for an offline undo to synchronize.
-      // This device finalizes immediately when the Snackbar times out.
+
       finalizeAfterMillis: DateTime.now()
           .add(const Duration(minutes: 5))
           .millisecondsSinceEpoch,

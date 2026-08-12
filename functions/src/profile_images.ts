@@ -161,13 +161,6 @@ function decodedImageFormat(input: Buffer): ProfileImageInputFormat {
   return invalidImage();
 }
 
-/**
- * Strictly decodes the callable payload and re-encodes it as a bounded JPEG.
- *
- * Sharp strips EXIF, ICC, XMP and other metadata by default. The explicit
- * re-encode is the trusted boundary: client-side sanitizing remains useful for
- * bandwidth, but is not part of the security guarantee.
- */
 export async function sanitizeProfileImagePayload(
   imageBase64: unknown,
   expectedFormat: ProfileImageInputFormat = 'jpeg',
@@ -401,7 +394,6 @@ type GenerationDeleteTarget = {
   }): Promise<unknown>;
 };
 
-/** Deletes only this invocation's generation; a newer upload always wins. */
 export async function deleteUploadedGenerationIfCurrent(
   target: GenerationDeleteTarget,
   uploadedGeneration: string,
@@ -412,8 +404,6 @@ export async function deleteUploadedGenerationIfCurrent(
       ifGenerationMatch: uploadedGeneration,
     });
   } catch (error) {
-    // A concurrent upload replaced this generation. Its invocation (or the
-    // account-deletion worker) owns cleanup of that newer object.
     const code = (error as { code?: unknown } | null)?.code;
     if (code !== 412 && code !== '412') throw error;
   }
@@ -437,7 +427,6 @@ async function deleteIfAccountClosing(
   return true;
 }
 
-/** Stores only a canonical private path; it never creates a download token. */
 export async function uploadOwnProfileImage(
   uid: string,
   upload: ParsedProfileImageUpload,
@@ -521,14 +510,11 @@ export async function uploadOwnProfileImage(
     }
     throw error;
   }
-  // Resolve from GCS rather than file.metadata, which can be absent after save
-  // or can still contain metadata read for the previous generation.
+
   const [uploadedMetadata] = await file.getMetadata();
   if (
     uploadedMetadata.metadata?.profileImageUploadAttempt !== uploadAttemptId
   ) {
-    // Our generation has already been superseded, so there is no mutation from
-    // this invocation left at the live canonical path to roll back.
     throw new ProfileImageRevisionError();
   }
   const uploadedGeneration = String(uploadedMetadata.generation ?? '');
@@ -556,8 +542,6 @@ export async function uploadOwnProfileImage(
         },
       });
     } catch (error) {
-      // Another authorized upload won after this generation. Never overwrite
-      // that newer object while rolling back this failed request.
       const code = (error as { code?: unknown } | null)?.code;
       if (code !== 412 && code !== '412') throw error;
     }
@@ -565,9 +549,6 @@ export async function uploadOwnProfileImage(
 
   let revision: number;
   try {
-    // GCS Admin uploads do not mint Firebase download tokens. Verify that fact
-    // anyway, and revoke a stale custom token defensively before publishing
-    // the path to either Firestore projection.
     const uploadedFile = bucket.file(path, { generation: uploadedGeneration });
     let [storedMetadata] = await uploadedFile.getMetadata();
     await file.setMetadata(

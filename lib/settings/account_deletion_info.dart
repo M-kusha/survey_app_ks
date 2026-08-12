@@ -6,7 +6,6 @@ import 'package:echomeet/utilities/bottom_navigation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Public, sign-in-free instructions for requesting permanent account deletion.
 class AccountDeletionInfoPage extends StatelessWidget {
   const AccountDeletionInfoPage({super.key});
 
@@ -56,13 +55,6 @@ class AccountDeletionInfoPage extends StatelessWidget {
               ),
               const SizedBox(height: Spacing.xl),
               FilledButton.icon(
-                // Settings is a tab, not a page: it has no app bar, because
-                // inside the shell the bottom bar is how you leave it. Pushing
-                // it as a route stranded people with no back button and no
-                // navigation - on a phone the only way out was to kill the app.
-                // Enter the shell on the settings tab instead, replacing this
-                // stack so Android's back gesture behaves as it does anywhere
-                // else in the app.
                 onPressed: () => signedIn
                     ? Navigator.pushAndRemoveUntil(
                         context,

@@ -123,12 +123,6 @@ class AppointmentService {
             : Appointment.fromFirestore(data).confirmedTimeSlots;
       });
 
-  /// The one appointment, or null once it is gone — including while it is going.
-  ///
-  /// An appointment mid-deletion still reads, so a page watching this would
-  /// otherwise sit on a live-looking screen whose votes are being cleared under
-  /// it. Reporting it as absent lets the page do what it already does for a
-  /// deleted appointment.
   Stream<Appointment?> watchAppointment(String appointmentId) => _db
       .collection('appointments')
       .doc(appointmentId)
@@ -161,17 +155,6 @@ class AppointmentService {
     return userDoc.data()?['fullName'] as String? ?? 'Unknown';
   }
 
-  /// Names of the people who may vote in one company, keyed by user id.
-  ///
-  /// The directory is the only trustworthy source: a vote carries a name the
-  /// participant's own client wrote, so it can name a colleague. Streaming the
-  /// company also reveals who has not answered yet, which the votes alone
-  /// cannot say.
-  ///
-  /// Only active members are returned. Someone still awaiting approval cannot
-  /// read the meeting at all, so listing them as outstanding would describe a
-  /// wait that can never end. Membership is filtered here rather than in the
-  /// query so this stays a single-field lookup needing no composite index.
   Stream<Map<String, String>> watchCompanyMemberNames(String companyId) {
     final id = companyId.trim();
     if (id.isEmpty) return Stream.value(const {});

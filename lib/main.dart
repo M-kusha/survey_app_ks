@@ -33,18 +33,6 @@ import 'package:flutter_quill/flutter_quill.dart'
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
-/// Picks how Firestore talks to the network on the web.
-///
-/// The browser console was filling with `WebChannelConnection RPC 'Listen'
-/// stream transport errored` and 400s on the Listen channel. That is Firestore's
-/// bidirectional WebChannel stream failing — it is blocked by a good deal of
-/// network equipment, browser extensions and proxies — after which the SDK
-/// retries and logs again. Auto-detect makes it notice the failure once and fall
-/// back to long polling for the session, so the stream stays up and the console
-/// stays quiet.
-///
-/// Web only: the mobile SDKs use gRPC and have neither the problem nor the
-/// setting.
 void _configureFirestoreTransport() {
   if (!kIsWeb) return;
   FirebaseFirestore.instance.settings = const Settings(
@@ -112,13 +100,6 @@ Future<void> main() async {
   );
 }
 
-/// The note editor's own translations, falling back to English.
-///
-/// flutter_quill ships no Albanian, and its delegate answers `isSupported`
-/// honestly - so on `sq` the framework skips it, every toolbar button asks for
-/// an instance that was never loaded, and the editor screen dies. Claiming
-/// support for everything and loading English for the gaps costs a few
-/// untranslated tooltips instead of the whole screen.
 class _QuillLocalizations
     extends LocalizationsDelegate<FlutterQuillLocalizations> {
   const _QuillLocalizations();
@@ -183,9 +164,7 @@ class MyApp extends StatelessWidget {
         navigatorKey: NotificationNavigation.navigatorKey,
         routes: AppRoutes.routes(),
         locale: context.locale,
-        // The note editor's toolbar reads its own tooltips from a delegate the
-        // package ships separately. Without it every toolbar button throws
-        // while building, which takes the whole editor screen down.
+
         localizationsDelegates: [
           ...context.localizationDelegates,
           const _QuillLocalizations(),

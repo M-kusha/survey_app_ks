@@ -186,24 +186,6 @@ class AppointmentDataProvider extends ChangeNotifier {
   }
 }
 
-/// Reads a list snapshot, dropping the rows that cannot stand on their own.
-///
-/// Both halves of this matter, and both were bugs.
-///
-/// A single unreadable document used to take the entire list with it. The map
-/// ran inside the stream callback, so one `FormatException` skipped the
-/// assignment *and* the `notifyListeners` after it — the tab kept showing stale
-/// rows, with the failure landing in the console as an unhandled async error
-/// where no user will ever see it.
-///
-/// What made that fire was deleting an appointment. The server stamps the parent
-/// with `deletionStartedAt` before it clears the votes, and that snapshot arrives
-/// while the row is still on screen. So the delete appeared to do nothing until
-/// the tab was switched and the list rebuilt from scratch.
-///
-/// A row on its way out is dropped rather than drawn, because there is nothing
-/// useful to do with it: opening it would race the deletion, and telling the
-/// reader it is "being deleted" is noise about a state that lasts a moment.
 List<Appointment> readAppointmentSnapshot(
   Iterable<Map<String, dynamic>> documents, {
   void Function(Object error)? onUnreadable,
@@ -215,9 +197,6 @@ List<Appointment> readAppointmentSnapshot(
       if (appointment.isBeingDeleted) continue;
       appointments.add(appointment);
     } on Object catch (error) {
-      // Keep the catch inside this one-document decode boundary. Firestore
-      // casts can throw TypeError as well as FormatException; neither should
-      // prevent the other independently readable rows from reaching the UI.
       (onUnreadable ?? _reportUnreadable)(error);
     }
   }

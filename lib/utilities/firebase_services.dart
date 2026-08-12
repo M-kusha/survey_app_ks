@@ -9,8 +9,6 @@ class FirebaseServices {
   final FirebaseFirestore _db;
   final FirebaseAuth _auth;
 
-  // Kept for call-site compatibility. Profile authorization data is no longer
-  // held in process memory, so there is nothing to invalidate.
   static void invalidateCache() {}
 
   Future<Map<String, dynamic>?> _currentProfile() async {

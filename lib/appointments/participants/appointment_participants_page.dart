@@ -15,10 +15,6 @@ import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:flutter/material.dart';
 
-/// Who is coming, and who has not answered.
-///
-/// Voting itself stays on the vote page; this is the read-only roll call it
-/// links to, and the surface the PDF export mirrors.
 class AppointmentParticipantsPage extends StatefulWidget {
   const AppointmentParticipantsPage({super.key, required this.appointment});
 
@@ -71,8 +67,6 @@ class _AppointmentParticipantsPageState
           },
         );
 
-    // A meeting always carries its company; the empty fallback simply yields an
-    // empty roster rather than throwing, and the voters still list.
     _membersSubscription = _service
         .watchCompanyMemberNames(widget.appointment.companyId ?? '')
         .listen(
@@ -176,10 +170,7 @@ class _AppointmentParticipantsPageState
               zoneId: widget.appointment.zoneId,
               totals: overview.totalsBySlotId[slot.slotId],
             ),
-          SectionLabel(
-            label: 'participants'.tr(),
-            count: overview.rows.length,
-          ),
+          SectionLabel(label: 'participants'.tr(), count: overview.rows.length),
           for (final row in overview.rows)
             Padding(
               padding: const EdgeInsets.only(bottom: Spacing.sm),
@@ -397,8 +388,7 @@ class _ParticipantCard extends StatelessWidget {
           ),
           if (row.hasResponded) ...[
             const SizedBox(width: Spacing.md),
-            // One mark per offered time, in the same order as the times above,
-            // so a column can be read down the list to compare people.
+
             Wrap(
               spacing: Spacing.xs,
               runSpacing: Spacing.xs,

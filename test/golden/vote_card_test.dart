@@ -67,7 +67,6 @@ void main() {
         Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Leading, voted yes, admin can confirm.
             VoteSlotCard(
               slot: _slot(12),
               zoneId: 'Europe/Berlin',
@@ -87,7 +86,6 @@ void main() {
               onConfirm: () {},
             ),
             const SizedBox(height: Spacing.md),
-            // Nobody has answered: no bar at all, rather than an empty one.
             VoteSlotCard(
               slot: _slot(13),
               zoneId: 'Europe/Berlin',
@@ -106,7 +104,6 @@ void main() {
               onShowVoters: () {},
             ),
             const SizedBox(height: Spacing.md),
-            // Voting closed: buttons visibly inert, counts still readable.
             VoteSlotCard(
               slot: _slot(14, confirmed: true),
               zoneId: 'Europe/Berlin',

@@ -7,12 +7,6 @@ import 'package:local_auth_android/local_auth_android.dart';
 class AuthService {
   final LocalAuthentication auth = LocalAuthentication();
 
-  /// Biometric unlock is a device feature, and the web has no such plugin.
-  ///
-  /// Asking anyway threw `MissingPluginException` — which is not a
-  /// `PlatformException`, so the old catch did not see it and the failure
-  /// surfaced as an unhandled rejection in the console on every visit to the
-  /// settings and sign-in screens.
   bool get _available => !kIsWeb;
 
   Future<bool> canCheckBiometrics() async {
@@ -22,7 +16,6 @@ class AuthService {
     } on PlatformException {
       return false;
     } on MissingPluginException {
-      // A platform this build reaches but the plugin does not implement.
       return false;
     }
   }

@@ -152,7 +152,6 @@ async function commitFinalDeletes(
   await batch.commit();
 }
 
-/** Deletes one survey or appointment only after its server-owned write barrier. */
 export async function deleteContentForUser(
   uid: string,
   rawRequest: unknown,

@@ -35,7 +35,6 @@ Appointment _appointment({
   );
 }
 
-/// Unfolds per RFC 5545: a CRLF followed by a single space is not a break.
 List<String> _contentLines(String ics) => ics
     .replaceAll('\r\n ', '')
     .split('\r\n')
@@ -66,7 +65,6 @@ void main() {
       final ics = buildAppointmentIcs(appointment: _appointment());
 
       expect(ics.endsWith('END:VCALENDAR\r\n'), isTrue);
-      // A bare LF anywhere would be a grammar violation.
       expect(ics.replaceAll('\r\n', ''), isNot(contains('\n')));
     });
 
@@ -80,13 +78,17 @@ void main() {
 
     test('SEQUENCE tracks the revision so updates are not seen as older', () {
       expect(
-        _value(buildAppointmentIcs(appointment: _appointment(revision: 1)),
-            'SEQUENCE'),
+        _value(
+          buildAppointmentIcs(appointment: _appointment(revision: 1)),
+          'SEQUENCE',
+        ),
         '0',
       );
       expect(
-        _value(buildAppointmentIcs(appointment: _appointment(revision: 4)),
-            'SEQUENCE'),
+        _value(
+          buildAppointmentIcs(appointment: _appointment(revision: 4)),
+          'SEQUENCE',
+        ),
         '3',
       );
     });
@@ -128,8 +130,6 @@ void main() {
     });
 
     test('a slot spanning a DST transition keeps its real duration', () {
-      // 00:30 → 01:30 UTC on the European spring-forward night. Local wall
-      // clocks jump, the instants do not.
       final start = DateTime.utc(2026, 3, 29, 0, 30);
       final ics = buildAppointmentIcs(
         appointment: _appointment(
@@ -170,7 +170,6 @@ void main() {
         appointment: _appointment(title: r'a\;b'),
       );
 
-      // Not `a\\\\\;b`, which is what escaping in the wrong order produces.
       expect(_value(ics, 'SUMMARY'), r'a\\\;b');
     });
 
@@ -186,10 +185,7 @@ void main() {
   group('folding', () {
     test('no content line exceeds 75 octets', () {
       final ics = buildAppointmentIcs(
-        appointment: _appointment(
-          title: 'A' * 200,
-          description: 'B' * 400,
-        ),
+        appointment: _appointment(title: 'A' * 200, description: 'B' * 400),
       );
 
       for (final line in ics.split('\r\n')) {
@@ -205,8 +201,6 @@ void main() {
     });
 
     test('German and Albanian characters survive folding intact', () {
-      // Each of these is two octets in UTF-8, so a naive character-based fold
-      // splits one in half and corrupts it.
       final description = 'Präsentation über Prüfungen ${'ë ç ü ö ä ß ' * 12}';
       final ics = buildAppointmentIcs(
         appointment: _appointment(description: description),
@@ -219,7 +213,6 @@ void main() {
     });
 
     test('a multi-byte character exactly on the boundary is not split', () {
-      // Pad so a two-octet character straddles octet 75.
       for (var padding = 60; padding < 80; padding++) {
         final description = '${'x' * padding}ë tail';
         final ics = buildAppointmentIcs(
@@ -254,8 +247,10 @@ void main() {
     });
 
     test('falls back when nothing usable remains', () {
-      expect(appointmentIcsFileName(_appointment(title: '///')),
-          'appointment.ics');
+      expect(
+        appointmentIcsFileName(_appointment(title: '///')),
+        'appointment.ics',
+      );
     });
 
     test('bounds the length', () {

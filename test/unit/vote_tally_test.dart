@@ -34,8 +34,6 @@ void main() {
     });
 
     test('an unreadable status is not silently a no', () {
-      // Counting it as a decline would record somebody as having refused a
-      // meeting they never opened.
       expect(VoteStatus.fromWire('garbage'), isNull);
       expect(VoteStatus.fromWire(null), isNull);
     });
@@ -60,9 +58,6 @@ void main() {
     });
 
     test('matches a vote to its full slot, not by object identity', () {
-      // The screens compared TimeSlot instances with `==`, which the class does
-      // not implement — so it was reference equality and only ever worked while
-      // the same objects stayed in the widget tree.
       final rebuilt = TimeSlot(
         slotId: monday.slotId,
         start: monday.startAt,
@@ -91,8 +86,6 @@ void main() {
     });
 
     test('two people with the same name are two votes', () {
-      // This is the bug that mattered: every check was `p.userName == userName`,
-      // so a second Jan Meier overwrote the first and could see their answer.
       final tally = tallyVotes(
         [monday],
         [
@@ -125,7 +118,6 @@ void main() {
     });
 
     test('votes for a slot that no longer exists are ignored', () {
-      // An admin can delete a proposed time after people have voted on it.
       final tally = tallyVotes(
         [monday],
         [vote('a', wednesday, VoteStatus.yes)],
@@ -173,7 +165,6 @@ void main() {
     });
 
     test('is null before anybody has voted', () {
-      // Not "the first slot" — a badge on an arbitrary row is worse than none.
       expect(tallyVotes([monday, tuesday], []).leader, isNull);
     });
 

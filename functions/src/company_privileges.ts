@@ -71,11 +71,7 @@ function validDocumentId(value: string): boolean {
   return value.length > 0 && value.length <= 128 && !value.includes('/');
 }
 
-/** Canonical, server-owned key used by the company-name uniqueness lock. */
 export function companyNameSlug(name: string): string {
-  // Keep the exact ASCII transform used by released clients. Changing this to
-  // transliterate accents would miss existing locks (for example Muller with
-  // an umlaut was historically stored as m-ller, not muller) and reopen names.
   const legacyCompatible = name
     .trim()
     .toLowerCase()
@@ -150,7 +146,6 @@ function memberProjection(uid: string, profile: Data): Data {
   return projection;
 }
 
-/** Writes the one canonical event shared by both company-creation paths. */
 export function writeCompanyCreatedActivity(
   transaction: ActivityCreateTransaction,
   input: {
@@ -181,13 +176,6 @@ async function firestoreTransaction<T>(
   }));
 }
 
-/**
- * Creates a company for one existing companyless account.
- *
- * Auth, profile eligibility, uniqueness, ownership, projection and the audit
- * event are all derived and committed at the trusted boundary. There is no
- * retry/request model because the database has no legacy creation state.
- */
 export async function createCompanyForCurrentUser(
   uid: string,
   authTime: unknown,

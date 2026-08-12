@@ -56,9 +56,6 @@ class SignOutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    // A tinted rounded square, matching the app's other icon actions. It was a
-    // grey circle with a grey glyph, which read as disabled next to them — and a
-    // circle at this size sits oddly against the squared cards around it.
     return Tooltip(
       message: 'log_out'.tr(),
       child: Material(
@@ -69,11 +66,7 @@ class SignOutButton extends StatelessWidget {
           onTap: () => confirmSignOut(context),
           child: Padding(
             padding: const EdgeInsets.all(9),
-            child: Icon(
-              Icons.logout_rounded,
-              size: 18,
-              color: scheme.primary,
-            ),
+            child: Icon(Icons.logout_rounded, size: 18, color: scheme.primary),
           ),
         ),
       ),

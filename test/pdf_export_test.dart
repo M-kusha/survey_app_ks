@@ -24,11 +24,6 @@ int _pdfPageCount(Uint8List bytes) => RegExp(
   r'/Type/Page(?!s)',
 ).allMatches(latin1.decode(bytes, allowInvalid: true)).length;
 
-/// Extracts the embedded Inter text used by these exports.
-///
-/// This deliberately reads the finalized bytes rather than the input model,
-/// so a clipped maxLines value or a widget that never reaches a later page
-/// loses its terminal sentinel and fails the test.
 String _extractPdfText(Uint8List bytes) {
   final source = latin1.decode(bytes, allowInvalid: true);
   final objects = <int, String>{};
@@ -96,20 +91,11 @@ String _extractPdfText(Uint8List bytes) {
   return extracted.toString();
 }
 
-/// Smoke tests for the exports.
-///
-/// A PDF layout error is invisible until somebody presses download: it is not a
-/// compile error, `flutter analyze` cannot see it, and the failure arrives as a
-/// blank viewer in front of whoever needed the results. These build real
-/// documents and assert bytes come out.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() => loadAppTranslations());
 
-  /// The awkward survey: a single choice, a multiple choice and a free-text
-  /// question, one unanswered question, and an option nobody picked. Every
-  /// branch of the option-marking switch is reachable from this one fixture.
   Survey surveyOf(SurveyType type) => Survey(
     id: 's1',
     surveyName: 'Quarterly review - Prüfung ë ç',
@@ -141,8 +127,7 @@ void main() {
 
   final participant = Participant(
     userId: 'u1',
-    // The response snapshot differs on purpose: authorized rendering must use
-    // the current directory name below, not this historical value.
+
     name: 'Historical Çabej-Ümlaut',
     surveyAnswers: {
       'Q0': [0],
@@ -173,8 +158,6 @@ void main() {
     final theme = await PdfKit.theme();
     expect(theme, isNotNull);
 
-    // Cached, not reparsed. Three TTFs per export is real work on a document
-    // somebody is waiting for.
     expect(identical(await PdfKit.theme(), theme), isTrue);
   });
 
@@ -194,13 +177,10 @@ void main() {
           PdfKit.questionHeading(1, 'Which is correct?'),
           PdfKit.row(text: 'A', tag: 'correct', chipColor: PdfKit.correct),
           PdfKit.row(text: 'B', tag: null),
-          // Both ends of the bar, which is where a flex of zero would throw.
           PdfKit.bar(0),
           PdfKit.bar(0.5),
           PdfKit.bar(1),
-          // The shape the written-answer box uses. `double.infinity` resolves
-          // against the page in a MultiPage; it would be unbounded and throw in
-          // a Row, so it is worth pinning where it is actually used.
+
           pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.all(8),
@@ -213,9 +193,6 @@ void main() {
     expect((await pdf.save()).length, greaterThan(1000));
   });
 
-  /// A PDF reader will not open a file whose trailer is missing, and the pdf
-  /// package will happily hand back bytes that look like a document. "We can't
-  /// open this file" is what that looks like from the other end.
   void expectValidPdf(Uint8List bytes, String label) {
     expect(bytes.length, greaterThan(1000), reason: '$label is too small');
 
@@ -225,7 +202,6 @@ void main() {
     final tail = String.fromCharCodes(bytes.skip(bytes.length - 32));
     expect(tail, contains('%%EOF'), reason: '$label has no trailer');
 
-    // Written out so a failure can be opened by hand rather than guessed at.
     File(
       '${Directory.systemTemp.path}/echomeet-$label.pdf',
     ).writeAsBytesSync(bytes);
@@ -250,8 +226,6 @@ void main() {
   });
 
   test('a survey sheet is a valid PDF', () async {
-    // The ungraded path: no summary strip, no right answers, and the option
-    // marking switch takes a different branch throughout.
     final widget = PDFResults(
       participant: participant,
       survey: surveyOf(SurveyType.survey),
@@ -277,7 +251,6 @@ void main() {
       answerCounts: const [
         [1, 0, 0],
         [1, 0, 1],
-        // A free-text question, which the old builder threw on.
         [],
         [0, 0],
       ],
@@ -451,8 +424,6 @@ void main() {
   });
 
   test('fixtures cover both survey kinds', () {
-    // Guards the fixture itself: if `SurveyType` grows a case, this is the
-    // reminder that the exports have a third shape to handle.
     expect(SurveyType.values, hasLength(2));
     expect(surveyOf(SurveyType.test).questions, hasLength(4));
     expect(participant.surveyAnswers.containsKey('Q3'), isFalse);

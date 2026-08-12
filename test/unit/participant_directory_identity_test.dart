@@ -20,11 +20,9 @@ void main() {
       'Current canonical name · UID retained-uid',
     );
 
-    // A successful snapshot without the UID means the member was removed.
     applyParticipantDirectorySnapshot([participant], const {});
     expect(participant.auditLabel(), 'Unknown · UID retained-uid');
 
-    // A directory read failure is also fail-closed, never a stale-name leak.
     applyParticipantDirectorySnapshot(
       [participant],
       const {'retained-uid': 'Current canonical name'},

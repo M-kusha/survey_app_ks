@@ -119,8 +119,7 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final appointment = _appointment;
-    // One frame between discovering the draft is missing and the wizard
-    // restarting. Nothing to draw, and nothing to crash on.
+
     if (appointment == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

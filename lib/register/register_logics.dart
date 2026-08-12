@@ -144,8 +144,6 @@ class RegisterLogic {
     required ProfileType profileType,
     String? existingCompanyId,
   }) async {
-    // createUserWithEmailAndPassword replaces Firebase's current account.
-    // Cleanup and sign out first so a push token cannot remain on that profile.
     if (_auth.currentUser != null && !await AuthManager().signOut()) {
       throw StateError('The existing session could not be closed safely.');
     }
@@ -200,9 +198,6 @@ class RegisterLogic {
         });
       }
 
-      // This is the only Firestore state an unverified registration creates.
-      // Tenant documents, name locks and memberDirectory projections are
-      // deferred to the verified callable and committed there atomically.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
@@ -213,9 +208,6 @@ class RegisterLogic {
       rethrow;
     }
 
-    // Force the next sign-in to mint a fresh token containing the verified
-    // email claim. The profile screen offers avatar upload after verification;
-    // registration itself creates no Storage or public directory state.
     try {
       await _auth.signOut();
     } catch (_) {}

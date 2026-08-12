@@ -101,9 +101,7 @@ class AppointmentListItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // Already loaded and shown nowhere in the list. A meeting's
-                    // description is usually what tells you whether it concerns
-                    // you, which is exactly the decision this row exists for.
+
                     if (appointment.description.trim().isNotEmpty) ...[
                       const SizedBox(height: Spacing.xs),
                       Text(
@@ -231,15 +229,8 @@ class _SlotStrip extends StatelessWidget {
     final shown = ordered.take(_maxShown).toList();
     final hidden = ordered.length - shown.length;
 
-    // Compact chips, several to a row.
-    //
-    // These were full-width bars, one per line, each holding a whole sentence:
-    // "Wed, Aug 19 · 6:02 AM – 7:32 AM". Three of them turned a card into a
-    // wall of near-identical prose, and the wording repeated on every row while
-    // the only part that differed - the day and the hour - sat buried in the
-    // middle of it. A chip stacks those two figures so they can be compared
-    // down a column, and three fit on one line.
-    final locale = Localizations.maybeLocaleOf(context)?.toLanguageTag() ?? 'en';
+    final locale =
+        Localizations.maybeLocaleOf(context)?.toLanguageTag() ?? 'en';
     final viewerZone = context.watch<DeviceTimeZone?>()?.zoneId;
 
     return Wrap(
@@ -274,8 +265,6 @@ class _SlotStrip extends StatelessWidget {
   }
 }
 
-/// One offered time, as a two-line chip: the weekday and date above, the hour
-/// below. Confirmed times carry the success tint and a tick.
 class _SlotChip extends StatelessWidget {
   const _SlotChip({
     required this.slot,
@@ -286,7 +275,6 @@ class _SlotChip extends StatelessWidget {
 
   final TimeSlot slot;
 
-  /// The reader's zone, or null to fall back to the device's own.
   final String? zoneId;
   final String locale;
   final bool confirmed;

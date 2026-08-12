@@ -111,9 +111,7 @@ class SurveyListItem extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    // Already loaded with the survey and shown nowhere in the
-                    // list, which left a wide card carrying a short title and
-                    // little else.
+
                     if (survey.surveyDescription.trim().isNotEmpty) ...[
                       const SizedBox(height: Spacing.xs),
                       Text(
@@ -230,13 +228,6 @@ class _AdminButton extends StatelessWidget {
     );
   }
 
-  /// Opens the create wizard pre-filled from this survey.
-  ///
-  /// A test's marked answers live in a separate document, so they are fetched
-  /// and merged back before the wizard opens. If that read fails the copy still
-  /// opens, with nothing marked — the author is told, and finishes the key by
-  /// hand. Silently publishing a test whose answers had quietly vanished would
-  /// be far worse than an extra step.
   Future<void> _duplicate(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);

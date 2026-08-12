@@ -139,8 +139,6 @@ class EmailChangeService {
     return EmailChangeRequestReceipt(newEmail: normalizedNewEmail);
   }
 
-  /// Reloads Firebase Auth, requires its current address to be verified, forces
-  /// a fresh ID token, then copies that trusted address through the callable.
   Future<EmailSyncReceipt> syncVerifiedEmail({String? expectedEmail}) async {
     final String currentEmail;
     try {
@@ -155,8 +153,6 @@ class EmailChangeService {
     return _syncPreparedEmail(currentEmail, expectedEmail: expectedEmail);
   }
 
-  /// Used only after a caller has already reloaded Auth and forced a token.
-  /// The verified-address check is repeated before the callable is invoked.
   Future<EmailSyncReceipt> syncAfterAuthenticationRefresh({
     String? expectedEmail,
   }) async {

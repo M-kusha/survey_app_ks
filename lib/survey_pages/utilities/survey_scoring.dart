@@ -56,8 +56,6 @@ class SurveyGrade {
 
   final double percentage;
 
-  /// Present when score/totals came from the trusted backend. A null value is
-  /// reserved for the pure scorer used by isolated unit tests.
   final SurveyGradingStatus? authoritativeStatus;
 
   bool get isProcessing =>
@@ -87,8 +85,6 @@ abstract final class SurveyScorer {
   static String reviewKey(String surveyId, int questionIndex) =>
       '$surveyId-${answerKey(questionIndex)}';
 
-  /// Builds UI state from fields authored by the trusted grading Function.
-  /// It never derives correctness from the member-readable survey document.
   static SurveyGrade authoritativeGrade({
     required String surveyId,
     required List<Map<String, dynamic>> questions,
@@ -176,8 +172,6 @@ abstract final class SurveyScorer {
     return count;
   }
 
-  /// Pure answer-key scorer retained for isolated parity tests. Production UI
-  /// must use [authoritativeGrade]; deployed clients cannot read private keys.
   static SurveyGrade grade({
     required String surveyId,
     required List<Map<String, dynamic>> questions,

@@ -19,9 +19,7 @@ class Step4CreateSurvey extends StatelessWidget {
       name: survey.surveyName,
       facts: [
         (
-          icon: isTest
-              ? Icons.workspace_premium_outlined
-              : Icons.poll_outlined,
+          icon: isTest ? Icons.workspace_premium_outlined : Icons.poll_outlined,
           label: (isTest ? 'label_test' : 'label_survey').tr(),
         ),
         (

@@ -45,8 +45,6 @@ Uint8List sanitizeProfileImageBytes(Uint8List bytes) {
           );
   }
 
-  // Re-encoding, with every metadata container cleared, prevents location,
-  // device, author, and embedded-comment data reaching the stored avatar.
   decoded.exif = image.ExifData();
   decoded.iccProfile = null;
   decoded.textData = null;

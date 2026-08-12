@@ -5,15 +5,6 @@ import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:flutter/material.dart';
 
-/// The screen shown after something has been created.
-///
-/// It used to hand over a document id to copy. Nothing needed it: the lists are
-/// searched by name, and nobody types a Firestore id anywhere in the app. What
-/// it did instead was end an otherwise finished task by presenting an internal
-/// identifier as if the reader were now responsible for it.
-///
-/// The facts it shows now are the ones worth checking before walking away —
-/// how many questions, how many times offered, when it closes.
 class CreationSuccessPage extends StatelessWidget {
   const CreationSuccessPage({
     super.key,
@@ -24,13 +15,10 @@ class CreationSuccessPage extends StatelessWidget {
     this.doneLabel,
   });
 
-  /// What happened, e.g. "Your test has been created".
   final String title;
 
-  /// What it was called.
   final String name;
 
-  /// The two or three things worth a glance before leaving.
   final List<({IconData icon, String label})> facts;
 
   final VoidCallback onDone;

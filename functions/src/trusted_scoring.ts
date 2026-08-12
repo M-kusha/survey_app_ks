@@ -4,10 +4,6 @@ export type TrustedSurveyGrade = SurveyScore & {
   gradingStatus: 'pending_review' | 'final';
 };
 
-/**
- * Validates the private envelope before it is used for an authoritative score.
- * A missing, stale, or cross-tenant key throws instead of turning into a zero.
- */
 export function scoreTrustedSurvey(args: {
   surveyId: string;
   survey: Record<string, unknown>;

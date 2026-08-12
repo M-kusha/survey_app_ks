@@ -170,12 +170,6 @@ class UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
-  /// Bans or lifts the ban, whichever this member currently needs.
-  ///
-  /// Lifting used to be possible only from the separate banned-members screen,
-  /// which meant the row that says "Banned" was the one place you could not act
-  /// on it. Both directions are optimistic and both roll back on failure, so a
-  /// refused call does not leave the list claiming something the server refused.
   Future<void> _toggleBan(UserModel user) async {
     final lifting = user.banned;
     final scheme = Theme.of(context).colorScheme;
@@ -195,8 +189,6 @@ class UserManagementPageState extends State<UserManagementPage> {
             child: Text('cancel'.tr()),
           ),
           FilledButton(
-            // Lifting a ban restores access, so it is not styled as a
-            // destructive action the way banning is.
             style: lifting
                 ? null
                 : FilledButton.styleFrom(
@@ -469,7 +461,6 @@ class _UserRow extends StatelessWidget {
                             ? Icons.lock_open_rounded
                             : Icons.block_rounded,
                         size: 18,
-                        // Lifting a ban is not a destructive action.
                         color: user.banned ? scheme.primary : scheme.error,
                       ),
                       const SizedBox(width: Spacing.md),

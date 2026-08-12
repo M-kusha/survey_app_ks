@@ -14,9 +14,6 @@ class NotificationLocaleService {
   static Locale? _desiredLocale;
   static String? _lastSynced;
 
-  /// Keeps locale persistence attached to Auth restoration as well as locale
-  /// rebuilds. MyApp can build before a persisted web session becomes visible;
-  /// the auth listener retries as soon as that verified user is restored.
   static void observe(Locale locale) {
     _desiredLocale = locale;
     _authSubscription ??= FirebaseAuth.instance.authStateChanges().listen((
@@ -37,9 +34,7 @@ class NotificationLocaleService {
     _queue = () async {
       try {
         await previous;
-      } catch (_) {
-        // A later rebuild should retry a transient failure.
-      }
+      } catch (_) {}
 
       final user = FirebaseAuth.instance.currentUser;
       if (user == null || !user.emailVerified) return;

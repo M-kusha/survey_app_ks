@@ -20,7 +20,9 @@ void main() {
   group('questions', () {
     test('a test question gets its marked answer back', () {
       final rebuilt = duplicateSurveyQuestions(
-        questions: [_single('Capital of France?', ['Paris', 'Rome'])],
+        questions: [
+          _single('Capital of France?', ['Paris', 'Rome']),
+        ],
         correctIndexes: [
           {0},
         ],
@@ -47,7 +49,9 @@ void main() {
 
     test('a plain survey copies with nothing marked', () {
       final rebuilt = duplicateSurveyQuestions(
-        questions: [_single('Favourite colour?', ['red', 'blue'])],
+        questions: [
+          _single('Favourite colour?', ['red', 'blue']),
+        ],
         correctIndexes: const [],
       );
 
@@ -67,8 +71,6 @@ void main() {
     });
 
     test('two answers marked on a single-choice question mark neither', () {
-      // The key disagrees with the question. Picking one would publish a copy
-      // that grades differently from the original without saying so.
       final rebuilt = duplicateSurveyQuestions(
         questions: [
           _single('Only one', ['a', 'b']),
@@ -111,7 +113,6 @@ void main() {
     });
 
     test('editing the copy cannot reach back into the original', () {
-      // The source survey is still in the provider's list and on screen.
       final options = ['a', 'b'];
       final source = [_single('Question', options)];
 
@@ -131,7 +132,9 @@ void main() {
       surveyName: 'Original',
       surveyDescription: 'Why we ask',
       timeCreated: DateTime(2026, 1, 1),
-      questions: [_single('Q', ['a', 'b'])],
+      questions: [
+        _single('Q', ['a', 'b']),
+      ],
       id: 'original-id',
       deadline: DateTime(2026, 2, 1),
       participants: [
@@ -176,8 +179,7 @@ void main() {
 
       expect(copy.id, 'new-id');
       expect(copy.participants, isEmpty);
-      // The server assigns the tenant from the author's own membership; a
-      // client-supplied one would be ignored at best and wrong at worst.
+
       expect(copy.companyId, '');
     });
 

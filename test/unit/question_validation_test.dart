@@ -38,7 +38,6 @@ void main() {
     });
 
     test('no correct answer is not a problem', () {
-      // Demanding one is how you end up with a "correct" favourite colour.
       final problems = validateQuestions([
         single(correct: null),
         multiple(correct: const []),
@@ -53,7 +52,6 @@ void main() {
     });
 
     test('fewer than two options is a problem', () {
-      // A "choice" with one option is not a choice. The old editor shipped it.
       expect(
         keys(
           validateQuestions([
@@ -113,8 +111,6 @@ void main() {
     });
 
     test('multiple choice needs at least two marked', () {
-      // One correct answer in a multiple-choice question is a single-choice
-      // question wearing a disguise.
       expect(
         keys(
           validateQuestions([
@@ -153,9 +149,6 @@ void main() {
 
   group('reporting', () {
     test('every broken question is named, not just the first', () {
-      // The old validator returned on the first failure and showed a snackbar
-      // naming no question at all, so a ten-question test was fixed one
-      // guess-and-press-Finish cycle at a time.
       final problems = validateQuestions([
         single(correct: 0),
         single(text: ''),
@@ -167,8 +160,6 @@ void main() {
     });
 
     test('one problem per question, the first that applies', () {
-      // A blank question with no options reports the blank, not both — fixing
-      // the text is the only sensible first move.
       final problems = validateQuestions([
         single(text: '', options: const []),
       ], isTest: true);
@@ -176,8 +167,6 @@ void main() {
     });
 
     test('an empty survey has nothing wrong with it', () {
-      // Whether an empty survey may be *submitted* is the screen's call; it is
-      // not a broken question.
       expect(validateQuestions([], isTest: true), isEmpty);
     });
 

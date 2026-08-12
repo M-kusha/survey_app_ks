@@ -9,7 +9,6 @@ import 'package:pdf/widgets.dart' as pw;
 
 TimeSlot _slot(int index) => TimeSlot(
   slotId: 'slot-$index',
-  // Spread across months so every slot renders a distinct, full-length date.
   start: DateTime.utc(2026, 1 + (index % 12), 1 + (index % 27), 9),
   end: DateTime.utc(2026, 1 + (index % 12), 1 + (index % 27), 10),
 );
@@ -27,14 +26,17 @@ Appointment _appointment(List<TimeSlot> slots) => Appointment(
   revision: 1,
 );
 
-AppointmentParticipants _vote(String userId, String slotId, VoteStatus status) =>
-    AppointmentParticipants(
-      userId: userId,
-      userName: 'ignored',
-      slotId: slotId,
-      status: status.wireName,
-      participated: true,
-    );
+AppointmentParticipants _vote(
+  String userId,
+  String slotId,
+  VoteStatus status,
+) => AppointmentParticipants(
+  userId: userId,
+  userName: 'ignored',
+  slotId: slotId,
+  status: status.wireName,
+  participated: true,
+);
 
 Future<pw.Document> _document({
   required int slotCount,
@@ -43,9 +45,7 @@ Future<pw.Document> _document({
   String? viewerZone,
 }) async {
   final slots = [for (var i = 0; i < slotCount; i++) _slot(i)];
-  final names = {
-    for (var i = 0; i < memberCount; i++) 'user-$i': 'Person $i',
-  };
+  final names = {for (var i = 0; i < memberCount; i++) 'user-$i': 'Person $i'};
   final overview = buildParticipantOverview(
     slots: slots,
     votes: [
@@ -103,14 +103,10 @@ Future<int> _renderedBytes({
 }
 
 void main() {
-  // `PdfKit.theme()` reads the bundled Inter fonts through the asset bundle.
   TestWidgetsFlutterBinding.ensureInitialized();
-  // The app gets these from `GlobalMaterialLocalizations`; a plain test does
-  // not, and `DateFormat.yMMMd(locale)` throws without them.
+
   initializeDateFormatting();
 
-  // A PDF that throws or overflows only fails at export time, on the one page
-  // an organizer wanted to print. These render the document for real.
   test('renders a small meeting', () async {
     expect(
       await _renderedBytes(slotCount: 2, memberCount: 3, vote: true),
@@ -133,33 +129,25 @@ void main() {
   });
 
   test('each time gets its own page, so one slot can be handed out', () async {
-    // The list for a single time is what an organizer actually uses — printed
-    // and taken to that meeting. Running two slots down one page defeats that.
-    final document = await _document(
-      slotCount: 3,
-      memberCount: 2,
-      vote: true,
-    );
+    final document = await _document(slotCount: 3, memberCount: 2, vote: true);
 
     expect(document.document.pdfPageList.pages, hasLength(3));
   });
 
   test('people still awaited are their own page, not a footnote', () async {
-    final document = await _document(
-      slotCount: 2,
-      memberCount: 3,
-      vote: false,
-    );
+    final document = await _document(slotCount: 2, memberCount: 3, vote: false);
 
     expect(document.document.pdfPageList.pages, hasLength(3));
   });
 
-  test('paginates the largest meeting the schema allows', () async {
-    // 100 slots is the ceiling `Appointment` enforces. Grouping by time is what
-    // makes this layout survive; a person-by-slot matrix could not.
-    expect(
-      await _renderedBytes(slotCount: 100, memberCount: 25, vote: true),
-      greaterThan(0),
-    );
-  }, timeout: const Timeout(Duration(minutes: 3)));
+  test(
+    'paginates the largest meeting the schema allows',
+    () async {
+      expect(
+        await _renderedBytes(slotCount: 100, memberCount: 25, vote: true),
+        greaterThan(0),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }

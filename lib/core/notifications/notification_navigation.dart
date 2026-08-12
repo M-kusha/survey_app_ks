@@ -17,8 +17,6 @@ class NotificationNavigation {
     appReady();
   }
 
-  /// Gives foreground web messages a visible in-app surface. Browsers deliver
-  /// foreground FCM through onMessage but do not draw a system notification.
   static void showForeground({
     required String? title,
     required String? body,
@@ -47,7 +45,6 @@ class NotificationNavigation {
     );
   }
 
-  /// Retries a notification tap after the navigator and session gate exist.
   static void appReady() {
     final data = _pending;
     final context = navigatorKey.currentContext;

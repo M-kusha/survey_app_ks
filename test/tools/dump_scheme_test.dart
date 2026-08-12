@@ -3,14 +3,6 @@ import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Prints the generated colour schemes as JSON.
-///
-/// Not an assertion — a tool. Material derives the full palette from the seed
-/// at runtime, so these values exist nowhere in the source. Dumping them is the
-/// only way to give Figma the same numbers the app actually paints, rather than
-/// a designer's approximation of them.
-///
-///     flutter test test/tools/dump_scheme_test.dart --plain-name dump
 String _hex(Color c) {
   int ch(double v) => (v * 255).round().clamp(0, 255);
   return '#'

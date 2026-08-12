@@ -4,14 +4,6 @@ import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Renders the design system itself, in both themes, as golden images.
-///
-/// This is the reference sheet for the redesign: every component the app uses,
-/// side by side, so a change to the theme is reviewed as a picture rather than
-/// discovered screen by screen. Regenerate with:
-///
-///     flutter test --update-goldens test/golden
-
 Future<void> _pump(WidgetTester tester, ThemeData theme, Widget child) async {
   tester.view.physicalSize = const Size(900, 1500);
   tester.view.devicePixelRatio = 1.0;
@@ -257,7 +249,6 @@ void main() {
     });
 
     test('dark mode never paints on pure black', () {
-      // Pure black beside a mid-grey card reads as a hole rather than depth.
       expect(AppTheme.dark.colorScheme.surface, isNot(const Color(0xFF000000)));
       expect(AppTheme.dark.scaffoldBackgroundColor, isNot(Colors.black));
     });

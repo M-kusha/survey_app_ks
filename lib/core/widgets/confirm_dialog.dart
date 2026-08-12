@@ -3,13 +3,6 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 
-/// Asks before something destructive happens.
-///
-/// One dialog rather than a hand-rolled `AlertDialog` per call site, so the
-/// wording, the colour of the confirming button and the order of the actions
-/// are the same wherever the question is asked. Returns true only on an
-/// explicit confirmation: dismissing by tapping outside or pressing back is a
-/// "no", which is the safe reading of an ambiguous gesture.
 Future<bool> confirmDestructive(
   BuildContext context, {
   required IconData icon,
@@ -43,8 +36,6 @@ Future<bool> confirmDestructive(
       ),
       actionsAlignment: MainAxisAlignment.center,
       actions: [
-        // Cancel first: the safe choice sits where a thumb rests, and the
-        // destructive one is never the button you hit by reflex.
         TextButton(
           onPressed: () => Navigator.pop(context, false),
           child: Text(cancelLabel ?? 'cancel'.tr()),

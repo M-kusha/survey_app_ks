@@ -9,16 +9,18 @@ TimeSlot _slot(String id, int hour) => TimeSlot(
   end: DateTime.utc(2026, 7, 15, hour + 1),
 );
 
-AppointmentParticipants _vote(String userId, String slotId, VoteStatus status) =>
-    AppointmentParticipants(
-      userId: userId,
-      // Deliberately a name nobody should ever see rendered: the overview must
-      // resolve identity from the directory, not from this field.
-      userName: 'spoofed',
-      slotId: slotId,
-      status: status.wireName,
-      participated: true,
-    );
+AppointmentParticipants _vote(
+  String userId,
+  String slotId,
+  VoteStatus status,
+) => AppointmentParticipants(
+  userId: userId,
+
+  userName: 'spoofed',
+  slotId: slotId,
+  status: status.wireName,
+  participated: true,
+);
 
 void main() {
   final slots = [_slot('a', 9), _slot('b', 11)];
@@ -51,8 +53,6 @@ void main() {
     });
 
     test('a removed member who voted keeps a row, flagged as former', () {
-      // Otherwise their answer counts toward the slot totals while vanishing
-      // from the list, and the two numbers stop agreeing.
       final overview = buildParticipantOverview(
         slots: slots,
         votes: [_vote('gone', 'a', VoteStatus.yes)],
@@ -113,9 +113,6 @@ void main() {
     });
 
     test('a stale vote does not mark someone as responded', () {
-      // The regression this guards: elsewhere any child vote document was read
-      // as participation, so an edit could leave a voter looking finished while
-      // their choice no longer applied to anything.
       final overview = buildParticipantOverview(
         slots: slots,
         votes: [
@@ -213,10 +210,7 @@ void main() {
       );
 
       expect(overview.rows.first.userId, 'u3');
-      expect(
-        overview.rows.skip(1).map((row) => row.name),
-        ['Anna', 'Bea'],
-      );
+      expect(overview.rows.skip(1).map((row) => row.name), ['Anna', 'Bea']);
     });
 
     test('sorting is case-insensitive by name', () {

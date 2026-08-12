@@ -14,10 +14,6 @@ final _canonicalProfileImagePath = RegExp(
 );
 final _legacyProfileImagePath = RegExp(r'^profile_images/[^/]{1,128}[.]jpg$');
 
-/// Resolves only EchoMeet profile-image objects in the configured Firebase
-/// bucket. Legacy Firebase download URLs are parsed into a Storage [Reference]
-/// and downloaded through the authenticated SDK; their bearer token is never
-/// handed to an HTTP image widget.
 Reference? profileImageReference(String stored, {FirebaseStorage? storage}) {
   final value = stored.trim();
   if (value.isEmpty) return null;
@@ -50,10 +46,6 @@ Future<Uint8List?> loadAuthenticatedProfileImage(
   return reference.getData(maximumStoredProfileImageBytes);
 }
 
-/// Displays a profile image only after Firebase Storage has authorized and
-/// returned its bytes. Put this over an initials/placeholder layer: failures
-/// intentionally render nothing so private URLs never become a network-image
-/// fallback.
 class AuthenticatedProfileImage extends StatefulWidget {
   const AuthenticatedProfileImage({
     super.key,
@@ -74,14 +66,6 @@ class AuthenticatedProfileImage extends StatefulWidget {
 class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
   late Future<Uint8List?> _bytes;
 
-  /// Resolves through the cache, which fetches only for a reference and
-  /// revision it does not already hold.
-  ///
-  /// This used to call Storage directly on every `initState`. Rotating the phone
-  /// moves the shell to a different layout branch, which disposes these widgets
-  /// and builds new ones, so every turn of the device re-downloaded every avatar
-  /// on screen. [refreshKey] carries the profile-image revision, so a genuinely
-  /// new photo still misses the cache and is fetched.
   Future<Uint8List?> _load() => ProfileImageCache.resolve(
     storedReference: widget.storedReference,
     revision: widget.refreshKey,
@@ -103,14 +87,6 @@ class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
     }
   }
 
-  /// Says why nothing was drawn, in debug builds only.
-  ///
-  /// Rendering nothing on failure is deliberate — a private object must never
-  /// fall back to a network image — but it also means every failure looks
-  /// identical to "no photo set": a blank avatar over the initials, with no way
-  /// to tell a rules denial from an unreachable bucket from a path this build
-  /// refuses to resolve. Release builds stay silent; a storage path is not
-  /// something to print in front of a user.
   void _explain(Object reason) {
     assert(() {
       debugPrint(
@@ -135,8 +111,6 @@ class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
         }
         final bytes = snapshot.data;
         if (bytes == null) {
-          // `profileImageReference` refused the stored value: a path outside
-          // this bucket, or one that is not an EchoMeet avatar.
           _explain('the stored reference did not resolve to an avatar object');
           return const SizedBox.shrink();
         }

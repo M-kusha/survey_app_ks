@@ -87,11 +87,6 @@ function optionalFieldMatches(
     (!inProfile || profile[field] === directory[field]);
 }
 
-/**
- * Returns the tenant only when both documents form one canonical active-member
- * projection. A malformed or stale projection must never attach an identity
- * event to the wrong company; it does not prevent the private email repair.
- */
 function canonicalActiveCompanyId(
   uid: string,
   profile: Data,
@@ -161,10 +156,6 @@ async function firestoreTransaction<T>(
   }));
 }
 
-/**
- * Copies the live, verified Firebase Auth email into the caller's private
- * profile. Auth is authoritative; no caller-provided email is accepted.
- */
 export async function syncVerifiedEmailForUser(
   uid: string,
   payload: unknown,

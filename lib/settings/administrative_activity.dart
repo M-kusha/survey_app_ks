@@ -110,9 +110,7 @@ class _AdministrativeActivityPageState
         ),
       );
     }
-    // A page can contain only malformed documents. The service deliberately
-    // drops those records, but its raw cursor can still have a next page; keep
-    // the load-more control reachable until that cursor is exhausted.
+
     if (_entries.isEmpty && !_hasMore) {
       return EmptyState(
         icon: Icons.history_rounded,
@@ -154,12 +152,6 @@ class _AdministrativeActivityPageState
   }
 }
 
-/// Builds the localized sentence for one validated activity event.
-///
-/// Kept outside the widget so all action-to-copy mappings can be checked
-/// without Firebase or a rendered page. Missing directory entries deliberately
-/// do not expose the stored UID: removed members are expected to disappear from
-/// the live directory, while their immutable events remain.
 String companyActivityDescription(
   CompanyActivity entry,
   Map<String, String> names,
@@ -263,7 +255,6 @@ String companyActivityDescription(
   };
 }
 
-/// Gives every supported action a recognizable non-generic activity icon.
 IconData companyActivityIcon(CompanyActivity entry) => switch (entry.action) {
   'member.approved' => Icons.person_add_alt_1_rounded,
   'member.role_changed' => Icons.admin_panel_settings_outlined,

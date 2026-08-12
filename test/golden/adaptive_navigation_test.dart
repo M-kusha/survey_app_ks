@@ -7,21 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/load_translations.dart';
 
-/// Golden tests for the responsive shell.
-///
-/// These render the real navigation widget at four widths and write a PNG for
-/// each, so a layout regression shows up as an image diff rather than as
-/// somebody noticing months later that the rail stopped appearing.
-///
-/// Regenerate after an intentional layout change:
-///
-///     flutter test --update-goldens test/golden
-///
-/// The tab contents are stubbed: the real pages all call Firebase in
-/// `initState`, which a widget test cannot satisfy. What is under test here is
-/// the shell — which navigation control appears, and where the content sits.
-
-/// Sizes chosen to sit one inside each window size class.
 const _viewports = <String, Size>{
   'compact_phone': Size(390, 844),
   'medium_tablet_portrait': Size(768, 1024),
@@ -60,12 +45,6 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
-  // Deliberately no EasyLocalization wrapper. It loads its translation files
-  // asynchronously off the test clock and renders a placeholder until they
-  // arrive, which never resolves inside a widget test's fake-async zone — only
-  // the first test in a file would ever render. `loadAppTranslations` in
-  // `setUpAll` primes the same static synchronously, so `.tr()` returns real
-  // copy without the widget.
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -98,12 +77,9 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    // Anything reaching for SharedPreferences gets an empty store rather than
-    // a MissingPluginException.
+
     SharedPreferences.setMockInitialValues({});
-    // Real labels, not raw keys. Without this the goldens showed
-    // "nav_appointments" where the label goes, which defeats the point of
-    // looking at an image to judge whether the bar fits.
+
     await loadAppTranslations();
   });
 
@@ -120,10 +96,7 @@ void main() {
 
     testWidgets('a phone gets a bottom bar and no rail', (tester) async {
       await _pumpAt(tester, _viewports['compact_phone']!);
-      // Keyed, not typed: the bar is this app's own widget, so there is no
-      // public Material type to find. This assertion used to look for
-      // `BottomNavigationBar`, which the app has never used — so it reported no
-      // bottom bar on every screen that had one.
+
       expect(find.byKey(bottomNavigationBarKey), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
     });
@@ -150,8 +123,7 @@ void main() {
 
     testWidgets('every tab stays alive across a switch', (tester) async {
       await _pumpAt(tester, _viewports['compact_phone']!);
-      // IndexedStack keeps all four in the tree; only one is visible. This is
-      // what stops notes scroll position and filters resetting on tab change.
+
       expect(find.byType(IndexedStack), findsOneWidget);
       final stack = tester.widget<IndexedStack>(find.byType(IndexedStack));
       expect(stack.children.length, 4);

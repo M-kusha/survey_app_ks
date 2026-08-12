@@ -4,16 +4,6 @@ import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/settings/data_export.dart';
 import 'package:intl/intl.dart';
 
-/// Gathers everything one person can read about themselves.
-///
-/// Deliberately client-side. Every read below is one the signed-in user is
-/// already entitled to make — their own profile, their own notes, their own
-/// answers, their own votes — so this needs no trusted function and adds no
-/// server surface that could be pointed at somebody else.
-///
-/// Each section is fetched independently and a failure is recorded rather than
-/// thrown. A person asking for their data is better served by most of it plus
-/// an honest note about what is missing than by an error.
 class DataExportService {
   DataExportService({FirebaseFirestore? firestore, String? locale})
     : _firestore = firestore,
@@ -88,8 +78,6 @@ class DataExportService {
 
     return {
       for (final entry in data.entries)
-        // Notification tokens identify devices, not the person, and pasting
-        // them into a file they may forward is a hazard rather than a service.
         if (entry.key != 'fcmTokens') entry.key: _plain(entry.value),
     };
   }
@@ -114,9 +102,7 @@ class DataExportService {
       notes.add(
         ExportedNote(
           title: '${row.data()['title'] ?? ''}',
-          // The stored body is a rich-text delta. It is included as written
-          // rather than flattened, because a lossy copy of somebody's notes is
-          // worse than a faithful one they need a tool to read.
+
           body: '${body.data()?['content'] ?? row.data()['preview'] ?? ''}',
           updatedAt: timestamp is Timestamp ? timestamp.toDate() : null,
         ),
@@ -138,8 +124,6 @@ class DataExportService {
 
     final participation = <ExportedParticipation>[];
     for (final survey in surveys.docs) {
-      // Read by id rather than listing: rules let a participant see their own
-      // submission and nobody else's, which a list query cannot express.
       final mine = await survey.reference
           .collection('participants')
           .doc(userId)
@@ -203,10 +187,9 @@ class DataExportService {
           statusBySlot: {
             for (final vote in mine.docs)
               _slotLabel(
-                    slots['${vote.data()['slotId']}'],
-                    '${appointment.data()['zoneId']}',
-                  ):
-                  '${vote.data()['status']}',
+                slots['${vote.data()['slotId']}'],
+                '${appointment.data()['zoneId']}',
+              ): '${vote.data()['status']}',
           },
         ),
       );
@@ -214,7 +197,6 @@ class DataExportService {
     return votes;
   }
 
-  /// The question as it was asked, so an answer is readable without the survey.
   String _questionText(List<dynamic> questions, String key) {
     final index = int.tryParse(key);
     if (index != null && index >= 0 && index < questions.length) {
@@ -235,7 +217,6 @@ class DataExportService {
     ).add_jm().format(appointmentTimeInZone(start.toDate(), zoneId));
   }
 
-  /// Firestore types the JSON encoder cannot take, rendered as text.
   Object? _plain(Object? value) => switch (value) {
     Timestamp() => value.toDate().toUtc().toIso8601String(),
     DocumentReference() => value.path,

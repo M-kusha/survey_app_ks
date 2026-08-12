@@ -24,14 +24,6 @@ type OwnedCompany = {
   ref: DocumentReference;
 };
 
-/**
- * Discovers ownership and establishes every write barrier in one transaction.
- *
- * The ownership query is deliberately inside the transaction. Verified
- * onboarding also reads the account lock transactionally, so either company
- * creation commits first and is included here, or this lock commits first and
- * onboarding retries into the locked state.
- */
 export async function establishAccountDeletionWriteBarrier(
   db: Pick<Firestore, 'collection' | 'runTransaction'>,
   uid: string,
@@ -49,8 +41,6 @@ export async function establishAccountDeletionWriteBarrier(
       throw new CompanyOwnerDeletionError();
     }
     if (ownedCompany.size > 400) {
-      // Current rules permit a single owned company. Refuse malformed state
-      // rather than splitting the write barrier across transactions.
       throw new Error('Account owns too many companies for an atomic deletion lock.');
     }
 
@@ -71,7 +61,6 @@ export async function establishAccountDeletionWriteBarrier(
   });
 }
 
-/** Callable account deletion requires a reauthentication no more than 5 minutes ago. */
 export function hasRecentAuthentication(
   authTime: unknown,
   nowSeconds = Math.floor(Date.now() / 1000),
@@ -85,21 +74,12 @@ export function hasRecentAuthentication(
   );
 }
 
-/**
- * Idempotently removes one account's personal data, then deletes Auth last.
- *
- * Every Firestore/Storage operation is safe to repeat. If any cleanup step
- * fails, the Auth record is intentionally retained so the signed-in person can
- * retry instead of being locked out with data stranded behind them.
- */
 export async function deleteUserAccount(
   uid: string,
   options: { deleteOwnedCompany?: boolean } = {},
 ): Promise<void> {
   const db = getFirestore();
 
-  // Do not trust the client profile/role. Ownership is discovered at the same
-  // trusted transaction boundary that stops a concurrent onboarding commit.
   const ownedCompanies = await establishAccountDeletionWriteBarrier(
     db,
     uid,
@@ -117,11 +97,6 @@ export async function deleteUserAccount(
     );
   }
 
-  // Account deletion is an explicit escape hatch from the normal seven-day
-  // company-closure grace period. The client gives owners a separate warning;
-  // the server independently proves ownership and deletes every owned tenant
-  // before personal cleanup. Multiple documents are handled defensively for
-  // malformed legacy data even though current rules permit only one.
   for (const company of ownedCompanies) {
     await purgeCompany(company.id);
   }
@@ -132,15 +107,11 @@ export async function deleteUserAccount(
   await deleteParticipation(db, uid);
   await deletePrivateNotes(db, uid);
 
-  // The public member projection and private account/token document are
-  // deliberately removed at the trusted boundary, not by client rules.
   await deleteReferences(db, [
     db.collection('memberDirectory').doc(uid),
     db.collection('users').doc(uid),
   ]);
 
-  // Auth is the final destructive step. A missing user means a duplicated
-  // callable invocation already completed the same idempotent deletion.
   try {
     await getAuth().deleteUser(uid);
   } catch (error) {
@@ -150,11 +121,6 @@ export async function deleteUserAccount(
   }
 }
 
-/**
- * Deletes temporary write locks after Firebase ID tokens issued before Auth
- * deletion have expired. Failed deletions unlock automatically and remain
- * retryable rather than stranding an account forever.
- */
 export async function purgeExpiredAccountDeletionLocks(): Promise<number> {
   const db = getFirestore();
   const expired = await db
@@ -197,9 +163,6 @@ async function anonymizeAuthoredContent(
 }
 
 async function cleanBanReferences(db: Firestore, uid: string): Promise<void> {
-  // Existing ban documents predate a userId field. Walk each known company's
-  // subcollection so legacy bans are covered without requiring a new
-  // collection-group index before account deletion can work.
   const companies = await db.collection('companies').get();
   const ownBans: DocumentReference[] = [];
   const authoredBans: DocumentReference[] = [];
@@ -233,8 +196,6 @@ async function deleteParticipation(db: Firestore, uid: string): Promise<void> {
     participation.docs.map((doc) => doc.ref),
   );
 
-  // This cache is server-derived for new votes, but legacy rows and delayed
-  // triggers can still contain the uid. Sweep it explicitly before Auth goes.
   const indexedAppointments = await db
     .collection('appointments')
     .where('participantUserIds', 'array-contains', uid)
@@ -285,7 +246,6 @@ async function updateReferences(
   }
 }
 
-/** Firestore batches cap at 500 writes; leave headroom for future markers. */
 function chunked<T>(items: T[], size = 400): T[][] {
   const chunks: T[][] = [];
   for (let start = 0; start < items.length; start += size) {

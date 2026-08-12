@@ -1,18 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Why the undo notice after deleting a note would not go away.
-///
-/// Flutter does not start the auto-dismiss timer for a snackbar that carries an
-/// action while accessible navigation is on, so that somebody using a screen
-/// reader has time to reach the button. Sensible in itself; the effect on
-/// everyone else is a bar that stays put until they press the very action they
-/// were trying to avoid — which is exactly what was reported.
-///
-/// The flag cannot be set from the test: `MaterialApp` inserts its own
-/// `MediaQuery.fromView`, which replaces anything wrapped around it, and the
-/// test binding reports accessible navigation as on. So these run in that mode
-/// and pin the behaviour there — which is the mode that was broken.
 Future<void> _pump(
   WidgetTester tester, {
   required bool withAction,
@@ -40,12 +28,6 @@ Future<void> _pump(
   );
 }
 
-/// Entrance, then its four-second life, then the exit.
-///
-/// Not one long pump: the dismiss timer is only created once the entrance
-/// animation reports completed, so a single jump past four seconds lands before
-/// the timer exists and nothing ever fires. Getting this wrong first made a
-/// perfectly healthy snackbar look broken and sent me after the wrong cause.
 Future<void> _waitOut(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
   await tester.pump(const Duration(seconds: 5));
@@ -71,8 +53,6 @@ void main() {
     await tester.pump();
     await _waitOut(tester);
 
-    // Deliberate on Flutter's part, and the reason the notice sat there until
-    // the user pressed Undo or reloaded the page.
     expect(find.text('Note deleted'), findsOneWidget);
   });
 

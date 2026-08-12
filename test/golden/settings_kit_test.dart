@@ -8,12 +8,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/load_fonts.dart';
 import '../support/load_translations.dart';
 
-/// The settings rows, rendered without Firebase.
-///
-/// The screen itself reads the signed-in user, so it cannot be pumped in a test
-/// as it stands. The kit it is built from can be, and that is where all the
-/// layout lives — which is enough to see whether a group of rows reads as a
-/// list rather than as seven separately-invented ones.
 Future<void> _pump(WidgetTester tester, ThemeData theme, Widget child) async {
   tester.view.physicalSize = const Size(520, 900);
   tester.view.devicePixelRatio = 1.0;
@@ -96,8 +90,7 @@ void main() {
                   value: true,
                   onChanged: (_) {},
                 ),
-                // The disabled case: a device with nothing enrolled. This used
-                // to be a live switch that silently wrote false straight back.
+
                 SettingsSwitchTile(
                   icon: Icons.fingerprint_rounded,
                   title: 'Biometrics',

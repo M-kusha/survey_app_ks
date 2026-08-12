@@ -129,12 +129,6 @@ class Appointment {
   String? confirmedSlotId;
   List<String> participantUserIds;
 
-  /// Set while the server is taking this appointment apart.
-  ///
-  /// Deletion is two-phase: the callable stamps the parent, clears the votes,
-  /// then removes the parent. Between the stamp and the removal the document is
-  /// still readable and still matches every list query, so anything showing it
-  /// has to know it is on its way out and drop it.
   final bool isBeingDeleted;
 
   DateTime get expirationDate => expirationAt.toLocal();
@@ -183,10 +177,7 @@ class Appointment {
         map['schemaVersion'] != schemaVersion) {
       throw const FormatException('Unsupported appointment schema.');
     }
-    // Only its presence is read. The instant is the server's own bookkeeping for
-    // resuming an interrupted delete, and nothing on screen has any use for it.
-    // Still validate it: a value with the right field name but the wrong wire
-    // type is an unreadable document, not a legitimate deletion barrier.
+
     final isBeingDeleted = map.containsKey('deletionStartedAt');
     if (isBeingDeleted && map['deletionStartedAt'] is! Timestamp) {
       throw const FormatException('Appointment deletion state is invalid.');
@@ -373,12 +364,6 @@ DateTime _requiredTimestamp(Map<String, dynamic> map, String key) {
 
 final _identifier = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
 
-/// Whether [map] carries exactly [expected], allowing only [optional] extras.
-///
-/// The strictness is the point: an unexpected field means the writer and this
-/// reader disagree, and guessing is how a half-migrated document gets shown as
-/// if it were whole. [optional] is for the fields the server owns and adds on
-/// its own schedule, which are absent far more often than they are present.
 bool _hasExactKeys(
   Map<String, dynamic> map,
   Set<String> expected, {

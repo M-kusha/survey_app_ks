@@ -146,9 +146,6 @@ class SurveyDataProvider extends ChangeNotifier {
 
             if (changedSurveyIds.isNotEmpty &&
                 _participationUserId?.isNotEmpty == true) {
-              // Invalidate all in-flight reads. A response revision can arrive
-              // after a local submit, so an older pre-submit get must never
-              // overwrite the successful local state.
               ++_participationGeneration;
               _pendingParticipationSurveyIds.clear();
               for (final surveyId in changedSurveyIds) {
@@ -312,8 +309,7 @@ class SurveyDataProvider extends ChangeNotifier {
                   _participantsSurveyId != surveyId) {
                 return;
               }
-              // Fail closed: results remain available, but names do not fall
-              // back to participant-authored or stale snapshot data.
+
               memberNames = const {};
               membersSeen = true;
               final participants = _participants;
@@ -543,13 +539,6 @@ class SurveyDataProvider extends ChangeNotifier {
   }
 }
 
-/// Reads the independently useful rows in a survey-list snapshot.
-///
-/// A trusted deletion first stamps the parent with [deletionStartedAt], then
-/// clears its descendants and removes it. The stamped survey must leave the
-/// list immediately. Any other unreadable document is isolated to that row so
-/// it cannot keep the previous complete list on screen by throwing out of the
-/// stream callback before assignment and notification.
 List<Survey> readSurveySnapshot(
   Iterable<Map<String, dynamic>> documents, {
   void Function(Object error)? onUnreadable,
@@ -565,9 +554,6 @@ List<Survey> readSurveySnapshot(
       }
       surveys.add(Survey.fromFirestore(document));
     } on Object catch (error) {
-      // The try/catch is deliberately limited to decoding this one Firestore
-      // row. In particular, TypeError from a malformed Timestamp or collection
-      // cast is data-local and must not terminate the list listener.
       (onUnreadable ?? _reportUnreadableSurvey)(error);
     }
   }

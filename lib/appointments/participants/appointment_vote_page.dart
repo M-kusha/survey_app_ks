@@ -86,8 +86,6 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
     final remaining = _appointment.expirationDate.difference(DateTime.now());
     if (remaining <= Duration.zero) return;
 
-    // Rebuild just after the strict boundary so controls cannot remain enabled
-    // on an idle page.
     _deadlineTimer = Timer(remaining + const Duration(milliseconds: 10), () {
       if (!mounted) return;
       setState(_pending.clear);
@@ -330,9 +328,6 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
         mimeType: 'text/calendar',
       );
     } catch (_) {
-      // A confirmed slot can be withdrawn by an admin between the build and
-      // the tap, and the platform handoff can refuse. Neither should leave the
-      // page in a broken state.
       if (mounted) UIUtils.showSnackBar(context, 'error_occurred'.tr());
     }
   }
@@ -346,8 +341,6 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       appBar: AppBar(
         title: Text(_appointment.title, overflow: TextOverflow.ellipsis),
         actions: [
-          // Reachable even before anyone votes: the roster answers "who has not
-          // answered", which is the question an organizer has on day one.
           if (!_appointmentDeleted)
             IconButton(
               tooltip: 'all_participants'.tr(),

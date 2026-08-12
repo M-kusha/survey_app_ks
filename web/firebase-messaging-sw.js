@@ -1,8 +1,3 @@
-/* global firebase, importScripts */
-
-// Firebase Messaging requires a dedicated worker for notifications received
-// while the Flutter web app is not in the foreground. These identifiers are
-// public Firebase client configuration, not server credentials.
 importScripts(
   'https://www.gstatic.com/firebasejs/12.17.0/firebase-app-compat.js',
 );

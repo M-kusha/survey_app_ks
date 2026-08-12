@@ -38,8 +38,6 @@ void main() {
   test('an empty account still produces every section', () {
     final export = _export();
 
-    // A reader must be able to tell "nothing here" from "this export is
-    // missing a section", so the keys are always present.
     expect(
       export.keys,
       containsAll(['profile', 'notes', 'surveysAndTests', 'meetingVotes']),
@@ -59,8 +57,6 @@ void main() {
   });
 
   test('a section that failed to load is named, not silently dropped', () {
-    // The difference between "you have no notes" and "your notes could not be
-    // read" matters when the file is the answer to a data request.
     final export = _export(omissions: const ['notes']);
 
     expect((export['export'] as Map<String, dynamic>)['couldNotBeIncluded'], [

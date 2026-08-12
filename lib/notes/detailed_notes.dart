@@ -194,9 +194,7 @@ class _DetailedNotePageState extends State<DetailedNotePage> {
     _draftQueue = () async {
       try {
         await previous;
-      } catch (_) {
-        // A later edit still gets a chance to create the recovery copy.
-      }
+      } catch (_) {}
       await _drafts.save(widget.noteId, draft);
     }();
     unawaited(_draftQueue.catchError((_) {}));
@@ -207,9 +205,7 @@ class _DetailedNotePageState extends State<DetailedNotePage> {
     _draftQueue = () async {
       try {
         await previous;
-      } catch (_) {
-        // Cloud persistence is authoritative after a successful save.
-      }
+      } catch (_) {}
       if (_revision == savedRevision && _savedRevision == savedRevision) {
         await _drafts.remove(widget.noteId);
       }
@@ -276,8 +272,6 @@ class _DetailedNotePageState extends State<DetailedNotePage> {
       if (_revision == revision) {
         _queueDraftRemoval(revision);
       } else {
-        // Edits made while this save was in flight now belong to the newly
-        // committed server revision. Refresh their recovery-copy base.
         _queueDraftSave();
       }
       if (mounted) {
@@ -544,9 +538,7 @@ class _Editor extends StatelessWidget {
                 showSubscript: false,
                 showSuperscript: false,
                 showSearchButton: false,
-                // Quill's defaults are sized for a desktop toolbar. Left alone
-                // on a phone, B / I / U came out as 40px filled circles that
-                // took a third of the screen above a note with one line in it.
+
                 toolbarSize: context.isCompact ? 34 : 42,
                 buttonOptions: QuillSimpleToolbarButtonOptions(
                   base: QuillToolbarBaseButtonOptions(

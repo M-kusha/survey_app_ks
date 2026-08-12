@@ -9,11 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The real English copy, read once off the test clock.
-///
-/// The bundled loader does file IO, which a fake clock cannot be pumped past:
-/// the widget settles while EasyLocalization is still rendering nothing, so the
-/// first test in a file passes and every later one finds an empty tree.
 class _SyncAssetLoader extends AssetLoader {
   const _SyncAssetLoader();
 
@@ -84,13 +79,9 @@ void main() {
     await EasyLocalization.ensureInitialized();
   });
 
-  // Tall enough that nothing under test is scrolled out of reach.
   setUp(() {
-    final view = TestWidgetsFlutterBinding
-        .instance
-        .platformDispatcher
-        .views
-        .first;
+    final view =
+        TestWidgetsFlutterBinding.instance.platformDispatcher.views.first;
     view.physicalSize = const Size(1000, 2400);
     view.devicePixelRatio = 1.0;
   });
@@ -119,8 +110,6 @@ void main() {
   testWidgets('the copied questions reach the step that publishes them', (
     tester,
   ) async {
-    // Getting this wrong means a duplicate publishes with no questions at all,
-    // which the wizard would happily let you do.
     await _pump(tester, CreateTrainingSurveyStep3(survey: _template()));
 
     expect(find.text('Which password is strongest?'), findsOneWidget);
@@ -131,8 +120,6 @@ void main() {
   testWidgets('the template survives being edited in the wizard', (
     tester,
   ) async {
-    // Step 1 hands the next step a copy of the question list, so the survey
-    // still listed on the screen behind does not change as you type.
     final template = _template();
 
     await _pump(tester, Step1CreateSurvey(template: template));

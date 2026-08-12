@@ -53,8 +53,6 @@ Deadline deadlineFor(
   );
 }
 
-/// Returns the first future boundary that can change a deadline-derived view.
-/// Past and exact-now values have already crossed and need no timer.
 DateTime? nearestFutureDeadline(
   Iterable<DateTime> deadlines, {
   required DateTime now,

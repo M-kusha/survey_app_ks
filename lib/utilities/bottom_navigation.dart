@@ -16,15 +16,8 @@ import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-/// The extended rail's width, declared once because both `NavigationRail` and
-/// the profile block sized to it have to agree.
 const double _extendedRailWidth = 256;
 
-/// Identifies the compact-width bar for tests.
-///
-/// Needed because the bar is this app's own widget rather than Material's, so
-/// there is no public type to search for — and a test that searched for the
-/// wrong Material type would report "no bottom bar" on a screen that has one.
 const Key bottomNavigationBarKey = Key('echomeet.bottomNavigationBar');
 
 class _Destination {
@@ -39,12 +32,6 @@ class _Destination {
   final IconData selectedIcon;
   final String labelKey;
 
-  /// The bottom bar's label, which has a quarter of the screen and no more.
-  ///
-  /// Separate from [labelKey] so the bar reads well rather than merely fitting.
-  /// `_BottomBarItem` truncates anything too long, but an ellipsis is a poor
-  /// label — "Meetings" beats "Appointme…" at 320px. The rail, which has room,
-  /// still uses the full [labelKey].
   final String shortLabelKey;
 }
 
@@ -173,15 +160,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
           top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
         ),
       ),
-      // Material's own `NavigationBar` cannot be used here. Its label is a
-      // String rendered by a `Text` with no `maxLines`, inside a `Material` that
-      // installs a fresh `DefaultTextStyle` — so a label wider than its quarter
-      // of the screen wraps to a second line and shoves the icon out of the bar,
-      // and nothing outside the widget can stop it. Holding the text size was
-      // not enough: it still wrapped at ordinary phone widths.
-      //
-      // `_BottomBar` is the same design with the label under this file's
-      // control, so it truncates instead of wrapping and the row cannot grow.
+
       child: _cappedScale(
         context: context,
         maxScale: 1.1,
@@ -204,20 +183,13 @@ class _BottomNavigationState extends State<BottomNavigation> {
           selectedIndex: _currentIndex,
           onDestinationSelected: _onDestinationSelected,
           extended: extended,
-          // A phone held sideways is 384px tall, and four destinations plus the
-          // profile block and footer do not fit in it — the rail overflowed,
-          // which is what the reported landscape overflow was. Scrolling the
-          // destination group is the rail's own answer to being too short.
+
           scrollable: true,
 
           labelType: extended
               ? NavigationRailLabelType.none
               : NavigationRailLabelType.all,
-          // The rail is an unconstrained child of the shell's Row, because
-          // NavigationRail sizes itself from its destinations. That leaves
-          // `leading` with an unbounded width, so anything flexible inside it
-          // throws during layout. Naming the extended width here and sizing the
-          // leading to it gives the profile row something finite to divide.
+
           minExtendedWidth: _extendedRailWidth,
           leading: SizedBox(
             width: extended ? _extendedRailWidth : null,
@@ -239,9 +211,7 @@ class _BottomNavigationState extends State<BottomNavigation> {
               NavigationRailDestination(
                 icon: Icon(destination.icon),
                 selectedIcon: Icon(destination.selectedIcon),
-                // Unlike the bottom bar's, this label is a widget, so the
-                // full name can be used and simply truncated when the collapsed
-                // rail is narrower than it.
+
                 label: Text(
                   destination.labelKey.tr(),
                   maxLines: 1,
@@ -251,13 +221,6 @@ class _BottomNavigationState extends State<BottomNavigation> {
               ),
           ],
 
-          // Load-bearing, and not obvious: `trailingAtBottom` defaults to
-          // false, which puts the trailing widget *inside* the scrolling
-          // destination group. There it rides up directly under the last
-          // destination — and any `Expanded` around it throws, because a scroll
-          // view offers unbounded height. True moves it into the rail's outer
-          // column, where the destination group's `Flexible` claims the slack
-          // and pushes this to the bottom on its own.
           trailingAtBottom: true,
           trailing: Padding(
             padding: const EdgeInsets.only(bottom: Spacing.lg),
@@ -335,11 +298,6 @@ class _RailFooter extends StatelessWidget {
   }
 }
 
-/// The signed-in account, at the top of the rail.
-///
-/// Collapsed it is the avatar alone; extended it carries the name and the
-/// company. Tapping it goes to settings, which is where everything about the
-/// account lives, so the obvious gesture does the obvious thing.
 class _RailProfile extends StatelessWidget {
   const _RailProfile({required this.extended, required this.onTap});
 
@@ -362,15 +320,10 @@ class _RailProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // Nullable reads on purpose. The rail is chrome, not a feature: if a screen
-    // ever hosts it without these providers it should draw a plain avatar, not
-    // bring the whole shell down.
+
     final user = context.watch<UserDataProvider?>()?.currentUser;
     final membership = context.watch<MembershipProvider?>()?.membership;
 
-    // A ring rather than a filled disc: at this size a solid block of
-    // primaryContainer was the brightest thing in the rail, which put the
-    // loudest element on the one row that is only there for reference.
     final avatar = ClipOval(
       child: Container(
         height: 36,
@@ -448,11 +401,6 @@ class _RailProfile extends StatelessWidget {
   }
 }
 
-/// The mark and wordmark, at the foot of the rail.
-///
-/// Quiet by construction: one stroke weight, one muted colour, no fill and no
-/// gradient. It marks the product without asking to be looked at, which is the
-/// job of a footer.
 class _RailBrand extends StatelessWidget {
   const _RailBrand({required this.extended});
 
@@ -484,12 +432,6 @@ class _RailBrand extends StatelessWidget {
   }
 }
 
-/// The compact-width navigation bar.
-///
-/// Exists because `NavigationBar`'s label is a bare String it renders without
-/// `maxLines`, which wraps and breaks the bar's height on narrow phones. Here
-/// the label is a widget, so it truncates and the bar keeps its height whatever
-/// the locale or the reader's font size.
 class _BottomBar extends StatelessWidget {
   const _BottomBar({required this.currentIndex, required this.onSelected});
 
@@ -504,8 +446,7 @@ class _BottomBar extends StatelessWidget {
 
     return Material(
       key: bottomNavigationBarKey,
-      // The tinted nav surface, shared with the rail so a phone and a desktop
-      // agree on what the navigation looks like.
+
       color: scheme.navSurface,
       child: SafeArea(
         top: false,
@@ -553,9 +494,6 @@ class _BottomBarItem extends StatelessWidget {
     final label = destination.shortLabelKey.tr();
 
     return Semantics(
-      // One node per destination, carrying what Material's own destinations
-      // report — so a screen reader announces "Notes, selected, tab" rather
-      // than an unlabelled button next to a stray text node.
       selected: selected,
       button: true,
       inMutuallyExclusiveGroup: true,
@@ -585,9 +523,7 @@ class _BottomBarItem extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 3),
-            // The whole point of this widget. `softWrap: false` with one line
-            // and an ellipsis means a long label shortens rather than pushing
-            // the icon out of the bar.
+
             Text(
               label,
               maxLines: 1,

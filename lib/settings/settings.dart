@@ -53,13 +53,6 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
   int _loadGeneration = 0;
   bool _exporting = false;
 
-  /// Assembles every record this account can read and hands it to the platform
-  /// as a JSON file.
-  ///
-  /// Reading is done here rather than in a trusted function because every read
-  /// is one this user is already entitled to make. A server-side exporter would
-  /// be a new endpoint that answers "give me everything about a person", which
-  /// is worth avoiding when nothing needs it.
   Future<void> _downloadMyData() async {
     if (_userId.isEmpty) return;
     setState(() => _exporting = true);
@@ -379,8 +372,6 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
         if (_isSuperAdmin && inCompany)
           SettingsTile(
-            // `domain_disabled` is a building with a slash through it, which
-            // reads as "no building" rather than "wind this company down".
             icon: membership!.isClosing
                 ? Icons.restore_rounded
                 : Icons.business_center_outlined,
@@ -402,20 +393,12 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             onTap: membership.isClosing ? _cancelClosure : _closeCompany,
           ),
         if (activeCompanyAdmin && inCompany) ...[
-          // Was a raw `SwitchListTile`, the only row in Settings that was not a
-          // `SettingsTile`. It therefore took the plain list-tile icon colour —
-          // grey, with no tinted square — while every neighbour had a blue one,
-          // so the odd row out was the one control here that changes who can
-          // walk into the company.
           SettingsTile(
             icon: Icons.door_front_door_outlined,
             title: 'open_to_join'.tr(),
             showChevron: false,
             onTap: () => _setJoinPolicy(!_openToJoin),
-            trailing: Switch(
-              value: _openToJoin,
-              onChanged: _setJoinPolicy,
-            ),
+            trailing: Switch(value: _openToJoin, onChanged: _setJoinPolicy),
           ),
           SettingsTile(
             icon: Icons.block_outlined,
@@ -741,10 +724,7 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
         SettingsTile(
           icon: Icons.logout_rounded,
           title: 'log_out'.tr(),
-          // Was `onSurfaceVariant`, the one grey icon in a column of coloured
-          // ones — which read as disabled rather than as understated. Signing
-          // out is an ordinary thing to do; only deleting the account below is
-          // dangerous, and it keeps the red to itself.
+
           showChevron: false,
           onTap: _signOut,
         ),

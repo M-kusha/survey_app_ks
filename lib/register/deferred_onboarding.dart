@@ -173,8 +173,6 @@ class DeferredOnboardingService {
   }
 }
 
-/// Blocks tenant screens until the verified registration transaction commits.
-/// Reopening the app simply re-runs the same persisted private intent.
 class DeferredOnboardingGate extends StatefulWidget {
   const DeferredOnboardingGate({super.key, required this.child});
 
@@ -185,17 +183,6 @@ class DeferredOnboardingGate extends StatefulWidget {
 }
 
 class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
-  /// The account this gate has already cleared, for this run of the app.
-  ///
-  /// The gate wraps every protected route, so it remounts on each navigation.
-  /// Without this it repeated a Firestore read and flashed the full-screen
-  /// "Finishing registration" panel on the way into settings, the survey list
-  /// and every wizard step — long enough to see, too short to read, and
-  /// meaningless to somebody who registered weeks ago.
-  ///
-  /// Keyed by uid rather than a bare flag, so signing in as a different account
-  /// is checked properly. Onboarding happens once per account, so a resolved
-  /// uid stays resolved.
   static String? _resolvedForUid;
 
   final _service = DeferredOnboardingService();
@@ -218,10 +205,6 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
     super.initState();
     _companyNameController.addListener(_nameChanged);
     if (_completed) {
-      // Nothing left to finish, but the work `_finish` schedules still has to
-      // happen: a notification tap waiting to be replayed once a navigator
-      // exists, and a profile photo chosen during registration that has not
-      // been uploaded yet. Skipping straight to the child dropped both.
       _scheduleReadyWork();
       return;
     }
@@ -292,8 +275,7 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
 
   void _finish() {
     FirebaseServices.invalidateCache();
-    // Remember for the rest of this run, so navigating anywhere else does not
-    // repeat the read or show the panel again.
+
     _resolvedForUid = FirebaseAuth.instance.currentUser?.uid;
     if (!mounted) return;
     setState(() {

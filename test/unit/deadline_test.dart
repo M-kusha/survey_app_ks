@@ -3,8 +3,6 @@ import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  // A late evening, deliberately: most of the calendar-vs-24-hours mistakes
-  // only show up when "tomorrow" is a few hours away.
   final now = DateTime(2025, 3, 10, 22, 30);
 
   group('urgency', () {
@@ -16,8 +14,6 @@ void main() {
     });
 
     test('early tomorrow is tomorrow, even though it is hours away', () {
-      // Two and a half hours off. Counted in 24-hour blocks this rounds to
-      // zero days and would read as "closes today" after midnight.
       final deadline = deadlineFor(DateTime(2025, 3, 11, 1), now: now);
       expect(deadline.days, 1);
       expect(deadline.labelKey, 'deadline_tomorrow');
@@ -92,8 +88,6 @@ void main() {
     );
 
     test('survives a created date after the deadline', () {
-      // Clock skew between a client and the server is enough to produce this,
-      // and a negative denominator would otherwise give a wild bar width.
       final deadline = deadlineFor(
         DateTime(2025, 3, 20),
         now: now,

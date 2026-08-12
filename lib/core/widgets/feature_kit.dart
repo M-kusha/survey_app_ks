@@ -67,15 +67,6 @@ class EmptyState extends StatelessWidget {
   }
 }
 
-/// A card. Its state, if any, is the colour of its outline.
-///
-/// There is deliberately no progress rule any more. A 2px part-filled line
-/// pinned to the bottom edge, inset from both corners, was read as a broken or
-/// half-drawn border every time somebody looked at it — and it was telling the
-/// reader something the card already says in words two lines above ("Closes
-/// Wed, Aug 19"), with the urgency already carried by the status pill's colour.
-/// A decoration that adds no information and looks like a rendering fault is
-/// just a rendering fault.
 class ContentCard extends StatelessWidget {
   const ContentCard({
     super.key,
@@ -101,11 +92,7 @@ class ContentCard extends StatelessWidget {
     final radius = BorderRadius.circular(18);
 
     return Material(
-      // Previously `surfaceContainerLowest` when muted, which in light mode is
-      // pure white — so an expired card was the brightest thing on the page,
-      // exactly backwards. The two tones now come from one place.
       color: muted ? scheme.mutedCardSurface : scheme.cardSurface,
-      // A muted card sits flat on the page; a live one is lifted off it.
       elevation: muted ? 0 : scheme.cardElevation,
       shadowColor: scheme.shadow.withValues(alpha: 0.18),
       borderRadius: radius,
@@ -115,15 +102,7 @@ class ContentCard extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: radius,
-            // The state colour is the whole outline, not a stripe down one edge.
-            //
-            // Two earlier shapes both failed. A full-height stripe was sliced by
-            // the 18px corner radius, leaving a coloured sliver in each corner
-            // and colliding with the progress rule at the bottom. Insetting it
-            // by that radius fixed the slivers but read as a line that had
-            // failed to finish drawing itself — a half border. An outline has no
-            // ends to get wrong: it follows the geometry exactly, at any card
-            // height, and still says the same thing at a glance.
+
             border: Border.all(
               color: accent != null
                   ? accent!.withValues(alpha: muted ? 0.35 : 0.65)

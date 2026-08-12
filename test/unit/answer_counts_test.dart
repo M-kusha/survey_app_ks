@@ -48,9 +48,6 @@ void main() {
   });
 
   test('a text question contributes an empty row rather than crashing', () {
-    // The old code called `questionData['options'].length` for every question,
-    // so a single text question threw and took the whole analytics screen with
-    // it — for any survey that had one.
     final counts = countAnswers(
       [
         choice(['A', 'B']),
@@ -86,8 +83,6 @@ void main() {
   });
 
   test('an index outside the options is dropped, not counted', () {
-    // An admin can delete an option after people have answered, which leaves
-    // stored answers pointing past the end of the list.
     final counts = countAnswers(
       [
         choice(['A', 'B']),

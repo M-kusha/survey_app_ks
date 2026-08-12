@@ -27,14 +27,6 @@ function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value.trim() : undefined;
 }
 
-/**
- * Completes a private pending registration at the Admin SDK boundary.
- *
- * Both branches are transactions. A company, its canonical name lock, its
- * public listing and its owner projection either all appear together or not at
- * all. Joining derives approval state and bans from authoritative documents;
- * no client-supplied role or membership is accepted.
- */
 export async function finalizePendingOnboarding(
   uid: string,
   options: FinalizeOptions = {},
@@ -64,8 +56,6 @@ export async function finalizePendingOnboarding(
     const existingCompanyId = optionalString(profile.companyId) ?? '';
     const intent = optionalString(profile.pendingOnboardingType);
 
-    // Network retries can reach the callable after its first transaction
-    // committed. Treat the already-final state as success, not a new company.
     if (!intent) {
       if (existingCompanyId) {
         return {

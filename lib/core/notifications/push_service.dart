@@ -104,8 +104,6 @@ class PushService {
       try {
         await stop(ownerUid: previousUid);
       } catch (_) {
-        // A newly selected account must not inherit the device token while
-        // cleanup for the previous profile is unconfirmed.
         if (_auth.currentUser?.uid == observedUser?.uid) {
           try {
             await _auth.signOut();
@@ -119,10 +117,7 @@ class PushService {
     if (current?.uid == observedUser?.uid && current?.emailVerified == true) {
       try {
         await startIfEnabled(expectedUid: current!.uid);
-      } catch (_) {
-        // Failed cleanup/reconciliation has its own retry. Avoid an unhandled
-        // asynchronous error from the Auth stream.
-      }
+      } catch (_) {}
     }
   }
 
@@ -141,7 +136,6 @@ class PushService {
 
     final result = await start(expectedUid: user.uid);
     if (result == PushStartResult.unavailable) {
-      // start() reports unavailable only after it has confirmed cleanup.
       if (!await persistDisabledPreference(preferences)) {
         _scheduleReconciliation();
       }
@@ -153,13 +147,9 @@ class PushService {
     final user = _auth.currentUser;
     final uid = expectedUid ?? user?.uid;
     if (uid == null || user?.uid != uid || user?.emailVerified != true) {
-      // No setup was attempted, so there is nothing this call can prove was
-      // cleaned up. Callers must not persist a disabled preference from this.
       return PushStartResult.disabled;
     }
 
-    // A stale cleanup timer must never be able to delete a newly registered
-    // token. Resolve it first and generation-guard every scheduled retry.
     if (_cleanupPending) {
       final cleanupUid = _cleanupOwnerUid;
       final cleanupToken = _cleanupToken;
@@ -231,8 +221,6 @@ class PushService {
         (newToken) => _queueTokenRefresh(expectedUid, newToken),
       );
 
-      // Auth can change while listeners are being replaced. Never report a
-      // successful start for a UID that is no longer the verified user.
       _requireSameVerifiedUser(expectedUid);
       _registeredUid = expectedUid;
       _registeredToken = token;
@@ -315,10 +303,7 @@ class PushService {
     if (previousToken != null && previousToken != token) {
       try {
         await _removeServerToken(ownerUid, previousToken);
-      } catch (_) {
-        // The refreshed token is registered. The obsolete token is normally
-        // invalidated by FCM and can be pruned on a later cleanup.
-      }
+      } catch (_) {}
     }
   }
 
@@ -340,9 +325,7 @@ class PushService {
     if (pendingStart != null) {
       try {
         await pendingStart;
-      } catch (_) {
-        // Retry cleanup below with the token/owner retained by this service.
-      }
+      } catch (_) {}
     }
 
     final uid = ownerUid ?? _registeredUid ?? _auth.currentUser?.uid;
@@ -549,7 +532,7 @@ class PushService {
             NotificationNavigation.open(data);
           }
         } on FormatException {
-          // Ignore malformed payloads from obsolete local notifications.
+          // ignore: empty_catches
         }
       },
     );

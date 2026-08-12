@@ -95,31 +95,22 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
         .collection('memberDirectory')
         .where('companyId', isEqualTo: id)
         .snapshots()
-        .listen(
-          (snapshot) {
-            if (!mounted || generation != _memberGeneration) return;
-            final avatars =
-                <String, ({String storedReference, int revision})>{};
-            for (final document in snapshot.docs) {
-              final data = document.data();
-              final storedReference = data['profileImage'];
-              if (storedReference is! String ||
-                  storedReference.trim().isEmpty) {
-                continue;
-              }
-              avatars[document.id] = (
-                storedReference: storedReference.trim(),
-                revision: readProfileImageRevision(
-                  data['profileImageRevision'],
-                ),
-              );
+        .listen((snapshot) {
+          if (!mounted || generation != _memberGeneration) return;
+          final avatars = <String, ({String storedReference, int revision})>{};
+          for (final document in snapshot.docs) {
+            final data = document.data();
+            final storedReference = data['profileImage'];
+            if (storedReference is! String || storedReference.trim().isEmpty) {
+              continue;
             }
-            setState(() => _memberAvatars = avatars);
-          },
-          onError: (Object _) {
-            // Historical participant snapshots remain the read-only fallback.
-          },
-        );
+            avatars[document.id] = (
+              storedReference: storedReference.trim(),
+              revision: readProfileImageRevision(data['profileImageRevision']),
+            );
+          }
+          setState(() => _memberAvatars = avatars);
+        }, onError: (Object _) {});
   }
 
   @override
@@ -213,7 +204,10 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                   ),
                 )
               else ...[
-                ParticipantsSummary(survey: widget.survey, participants: participants),
+                ParticipantsSummary(
+                  survey: widget.survey,
+                  participants: participants,
+                ),
                 const SizedBox(height: Spacing.md),
                 _Filters(
                   selected: _filter,
@@ -296,8 +290,6 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 }
 
-/// How a test went, at a glance: the average, the pass split, and any
-/// exceptions that actually occurred.
 class ParticipantsSummary extends StatelessWidget {
   const ParticipantsSummary({
     super.key,
@@ -330,11 +322,6 @@ class ParticipantsSummary extends StatelessWidget {
     final processing = grades.where((grade) => grade.isProcessing).length;
     final errors = grades.where((grade) => grade.hasGradingError).length;
 
-    // Six figures used to be laid out in a fixed three-by-two grid whether or
-    // not they had anything to report, so a healthy test showed one number and
-    // five zeros under labels like "grading errors". The average is the figure
-    // that always means something; the rest are exceptions, and an exception
-    // worth a place on screen is one that actually happened.
     final band = average == null ? null : ScoreBand.of(average);
     final averageColour = band == null
         ? theme.colorScheme.onSurfaceVariant
@@ -373,10 +360,7 @@ class ParticipantsSummary extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       average == null ? '—' : '${average.round()}%',
-                      // Same size as the pass/fail tallies beside it. Larger
-                      // made the one figure that is only context — an average
-                      // says nothing about any individual — the loudest thing
-                      // on the page. Colour and position carry it instead.
+
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: averageColour,
                         height: 1,
@@ -385,9 +369,7 @@ class ParticipantsSummary extends StatelessWidget {
                   ],
                 ),
               ),
-              // Nothing has finished grading yet, so a pass split would be two
-              // more zeros. The average already reads "—"; the exceptions below
-              // say what is actually happening.
+
               if (passed + failed > 0) ...[
                 _Tally(
                   count: passed,
@@ -413,7 +395,10 @@ class ParticipantsSummary extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (passed > 0)
-                      Expanded(flex: passed, child: ColoredBox(color: app.success)),
+                      Expanded(
+                        flex: passed,
+                        child: ColoredBox(color: app.success),
+                      ),
                     if (failed > 0)
                       Expanded(
                         flex: failed,
@@ -467,9 +452,6 @@ Color _colourFor(BuildContext context, ScoreBand band) {
   };
 }
 
-
-/// A count with its label beneath, sized to sit beside the average rather than
-/// compete with it.
 class _Tally extends StatelessWidget {
   const _Tally({
     required this.count,
@@ -520,12 +502,6 @@ class _Filters extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Six chips were offered unconditionally, so a test with no errors and
-    // nothing pending still showed "Grading errors 0" and wrapped onto a second
-    // and third row. A filter that would empty the list is not a choice worth
-    // offering; "All" always stays, and the current selection stays even if its
-    // count has just dropped to zero, so the chips cannot vanish under the tap
-    // that selected them.
     return Wrap(
       spacing: Spacing.sm,
       runSpacing: Spacing.sm,

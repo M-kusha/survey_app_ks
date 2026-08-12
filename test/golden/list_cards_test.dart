@@ -12,17 +12,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/load_fonts.dart';
 import '../support/load_translations.dart';
 
-/// Every state a list row can be in, side by side.
-///
-///     flutter test --update-goldens test/golden
-///
-/// These exist because the states are the part nobody looks at. Open rows get
-/// exercised constantly; expired and already-answered ones are what a reviewer
-/// sees on a stale account, and until now there was no way to check they read
-/// as finished rather than as broken.
-///
-/// Dates are fixed relative to a frozen "now" so the deadline copy is stable —
-/// a golden built from `DateTime.now()` would rewrite itself daily.
 final _now = DateTime(2025, 3, 10, 9);
 
 Survey _survey({

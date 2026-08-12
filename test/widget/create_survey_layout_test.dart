@@ -10,22 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/load_translations.dart';
 
-/// Layout guards for the survey builder.
-///
-/// This screen has now been broken three times by where the finish button
-/// lives, and none of it was visible to `flutter analyze`:
-///
-///   1. the button sat on the last page of a PageView, so it disappeared the
-///      moment you added a question and were carried onto that question's card
-///   2. moving it into `bottomNavigationBar` handed a bare `Center` loose
-///      constraints, and `Center` expands to fill them — the bar grew to the
-///      full screen height and squeezed the page to nothing
-///   3. the same `Center` mistake again, in the shared action bar
-///
-/// The builder is a scrolling list now rather than a swipe deck, so these
-/// assert the properties that survived the redesign: the button exists before
-/// you have written anything, the bar is a bar, and adding a question adds an
-/// editor without navigating anywhere.
 Survey _survey({SurveyType type = SurveyType.survey}) => Survey(
   surveyName: 'Test',
   surveyDescription: 'Test survey',
@@ -62,7 +46,6 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
-/// The three "add a question" buttons at the foot of the list.
 Finder get _addButtons => find.byType(OutlinedButton);
 
 void main() {
@@ -100,8 +83,6 @@ void main() {
     });
 
     testWidgets('nothing overflows on a narrow one either', (tester) async {
-      // 320 is the narrowest phone still in use, and the three add-buttons sit
-      // in a row with translated labels.
       await _pump(tester, const Size(320, 700));
       expect(tester.takeException(), isNull);
     });
@@ -121,13 +102,9 @@ void main() {
     });
 
     testWidgets('several are visible at once', (tester) async {
-      // The whole point of dropping the PageView: you can see the survey.
       await _pump(tester, const Size(390, 844));
 
       for (var i = 0; i < 3; i++) {
-        // The add buttons sit below the questions, so they move down the page
-        // as it fills — which is the point of a list, and means the test has to
-        // scroll to them the way a person would.
         await tester.ensureVisible(_addButtons.first);
         await tester.pumpAndSettle();
         await tester.tap(_addButtons.first);
@@ -141,14 +118,11 @@ void main() {
     testWidgets('a choice question starts with two blank options', (
       tester,
     ) async {
-      // Starting with none made the card look finished when it was not, and
-      // the old editor happily saved a choice with nothing to choose between.
       await _pump(tester, const Size(390, 844));
 
       await tester.tap(_addButtons.first);
       await tester.pumpAndSettle();
 
-      // One field for the question, two for the options.
       expect(find.byType(TextFormField), findsNWidgets(3));
     });
 

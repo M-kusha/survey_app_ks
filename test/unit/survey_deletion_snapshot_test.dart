@@ -36,8 +36,6 @@ void main() {
   });
 
   test('one malformed survey cannot retain or stall the complete list', () {
-    // Survey.fromFirestore performs runtime Firestore casts, so malformed wire
-    // data commonly throws TypeError rather than FormatException.
     final malformed = wireSurvey(id: 'malformed')
       ..['timeCreated'] = 'not-a-timestamp';
     final failures = <Object>[];

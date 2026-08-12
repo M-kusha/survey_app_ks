@@ -138,9 +138,6 @@ class _SlotRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // The time leads, because that is what differs between the
-                // slots being compared. The date sits beneath it with the zone
-                // and duration, since those only matter once you have picked.
                 Text(
                   '${DateFormat.jm().format(start)} – '
                   '${DateFormat.jm().format(end)}',
@@ -149,9 +146,7 @@ class _SlotRow extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                // One ellipsizing line, not a Row of two unconstrained Texts —
-                // that combination overflowed by ~28px on a phone and drew
-                // Flutter's yellow-and-black overflow stripes across the card.
+
                 Text(
                   '${DateFormat.MMMEd().format(start)} · '
                   '${_durationLabel(slot)} · $zoneId',

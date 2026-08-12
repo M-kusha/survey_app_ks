@@ -4,8 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 const _collection = ".collection('appointments')";
 
-/// Every place a client reaches for the appointments collection, with enough
-/// following source to see how the read is shaped.
 Iterable<({String path, String source})> _appointmentReads() sync* {
   final files = Directory('lib')
       .listSync(recursive: true)
@@ -25,10 +23,6 @@ Iterable<({String path, String source})> _appointmentReads() sync* {
   }
 }
 
-/// A read of one document by id, rather than a query over the collection.
-///
-/// `.doc(` before any `.where(` means the id is already known, and an id is
-/// its own authorization boundary — rules check the document that was named.
 bool _isSingleDocument(String source) {
   final doc = source.indexOf('.doc(');
   final where = source.indexOf('.where(');
@@ -36,11 +30,6 @@ bool _isSingleDocument(String source) {
 }
 
 void main() {
-  // Discovered rather than listed. The previous version named two files, one of
-  // which later moved its query to a Cloud Function — so the test kept passing
-  // on a file that no longer had a query, then failed on a file that no longer
-  // existed, and in neither state was it checking anything. A scan cannot go
-  // stale, and it catches a new unbound query the day it is written.
   test('every client appointment list query binds tenant and v2 schema', () {
     final queries = _appointmentReads()
         .where((read) => !_isSingleDocument(read.source))
@@ -69,9 +58,6 @@ void main() {
   });
 
   test('single-document reads are still recognised as such', () {
-    // Guards the classifier itself: if `_isSingleDocument` ever returned false
-    // for a plain `.doc()` read, the test above would demand a tenant filter on
-    // a lookup that cannot take one, and the only way out would be to weaken it.
     final documentReads = _appointmentReads().where(
       (read) => _isSingleDocument(read.source),
     );

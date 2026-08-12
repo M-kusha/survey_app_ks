@@ -52,8 +52,6 @@ void main() {
   });
 
   test('filter and sort apply together', () {
-    // The old code put both behind one integer, so choosing "oldest first"
-    // silently turned off "only show what is unfinished".
     final notes = [
       note('b open', at: wednesday),
       note('done', completed: true, at: monday),
@@ -103,9 +101,6 @@ void main() {
     });
 
     test('a note still awaiting its server timestamp sorts as newest', () {
-      // Firestore reports a pending write before the server stamps it, so the
-      // note the user just typed has a null date. The old comparator called
-      // compareTo on that null and threw.
       final notes = [note('saved', at: wednesday), note('just typed')];
 
       expect(titles(queryNotes(notes, sort: NoteSort.newest)), [
@@ -121,8 +116,6 @@ void main() {
   });
 
   test('the source list is never reordered', () {
-    // `applyFilters` sorted the list it was handed, so displaying the notes
-    // rearranged the state the screen was holding.
     final notes = [note('b', at: monday), note('a', at: wednesday)];
     final original = titles(notes);
 
@@ -139,8 +132,6 @@ void main() {
         note('c', at: tuesday),
       ];
 
-      // Newest-first would put 'a' on top; the pin outranks it. A pin the sort
-      // order can override is not a pin.
       expect(titles(queryNotes(notes, sort: NoteSort.newest)), ['b', 'a', 'c']);
       expect(titles(queryNotes(notes, sort: NoteSort.alphabetical)), [
         'b',
@@ -166,8 +157,6 @@ void main() {
     });
 
     test('a pinned note is still hidden by a filter that excludes it', () {
-      // Pinning is about order, not visibility. A pinned done note must not
-      // reappear while the list is filtered to open ones.
       final notes = [note('a', completed: true, pinned: true), note('b')];
       expect(titles(queryNotes(notes, filter: NoteFilter.open)), ['b']);
     });

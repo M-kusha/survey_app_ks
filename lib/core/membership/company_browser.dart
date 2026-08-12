@@ -24,12 +24,6 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
   bool _hasError = false;
   String? _joining;
 
-  /// Why the load failed, shown only in debug builds.
-  ///
-  /// A bare "something went wrong" is untestable: it cannot distinguish a
-  /// permission rule from an offline device from an empty directory, so the
-  /// first thing anyone asks is what it actually said. Release builds keep the
-  /// generic wording, because an error string can name internal collections.
   Object? _error;
 
   @override

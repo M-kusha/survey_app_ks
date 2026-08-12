@@ -1,10 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// The company-visible projection of a private `users/{uid}` document.
-///
-/// Email, birth date, notification tokens and other account data must never be
-/// copied here. Security rules make this collection readable to active members
-/// of the same company, while the full user document is owner-only.
 class MemberDirectory {
   const MemberDirectory._();
 
@@ -40,8 +35,6 @@ class MemberDirectory {
     batch.set(reference(firestore, userId), projection(profile));
   }
 
-  /// Atomically changes the signed-in user's private profile and its public
-  /// company projection. Joining creates the projection; leaving removes it.
   static Future<void> updateOwnProfile({
     required FirebaseFirestore firestore,
     required String userId,
@@ -64,8 +57,6 @@ class MemberDirectory {
     await batch.commit();
   }
 
-  /// Atomically changes role or membership fields for an existing colleague.
-  /// The caller does not need read access to the private profile document.
   static Future<void> updateMember({
     required FirebaseFirestore firestore,
     required String userId,
@@ -77,7 +68,6 @@ class MemberDirectory {
     await batch.commit();
   }
 
-  /// Releases a member without exposing or reading their private profile.
   static Future<void> removeMember({
     required FirebaseFirestore firestore,
     required String userId,

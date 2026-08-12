@@ -18,14 +18,12 @@ export type CompanyActivityAction =
   | 'appointment.deleted'
   | 'appointment.slot_confirmed';
 
-/** What a content event was about. Surveys and tests are told apart here. */
 export type CompanyActivityEntity = {
   type: 'survey' | 'test' | 'appointment';
   id: string;
   title: string;
 };
 
-/** The actions that must name their subject, and may not name a member. */
 const contentActions = new Set<CompanyActivityAction>([
   'survey.created',
   'survey.deleted',
@@ -35,12 +33,6 @@ const contentActions = new Set<CompanyActivityAction>([
   'appointment.slot_confirmed',
 ]);
 
-/**
- * The longest title kept on an event.
- *
- * Long enough for any real title, short enough that the field cannot be used as
- * a place to smuggle a document into an immutable store.
- */
 const titleLimit = 120;
 
 type MemberRole = 'user' | 'moderator' | 'admin' | 'superadmin';
@@ -101,15 +93,6 @@ function validId(value: string): boolean {
   return value.length > 0 && value.length <= 128 && !value.includes('/');
 }
 
-/**
- * Event IDs are composed, so they get their own bound.
- *
- * Every caller derives the ID from what the event is about — `survey-created-{id}`
- * and so on — which makes a retry land on the document it already wrote instead
- * of appending a second copy of the same event. A composed ID can therefore be
- * longer than the 128 characters a UID is held to, and refusing it would mean
- * refusing the content write that carries it.
- */
 function validEventId(value: string): boolean {
   return value.length > 0 && value.length <= 400 && !value.includes('/');
 }
@@ -176,31 +159,12 @@ function assertSafeState(state: CompanyActivityState | undefined): void {
   }
 }
 
-/**
- * Trims a title to what an event is allowed to carry.
- *
- * Call sites read titles straight off the document being acted on, so this is
- * where an over-long or non-string one stops. An empty result is kept rather
- * than rejected: an event that cannot name its subject is still worth more than
- * no event at all, and the app already falls back to the ID.
- */
 export function activityTitle(value: unknown): string {
   if (typeof value !== 'string') return '';
   const trimmed = value.trim();
   return trimmed.length > titleLimit ? trimmed.slice(0, titleLimit) : trimmed;
 }
 
-/**
- * Validates one event and returns where it goes and what it says.
- *
- * The narrow state and entity types intentionally cannot hold emails, names,
- * tokens, answers, responses, URLs or whole document snapshots. A content
- * event does carry the title of the survey or appointment it is about, because
- * an audit trail that cannot say *which* meeting was deleted is not an audit
- * trail — and after the delete there is nowhere left to look the title up.
- * Titles are company-authored and already visible to every member; the readers
- * of this log are that company's owners and admins.
- */
 export function companyActivityDocument(input: CompanyActivityInput): {
   path: string;
   event: Record<string, unknown>;
@@ -231,7 +195,6 @@ export function companyActivityDocument(input: CompanyActivityInput): {
   return { path: `companies/${input.companyId}/activity/${input.id}`, event };
 }
 
-/** Appends one immutable event as part of the change it records. */
 export function writeCompanyActivity(
   transaction: ActivityCreateTransaction,
   input: CompanyActivityInput,

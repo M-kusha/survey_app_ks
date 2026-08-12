@@ -60,8 +60,6 @@ void main() {
   testWidgets('the reader in the organizer zone sees one unlabelled time', (
     tester,
   ) async {
-    // The whole point of the change: no "Your time:" prefix and no second line
-    // repeating the identical clock reading back at them.
     final deviceTimeZone = await _zone(tester, () => 'Europe/Berlin');
     await _pump(
       tester,
@@ -94,11 +92,9 @@ void main() {
 
     final lines = _lines(tester);
     expect(lines, hasLength(2));
-    // Converted to the reader's clock, and it is the line that leads.
     expect(lines.first, contains('5:00'));
     expect(lines.first, isNot(contains('11:00')));
-    // The organizer's reading is kept, because "nine o'clock" is ambiguous
-    // across zones and somebody has to say whose nine.
+
     expect(lines.last, contains('11:00'));
     expect(lines.last, contains('Europe/Berlin'));
   });
@@ -121,7 +117,6 @@ void main() {
   testWidgets('a meeting across the clock change still warns about it', (
     tester,
   ) async {
-    // Losing this would let a meeting read as an hour longer than it runs.
     final deviceTimeZone = await _zone(tester, () => 'Europe/Berlin');
     final startAt = resolveAppointmentWallTime(
       zoneId: 'Europe/Berlin',

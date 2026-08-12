@@ -5,8 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('minimum questions', () {
     test('is two', () {
-      // Pinned, because the editor and its inline hint both read it and a
-      // silent change back to one would restore the bug.
       expect(kMinimumQuestions, 2);
     });
   });
@@ -30,9 +28,6 @@ void main() {
     );
 
     test('exactly on the mark passes', () {
-      // One of two right is 50%, and 50 is a pass — the boundary is inclusive,
-      // which is the half of the rule that a `>` instead of `>=` would break
-      // without failing any other case.
       final grade = gradeOf([
         [0],
         [1],

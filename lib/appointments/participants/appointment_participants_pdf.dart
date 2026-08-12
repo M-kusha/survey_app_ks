@@ -11,11 +11,6 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:provider/provider.dart';
 
-/// The participants page as a printable roll call.
-///
-/// Grouped by time rather than by person: a meeting may offer up to a hundred
-/// slots, and a person-by-slot matrix that wide cannot be laid out on a page —
-/// grouping simply spills onto more pages instead of overflowing.
 class AppointmentParticipantsPdf extends StatelessWidget {
   const AppointmentParticipantsPdf({
     super.key,
@@ -29,8 +24,7 @@ class AppointmentParticipantsPdf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toLanguageTag();
-    // The zone the person exporting is reading in, so the printed times match
-    // the ones they just looked at on screen.
+
     final viewerZone = context.watch<DeviceTimeZone?>()?.zoneId;
 
     return PdfViewerPage(
@@ -75,10 +69,7 @@ class AppointmentParticipantsPdf extends StatelessWidget {
             ),
             PdfKit.stat('time_slots'.tr(), '${slots.length}'),
           ]),
-          // Every time starts its own page. The list for one slot is the thing
-          // an organizer actually uses — printed and taken to that meeting, or
-          // sent to the people in it — and that is only true if it can be
-          // separated from the others without a pair of scissors.
+
           for (final (index, slot) in slots.indexed) ...[
             if (index > 0) pw.NewPage(),
             ..._slotSection(slot, locale, viewerZone),
@@ -113,10 +104,6 @@ class AppointmentParticipantsPdf extends StatelessWidget {
     final there = at(appointment.zoneId);
 
     return [
-      // The exporter's own time leads, as it does on screen. A printed page
-      // travels, so the zone is always named rather than left implied - and
-      // the organizer's reading is added only when it differs, which is the
-      // one case where the two are not interchangeable.
       _heading(
         '$here (${viewer ?? appointment.zoneId})',
         confirmed: slot.isConfirmed,

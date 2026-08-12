@@ -57,8 +57,6 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
       if (!value) {
         await pushService.stop();
         if (!await PushService.persistDisabledPreference(prefs)) {
-          // Cleanup succeeded but the durable preference still says enabled.
-          // Restore registration to that persisted truth and keep retrying.
           final reconciled = await pushService.reconcilePersistedPreference();
           if (mounted) setState(() => _notificationsEnabled = reconciled);
           throw StateError('Notification preference could not be saved.');
@@ -67,9 +65,6 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
         return;
       }
 
-      // Persist intent before registering a server token. If the process stops
-      // between these steps, startup retries registration; it never leaves a
-      // background token active behind a locally disabled switch.
       if (!await prefs.setBool(PushService.notificationsPreferenceKey, true) ||
           prefs.getBool(PushService.notificationsPreferenceKey) != true) {
         throw StateError('Notification preference could not be saved.');
@@ -79,8 +74,6 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
           result == PushStartResult.registered &&
           pushService.isRegisteredForCurrentUser;
       if (!registered) {
-        // Only unavailable proves that setup rollback was confirmed. A
-        // disabled result can mean Auth changed mid-action, so retain intent.
         if (result == PushStartResult.unavailable) {
           if (!await PushService.persistDisabledPreference(prefs)) {
             unawaited(pushService.reconcilePersistedPreference());

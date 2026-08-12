@@ -35,7 +35,6 @@ class AppTextField extends StatefulWidget {
   final bool enabled;
   final int? maxLength;
 
-  /// Focuses on first build. For a dialog whose only job is one field.
   final bool autofocus;
 
   @override

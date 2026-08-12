@@ -1,8 +1,6 @@
 import 'package:echomeet/survey_pages/utilities/survey_scoring.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Builders keep each test focused on the rule it is exercising rather than on
-/// the shape of the stored question map.
 Map<String, dynamic> single(String correct, {List<String>? options}) => {
   'type': 'Single',
   'question': 'q',
@@ -85,8 +83,6 @@ void main() {
       expect(grade.correctCount, 1);
     });
 
-    // The regression this whole file exists for: intersection-only scoring gave
-    // full marks to anyone who simply ticked every box.
     test('selecting every option scores zero, not full marks', () {
       final grade = gradeOf(
         [
@@ -211,8 +207,6 @@ void main() {
       expect(notReviewed.hasPendingReview, isTrue);
     });
 
-    // Re-grading from scratch is what makes an admin toggling a verdict
-    // back and forth converge instead of inflating the stored score.
     test('toggling a verdict is idempotent', () {
       final questions = [text()];
       final answers = [

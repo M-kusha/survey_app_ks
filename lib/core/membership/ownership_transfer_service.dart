@@ -60,10 +60,6 @@ class OwnershipTransferAcceptanceReceipt {
   final String activityId;
 }
 
-/// The short-lived offer stored on the company document.
-///
-/// Invalid or expanded values decode to `null`, so an untrusted client cannot
-/// turn malformed company state into an actionable acceptance prompt.
 @immutable
 class OwnershipTransferOffer {
   const OwnershipTransferOffer({
@@ -125,7 +121,6 @@ class OwnershipTransferOffer {
   }
 }
 
-/// A directory member that the owner may select as the next owner.
 @immutable
 class OwnershipTransferTarget {
   const OwnershipTransferTarget({

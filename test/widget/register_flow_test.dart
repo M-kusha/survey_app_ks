@@ -11,12 +11,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/load_fonts.dart';
 import '../support/load_translations.dart';
 
-/// Registration screens, driven without Firebase.
-///
-/// Nothing here signs anyone up — `registerUser` is the last thing each flow
-/// calls and it needs a live backend. What these cover is the part that broke
-/// repeatedly: whether the screens render at all, whether the continue button
-/// is reachable, and whether the step you are on is the step you asked for.
 Future<void> _pump(
   WidgetTester tester,
   Widget screen, {
@@ -47,7 +41,6 @@ Future<void> _pump(
   await tester.pumpAndSettle();
 }
 
-/// The shell's primary action.
 FilledButton _continueButton(WidgetTester tester) =>
     tester.widget<FilledButton>(
       find.descendant(
@@ -69,8 +62,6 @@ void main() {
     ) async {
       await _pump(tester, Register1step(registerLogic: RegisterLogic()));
 
-      // The old screen hid the button entirely, so an undecided user saw a
-      // page with no way forward and no explanation.
       expect(find.byType(GlowButton), findsOneWidget);
       expect(_continueButton(tester).onPressed, isNull);
 
@@ -137,8 +128,6 @@ void main() {
       await tester.enterText(find.byType(TextField).first, 'Tr0ub4dor&3xyz');
       await tester.pumpAndSettle();
 
-      // The bar and the gate read the same estimate, so a password strong
-      // enough to be accepted can never still be labelled weak.
       expect(find.textContaining('password_weak'.tr()), findsNothing);
     });
 
@@ -160,12 +149,6 @@ void main() {
       size: const Size(1280, 800),
     );
 
-    // Two columns, story left of form, neither overlapping the other. Asserting
-    // the geometry is what catches a MediaQuery that reports the wrong width
-    // and quietly renders the phone layout on a desktop.
-    //
-    // Not "headline ends before the midpoint" — the panes are 6:5, so the left
-    // one legitimately runs past halfway.
     final panel = tester.getRect(find.byType(GlassPanel));
     final headline = tester.getRect(find.text('register_step1_title'.tr()));
 

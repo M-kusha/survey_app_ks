@@ -38,9 +38,7 @@ class AccountDeletionService {
       await user.reauthenticateWithCredential(
         EmailAuthProvider.credential(email: user.email!, password: password),
       );
-      // Force the callable to receive the new auth_time claim rather than an
-      // older cached ID token. The server independently enforces a five-minute
-      // recent-login window and checks company ownership from Firestore.
+
       await user.getIdToken(true);
     } on FirebaseAuthException {
       throw const ReauthenticationFailure();
@@ -69,8 +67,6 @@ class AccountDeletionService {
       throw const AccountDeletionIncomplete();
     }
 
-    // The trusted function has now removed personal data and deleted Auth last.
-    // Local token/session cleanup cannot make that completed deletion partial.
     try {
       await PushService().stop();
     } catch (_) {}

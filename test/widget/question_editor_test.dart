@@ -51,9 +51,6 @@ void main() {
   });
 
   test('sanity: the fixture shape matches what the app stores', () {
-    // The stored question is an untyped map, so nothing checks these keys at
-    // compile time. If they drift, everything below passes while the real
-    // editor writes fields the scorer never reads.
     final question = <String, dynamic>{
       'type': 'Single',
       'question': '',
@@ -114,8 +111,6 @@ void main() {
     };
     await _pump(tester, question, isTest: true);
 
-    // By size, not by icon alone: the type badge uses the same glyph at 13px,
-    // so `byIcon` matches two widgets and `tap` refuses an ambiguous target.
     await tester.tap(
       find.byWidgetPredicate(
         (widget) =>
@@ -150,8 +145,6 @@ void main() {
 
   group('removing an option', () {
     testWidgets('shifts a later correct answer down', (tester) async {
-      // The marks are indices into the option list. The old editor kept the raw
-      // index, so deleting option 0 quietly made a different answer correct.
       final question = <String, dynamic>{
         'type': 'Single',
         'question': 'Q',

@@ -211,10 +211,7 @@ class _QuestionarySurveyPageUIState extends State<QuestionarySurveyPageUI> {
     if (!_isLoading &&
         !membershipState.loading &&
         membership?.isActive != true) {
-      return CompanyGate(
-        membership: membership,
-        onChanged: _load,
-      );
+      return CompanyGate(membership: membership, onChanged: _load);
     }
 
     return Scaffold(

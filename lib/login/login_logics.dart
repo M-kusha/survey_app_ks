@@ -39,8 +39,6 @@ class AuthManager {
   }) async {
     lastFailure = null;
     try {
-      // Never let Firebase switch accounts while this installation's token is
-      // still registered on the current profile.
       if (_auth.currentUser != null && !await signOut()) {
         lastFailure = SignInFailure.sessionCleanupFailed;
         return false;
@@ -59,8 +57,7 @@ class AuthManager {
         try {
           await user.sendEmailVerification();
         } on FirebaseAuthException {
-          // A previous verification link remains valid. Authentication still
-          // fails closed until Firebase confirms the address.
+          // ignore: empty_catches
         }
         lastFailure = SignInFailure.emailNotVerified;
         await _auth.signOut();
@@ -106,15 +103,10 @@ class AuthManager {
       await _auth.signOut();
       await UserPreferences.endSession();
       FirebaseServices.invalidateCache();
-      // Avatar bytes are cached on the device. They are keyed per user so they
-      // could never be served to the wrong account, but leaving one person's
-      // photo on a shared phone after they have signed out is not this app's
-      // business.
+
       await ProfileImageCache.clear();
       return true;
     } catch (_) {
-      // Auth still owns the same profile, so restore the saved notification
-      // preference after token cleanup rather than silently leaving it off.
       if (_auth.currentUser?.uid == uid) {
         try {
           await _push.startIfEnabled(expectedUid: uid);

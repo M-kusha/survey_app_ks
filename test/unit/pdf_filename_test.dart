@@ -1,11 +1,6 @@
 import 'package:echomeet/survey_pages/admin/print_pages/pdf_viewer_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Export file names.
-///
-/// `PdfPreview` defaults to `document.pdf`, so every export anyone downloaded
-/// landed under the same name as the last one. Survey titles are free text and
-/// go straight into that name, which is where the escaping matters.
 void main() {
   test('joins the parts with hyphens', () {
     expect(
@@ -15,7 +10,6 @@ void main() {
   });
 
   test('strips characters that are path separators', () {
-    // A slash in a survey title is a directory on every platform this ships to.
     expect(
       pdfFileNameFrom(['Sales / Marketing', 'Bob']),
       'Sales-Marketing-Bob',
@@ -35,8 +29,6 @@ void main() {
   });
 
   test('falls back rather than producing an empty name', () {
-    // A survey titled entirely in punctuation is unlikely but a file called
-    // ".pdf" is worse than a dull one.
     expect(pdfFileNameFrom(['***', '']), 'echomeet-export');
     expect(pdfFileNameFrom([]), 'echomeet-export');
   });

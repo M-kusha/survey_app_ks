@@ -7,22 +7,13 @@ import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:flutter/material.dart';
 
-/// How a birthdate is written to the profile.
-///
-/// The registration form stores it as a localised display string rather than an
-/// ISO date, so this screen has to keep writing the same shape or the two would
-/// disagree about what a birthdate looks like. Matching the existing format is
-/// the smaller of two evils; changing it is a data migration.
 String formatBirthdate(DateTime value, {String? locale}) =>
     DateFormat.yMMMMd(locale).format(value);
 
-/// Reads a stored birthdate back into a date, or null if it cannot be trusted.
-///
-/// The stored string was formatted in whatever locale the person registered in,
-/// which is not necessarily the one they are reading now — so every supported
-/// locale is tried before giving up. Returning null is a normal outcome: the
-/// picker then opens at its default instead of on a date that was guessed.
-DateTime? parseStoredBirthdate(String stored, {List<String> locales = const []}) {
+DateTime? parseStoredBirthdate(
+  String stored, {
+  List<String> locales = const [],
+}) {
   final value = stored.trim();
   if (value.isEmpty) return null;
 
@@ -33,17 +24,9 @@ DateTime? parseStoredBirthdate(String stored, {List<String> locales = const []})
       continue;
     }
   }
-  // Older or hand-edited values may be plain ISO.
   return DateTime.tryParse(value);
 }
 
-/// Writes a name and birthdate to the profile, and to the company projection.
-///
-/// Both documents move together. `memberDirectory` is what every company screen
-/// reads, and the rules require it to equal the private profile *after* the
-/// write — so a name change that touched only one of them would either be
-/// refused or leave the member list showing a name its owner had already
-/// changed. A batch is one atomic write, which satisfies both.
 Future<void> saveProfileDetails({
   required String userId,
   required String fullName,
@@ -111,10 +94,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _load() async {
     try {
-      final snapshot = await _db
-          .collection('users')
-          .doc(widget.userId)
-          .get();
+      final snapshot = await _db.collection('users').doc(widget.userId).get();
       if (!mounted) return;
       final data = snapshot.data();
       final stored = (data?['birthdate'] as String? ?? '').trim();
@@ -126,8 +106,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       });
     } catch (_) {
       if (!mounted) return;
-      // Saying so beats an empty form that would overwrite a real name with
-      // whatever the reader typed into blank fields.
+
       setState(() {
         _loading = false;
         _loadFailed = true;
@@ -137,8 +116,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _pickBirthdate() async {
     final now = DateTime.now();
-    // The same 18-year floor registration applies. An edit screen that let you
-    // set a date registration would have refused is a way around the rule.
+
     final latest = DateTime(now.year - 18, now.month, now.day);
     final initial = _birthdate != null && !_birthdate!.isAfter(latest)
         ? _birthdate!
@@ -228,8 +206,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                             : null,
                       ),
                       const SizedBox(height: Spacing.md),
-                      // Read-only with a picker behind it, the same as
-                      // registration — a typed date could not be parsed back.
+
                       InkWell(
                         onTap: _saving ? null : _pickBirthdate,
                         borderRadius: BorderRadius.circular(Radii.md),

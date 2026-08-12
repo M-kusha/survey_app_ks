@@ -401,8 +401,6 @@ async function requestTransfer(
     throw fail('permission-denied', 'ownership-transfer-target-unavailable');
   }
 
-  // Authorize the owner and canonical target before consulting Auth so an
-  // unrelated caller cannot use error differences to probe arbitrary UIDs.
   await verifyTargetAuth();
 
   const expiresAtMillis = nowMillis + transferLifetimeMillis;
@@ -516,13 +514,6 @@ async function acceptTransfer(
   };
 }
 
-/**
- * Creates or accepts one short-lived ownership-transfer offer.
- *
- * The company is always derived from canonical membership. Acceptance moves
- * both ownership pointers and both role projections together with the PII-free
- * activity event; a partial privilege hand-off cannot commit.
- */
 export async function transferCompanyOwnershipForUser(
   uid: string,
   authTime: unknown,

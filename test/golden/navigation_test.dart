@@ -7,10 +7,6 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/load_fonts.dart';
 import '../support/load_translations.dart';
 
-/// The navigation shell, with stand-in pages.
-///
-/// `BottomNavigation` takes a `pages` override precisely so it can be pumped
-/// without Firebase — the real tabs all reach for it in `initState`.
 Future<void> _pump(
   WidgetTester tester,
   ThemeData theme, {
@@ -59,10 +55,6 @@ void main() {
   testWidgets('phone shows the bottom bar', (tester) async {
     await _pump(tester, AppTheme.dark, size: const Size(393, 700));
 
-    // Keyed rather than typed: the compact bar is this app's own widget now,
-    // because Material's `NavigationBar` renders its label through a `Text` with
-    // no `maxLines` and wrapped long labels onto a second line, pushing the icon
-    // out of the bar.
     expect(find.byKey(bottomNavigationBarKey), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
 

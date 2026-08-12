@@ -148,10 +148,7 @@ class _ProfileSectionState extends State<ProfileSection> {
                   ],
                 ),
               ),
-              // Editing lives on the thing being edited, rather than as its own
-              // row further down the settings list. The avatar is already
-              // tappable for a new photo, so the pencil takes the name and
-              // birthdate.
+
               CircleAction(
                 icon: Icons.edit_outlined,
                 tooltip: 'edit_profile'.tr(),

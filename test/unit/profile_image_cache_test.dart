@@ -3,20 +3,11 @@ import 'dart:typed_data';
 import 'package:echomeet/core/profile/profile_image_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// The reported problem: turning the phone re-downloaded every avatar on screen.
-///
-/// Rotation moves the shell to a different layout branch, so the avatar widgets
-/// are disposed and rebuilt, and each new one called Storage from `initState`.
-/// These tests are about the property that fixes it — bytes are fetched once per
-/// reference and revision — and about the one thing a cache must never do, which
-/// is serve a photo that has been replaced.
 void main() {
   const avatar = 'profile_images/user_1/avatar.jpg';
   final bytes = Uint8List.fromList(List.filled(64, 7));
 
   setUp(() async {
-    // No filesystem in unit tests, and the memory layer is what rotation
-    // exercises. The disk layer's own failure path is covered below.
     ProfileImageCache.diskEnabled = false;
     await ProfileImageCache.clear();
   });
@@ -65,8 +56,6 @@ void main() {
     await load(1);
     await load(2);
 
-    // Freshness is the key, not a timer: uploading a photo increments the
-    // revision, which is a cache miss by construction.
     expect(fetches, 2);
   });
 
@@ -85,8 +74,6 @@ void main() {
   });
 
   test('concurrent mounts share one fetch', () async {
-    // A member list mounts many rows at once. Twenty rows of the same avatar
-    // must be one request, not twenty.
     var fetches = 0;
     Future<Uint8List?> load() => ProfileImageCache.resolve(
       storedReference: avatar,
@@ -116,8 +103,7 @@ void main() {
     );
 
     expect(await load(), isNull);
-    // Caching the null would have left a permanently blank avatar for as long as
-    // the app ran, which is worse than the extra request.
+
     expect(await load(), bytes);
     expect(attempts, 2);
   });
@@ -138,8 +124,6 @@ void main() {
   });
 
   test('the key is stable across runs and filesystem-safe', () async {
-    // It names a file that has to be found again after a restart, so it may not
-    // depend on String.hashCode and may not contain path separators.
     final key = ProfileImageCache.keyFor(avatar, 4);
 
     expect(key, ProfileImageCache.keyFor(avatar, 4));
@@ -158,8 +142,6 @@ void main() {
   });
 
   test('memory is bounded, and the oldest entry goes first', () async {
-    // Without a bound this is a leak that grows with every member whose photo
-    // has ever been on screen.
     final big = Uint8List(ProfileImageCache.maxMemoryBytes ~/ 2 + 1024);
     for (var index = 0; index < 3; index++) {
       await ProfileImageCache.resolve(
@@ -169,7 +151,10 @@ void main() {
       );
     }
 
-    expect(ProfileImageCache.peek('profile_images/user_0/avatar.jpg', 1), isNull);
+    expect(
+      ProfileImageCache.peek('profile_images/user_0/avatar.jpg', 1),
+      isNull,
+    );
     expect(
       ProfileImageCache.peek('profile_images/user_2/avatar.jpg', 1),
       isNotNull,

@@ -8,9 +8,7 @@ class SessionAccess extends ChangeNotifier {
   SessionAccess({FirebaseAuth? auth}) : _auth = auth ?? FirebaseAuth.instance {
     final currentUser = _auth.currentUser;
     _userId = currentUser?.uid;
-    // Firebase already owns session persistence. A restored authenticated
-    // session should survive refresh unless the user explicitly enabled the
-    // local biometric gate, in which case LoginPage performs that check.
+
     _isUnlocked =
         currentUser?.emailVerified == true &&
         !UserPreferences.getBiometricAuthEnabled();

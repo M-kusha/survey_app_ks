@@ -32,8 +32,6 @@ class WallTimeResolution {
   DateTime? get single => instants.length == 1 ? instants.single : null;
 }
 
-/// Finds every real instant represented by the supplied civil clock fields.
-/// A skipped DST time has no candidates and a repeated time has two.
 WallTimeResolution resolveAppointmentWallTime({
   required String zoneId,
   required DateTime wallTime,
@@ -97,13 +95,7 @@ String formatAppointmentRange({
   final end = zoneId == null
       ? canonicalAppointmentInstant(endAt).toLocal()
       : appointmentTimeInZone(endAt, zoneId);
-  // Read as "Wed, Aug 19 · 6:02 – 7:32 AM", not "Aug 19, 2026 6:02 AM – 7:32
-  // AM". The old string put the year — which is almost always this year and
-  // never what anybody is checking — in the middle of the sentence, and led
-  // with the date when the thing being compared between slots is the time. A
-  // middle dot separates the two facts so the eye can land on either.
-  //
-  // The weekday is worth its four characters: nobody schedules by date alone.
+
   final sameDay = _sameCalendarDay(start, end);
   final day = DateFormat.MMMEd(locale).format(start);
   final from = DateFormat.jm(locale).format(start);

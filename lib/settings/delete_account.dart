@@ -68,8 +68,7 @@ class _DeleteAccountButtonState extends State<DeleteAccountButton> {
     } on AccountDeletionIncomplete {
       if (!mounted) return;
       setState(() => _isDeleting = false);
-      // The server keeps Auth intact whenever cleanup is incomplete, so this
-      // screen remains available and the user can safely retry.
+
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
     } catch (_) {
       if (!mounted) return;

@@ -14,8 +14,6 @@ Future<void> _pump(WidgetTester tester, Membership? membership) async {
   await tester.pumpAndSettle();
 }
 
-/// Anything a person can read or press. A gate that renders none of these is
-/// the blank page this widget exists to prevent.
 int _actionableWidgets(WidgetTester tester) =>
     tester.widgetList<Text>(find.byType(Text)).length;
 
@@ -28,21 +26,14 @@ void main() {
   testWidgets('a membership that failed to load offers a retry, not a blank', (
     tester,
   ) async {
-    // The bug this replaces: `MembershipProvider` leaves the membership null and
-    // records an error when the read fails, and the gate returned its child —
-    // which both callers set to `SizedBox.shrink()`. A transient Firestore
-    // error therefore rendered an empty page with no message and no way back.
     await _pump(tester, null);
 
     expect(_actionableWidgets(tester), greaterThan(0));
     expect(find.widgetWithText(FilledButton, 'Try again'), findsOneWidget);
-    // It must not claim the person has no company: it does not know that.
     expect(find.text('Find a company'), findsNothing);
   });
 
   testWidgets('every membership state renders something', (tester) async {
-    // The states are what the gate switches on, so a new one added without a
-    // branch would fall through. Blank must be unreachable for all of them.
     for (final state in MembershipState.values) {
       await _pump(
         tester,

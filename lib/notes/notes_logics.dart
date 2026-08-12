@@ -60,8 +60,6 @@ class TodoListBackend {
     });
   }
 
-  /// Atomically removes the list row and rich body. A marker is required so a
-  /// stale client can never turn an ordinary note into a deletion request.
   Future<NoteDeletionFinalization> finalizeNoteDeletion(
     String noteId, {
     bool ignoreGracePeriod = false,
@@ -71,8 +69,6 @@ class TodoListBackend {
     return _firestore.runTransaction((transaction) async {
       final row = await transaction.get(rowRef);
       if (!row.exists) {
-        // A previous attempt may have removed the row before the old two-write
-        // implementation failed. Cleaning the private orphan is idempotent.
         transaction.delete(bodyRef);
         return NoteDeletionFinalization.deleted;
       }

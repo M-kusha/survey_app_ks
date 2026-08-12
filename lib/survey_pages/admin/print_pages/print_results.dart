@@ -20,11 +20,6 @@ class PDFResults extends StatelessWidget {
   final Survey survey;
   final Map<String, bool> textQuestionCorrect;
 
-  /// The correct option indexes per question, as the review screen shows them.
-  ///
-  /// Empty for a survey, and empty when the key could not be read — in both
-  /// cases the export falls back to marking only what was picked, rather than
-  /// marking every option wrong.
   final List<Set<int>> correctIndexes;
 
   bool get _isTest => survey.surveyType != SurveyType.survey;
@@ -146,11 +141,6 @@ class PDFResults extends StatelessWidget {
         .map((option) => '$option')
         .toList();
 
-    // The export marked only what was picked, in one blue tone, so a printed
-    // test looked identical to a printed survey and told a reviewer nothing
-    // about whether the answer was right. This is the same four states the
-    // review screen shows, and `PdfKit.row` already had the fill and lost-mark
-    // parameters for it.
     final graded = _isTest && correct.isNotEmpty;
 
     return pw.Column(
@@ -178,14 +168,8 @@ class PDFResults extends StatelessWidget {
                 'chosen_wrong',
                 true,
               ),
-              // A right answer left untouched is a mark thrown away, so it
-              // carries the red border without being filled as a wrong pick.
-              (true, false, true) => (
-                PdfKit.correct,
-                null,
-                'missed',
-                true,
-              ),
+
+              (true, false, true) => (PdfKit.correct, null, 'missed', true),
               (true, false, false) => (PdfKit.rule, null, null, false),
               (false, true, _) => (PdfKit.chosen, null, 'chosen', false),
               (false, false, _) => (PdfKit.rule, null, null, false),

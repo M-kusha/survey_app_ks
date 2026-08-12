@@ -3,11 +3,6 @@ import 'package:flutter/foundation.dart';
 
 typedef AppCheckActivation = Future<void> Function();
 
-/// Runs App Check activation at most once, while allowing a failed activation
-/// to be tried again.
-///
-/// Keeping this small boundary injectable makes the concurrency contract
-/// testable without contacting Firebase.
 class AppCheckActivationCoordinator {
   AppCheckActivationCoordinator(this._activateProvider);
 
@@ -63,8 +58,6 @@ abstract final class AppCheckBootstrap {
     WebProvider? webProvider;
     if (kIsWeb) {
       if (kDebugMode) {
-        // With no supplied token the Firebase web SDK generates one and prints
-        // it once. Register that value in the Firebase console before testing.
         webProvider = WebDebugProvider(debugToken: debugToken);
       } else {
         if (_webSiteKey.isEmpty) {
@@ -84,9 +77,7 @@ abstract final class AppCheckBootstrap {
       providerApple: kDebugMode
           ? AppleDebugProvider(debugToken: debugToken)
           : const AppleAppAttestWithDeviceCheckFallbackProvider(),
-      // FlutterFire requires a Windows provider argument and currently offers
-      // only debug. The release guard above makes this value unreachable in a
-      // Windows release; other platforms ignore it.
+
       providerWindows: WindowsDebugProvider(debugToken: debugToken),
     );
   }

@@ -76,27 +76,8 @@ import {
 
 initializeApp();
 
-// Dictated by the database, not chosen.
-//
-// This project's Firestore lives in `eur3`, a Europe multi-region. Eventarc
-// routes events out of a multi-region from one fixed place — `europe-west4` for
-// `eur3`, `us-central1` for `nam5` — and a v2 Firestore trigger deployed
-// anywhere else simply cannot be created.
-//
-// The failure is worth recognising by shape: on the first deploy the two
-// scheduled functions succeeded and all four Firestore triggers failed.
-// Scheduled functions have no such constraint, so a clean split down that line
-// means the region, not the code.
-//
-// Everything is kept here rather than only the triggers. Two regions for six
-// functions buys nothing and makes the next person wonder why.
 const region = 'europe-west4';
 
-/**
- * Converts a verified user's private registration intent into tenant state.
- * App Check and Firebase Auth are both required; the transaction independently
- * re-checks the Auth record before creating any public/company documents.
- */
 export const completeOnboarding = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -118,7 +99,6 @@ export const completeOnboarding = onCall(
   },
 );
 
-/** App-Check-protected boundary for creating one trusted survey definition. */
 export const saveSurveyDefinition = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -148,7 +128,6 @@ export const saveSurveyDefinition = onCall(
   },
 );
 
-/** App-Check-protected boundary for canonical appointment create/update. */
 export const saveAppointmentDefinition = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -178,7 +157,6 @@ export const saveAppointmentDefinition = onCall(
   },
 );
 
-/** App-Check-protected server cleanup for one survey or appointment. */
 export const deleteContent = onCall(
   { region, timeoutSeconds: 120, enforceAppCheck: true },
   async (request) => {
@@ -204,11 +182,6 @@ export const deleteContent = onCall(
   },
 );
 
-/**
- * Re-encodes and stores the signed-in user's avatar without a bearer token.
- * The callable derives the Storage path from Auth; the client never supplies a
- * uid, object path, MIME type, or Firestore reference.
- */
 export const uploadProfileImage = onCall(
   {
     region,
@@ -250,7 +223,6 @@ export const uploadProfileImage = onCall(
   },
 );
 
-/** Lets an existing companyless account create a company and become owner. */
 export const createCompanyForCurrentUser = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -280,7 +252,6 @@ export const createCompanyForCurrentUser = onCall(
   },
 );
 
-/** Two-step, recently authenticated hand-off to an active company member. */
 export const transferCompanyOwnership = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -310,7 +281,6 @@ export const transferCompanyOwnership = onCall(
   },
 );
 
-/** Copies the caller's live verified Auth email into its private profile. */
 export const syncVerifiedEmail = onCall(
   { region, enforceAppCheck: true },
   async (request) => {
@@ -336,11 +306,6 @@ export const syncVerifiedEmail = onCall(
   },
 );
 
-/**
- * App-Check-protected boundary for every company people/policy mutation.
- * The function derives the tenant and all activity fields from trusted state;
- * callers cannot supply a company, actor, prior value or log entry.
- */
 export const administerCompany = onCall(
   {
     region,
@@ -375,10 +340,6 @@ export const administerCompany = onCall(
   },
 );
 
-/**
- * Completes account erasure at the trusted boundary after a recent sign-in.
- * Cleanup is retryable; Auth is deleted only after every data store succeeds.
- */
 export const deleteMyAccount = onCall(
   {
     region,
@@ -422,9 +383,6 @@ async function notifyJoinRequest(
   const companyId = joinRequestCompanyId(profile, false);
   if (!companyId) return;
 
-  // A ban mirrors membership to pending for Storage authorization. It is not a
-  // new join request, and its atomic ban document is visible by the time this
-  // trigger runs. Check it before notifying admins.
   const ban = await getFirestore()
     .collection('companies')
     .doc(companyId)
@@ -443,12 +401,6 @@ async function notifyJoinRequest(
   );
 }
 
-/**
- * A new survey or test, announced to the company.
- *
- * The author is left out. Being notified about the thing you just wrote is the
- * fastest way to teach somebody that these notifications are noise.
- */
 export const onSurveyCreated = onDocumentCreated(
   { document: 'surveys/{surveyId}', region, retry: true },
   async (event) => {
@@ -472,13 +424,6 @@ export const onSurveyCreated = onDocumentCreated(
   },
 );
 
-/**
- * Scores an initial response at the trusted boundary.
- *
- * Rules require client-written score fields to be zero sentinels, so a forged
- * first write cannot become an authoritative result. The calculation is
- * deterministic and idempotent if the event is delivered more than once.
- */
 export const onSurveyResponseCreated = onDocumentCreated(
   { document: 'surveys/{surveyId}/participants/{participantId}', region },
   async (event) => {
@@ -506,9 +451,6 @@ export const onSurveyResponseCreated = onDocumentCreated(
         return;
       }
 
-      // This backend-owned value is only an invalidation signal. Clients use
-      // the already-open survey query to refresh their own response status
-      // without maintaining one participant listener per survey.
       transaction.update(surveyRef, {
         responsesRevision: FieldValue.increment(1),
       });
@@ -543,7 +485,6 @@ export const onSurveyResponseCreated = onDocumentCreated(
   },
 );
 
-/** Invalidates live participation state after a response is removed. */
 export const onSurveyResponseDeleted = onDocumentDeleted(
   { document: 'surveys/{surveyId}/participants/{participantId}', region },
   async (event) => {
@@ -560,14 +501,6 @@ export const onSurveyResponseDeleted = onDocumentDeleted(
   },
 );
 
-/**
- * Recomputes the complete grade after a staff member reviews free text.
- *
- * The client may change only the review map. Score and correct-answer totals
- * are written here from the immutable questions and submitted answers, in one
- * transaction. A stale out-of-order event is discarded rather than replacing
- * a newer review's grade.
- */
 export const onSurveyResponseUpdated = onDocumentUpdated(
   { document: 'surveys/{surveyId}/participants/{participantId}', region },
   async (event) => {
@@ -595,8 +528,7 @@ export const onSurveyResponseUpdated = onDocumentUpdated(
       if (!current.exists || !survey.exists) return;
 
       const currentReviews = current.get('textAnswersReviewed') ?? {};
-      // Another review won the race. Its own event will calculate the current
-      // grade, so this older invocation must not write stale totals.
+
       if (!isDeepStrictEqual(currentReviews, afterReviews)) return;
 
       try {
@@ -629,7 +561,6 @@ export const onSurveyResponseUpdated = onDocumentUpdated(
   },
 );
 
-/** A new meeting poll, announced the same way. */
 export const onAppointmentCreated = onDocumentCreated(
   { document: 'appointments/{appointmentId}', region, retry: true },
   async (event) => {
@@ -651,7 +582,6 @@ export const onAppointmentCreated = onDocumentCreated(
   },
 );
 
-/** A vote document is the source of truth for the compact parent voter index. */
 export const onAppointmentVoteCreated = onDocumentCreated(
   {
     document: 'appointments/{appointmentId}/participants/{participantId}',
@@ -666,7 +596,6 @@ export const onAppointmentVoteCreated = onDocumentCreated(
   },
 );
 
-/** Remove a voter from the parent only after their final slot vote is gone. */
 export const onAppointmentVoteDeleted = onDocumentDeleted(
   {
     document: 'appointments/{appointmentId}/participants/{participantId}',
@@ -680,13 +609,6 @@ export const onAppointmentVoteDeleted = onDocumentDeleted(
   },
 );
 
-/**
- * A time has been settled.
- *
- * This is the one notification people actually wait for, and the only one where
- * *not* being told has a real cost: the whole point of voting was to find out
- * when the meeting is.
- */
 export const onTimeSlotConfirmed = onDocumentUpdated(
   { document: 'appointments/{appointmentId}', region, retry: true },
   async (event) => {
@@ -697,8 +619,6 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
     const confirmation = appointmentConfirmationTransition(before, after);
     if (!confirmation) return;
 
-    // Every member still entitled to this company. Raw voter ids are not an
-    // authorization source: they may be stale after a removal or ban.
     const companyId = after.companyId as string | undefined;
     if (!companyId) return;
     const members = await activeMemberIds(companyId);
@@ -721,12 +641,6 @@ export const onTimeSlotConfirmed = onDocumentUpdated(
   },
 );
 
-/**
- * Somebody has asked to join.
- *
- * The gap this fills: approvals arrived in total silence, and the only way to
- * discover one was to happen to open the member list.
- */
 export const onJoinRequested = onDocumentUpdated(
   { document: 'users/{userId}', region, retry: true },
   async (event) => {
@@ -744,7 +658,6 @@ export const onJoinRequested = onDocumentUpdated(
   },
 );
 
-/** Registration creates a pending profile rather than updating an old one. */
 export const onJoinRequestedAtRegistration = onDocumentCreated(
   { document: 'users/{userId}', region, retry: true },
   async (event) => {
@@ -754,13 +667,6 @@ export const onJoinRequestedAtRegistration = onDocumentCreated(
   },
 );
 
-/**
- * The daily sweep: what closes tomorrow, and who has not answered it.
- *
- * Aimed only at people who still have something to do. A reminder sent to
- * somebody who already answered is the notification that makes people turn all
- * of them off.
- */
 export const remindExpiring = onSchedule(
   {
     schedule: '0 9 * * *',
@@ -811,12 +717,8 @@ export const remindExpiring = onSchedule(
       const companyId = appointment.get('companyId') as string | undefined;
       if (!companyId) continue;
 
-      // A settled meeting wants nothing further from anybody.
       if (appointmentIsSettled(appointment.data())) continue;
 
-      // Vote documents are authoritative. The parent index is updated by an
-      // at-least-once trigger and can lag for a few seconds, which is not a
-      // sound basis for deciding who receives a reminder.
       const [members, votes] = await Promise.all([
         activeMemberIds(companyId),
         appointment.ref.collection('participants').get(),
@@ -845,13 +747,6 @@ export const remindExpiring = onSchedule(
   },
 );
 
-/**
- * Carries out company closures whose week has run out.
- *
- * This is the piece the client cannot do properly. Until now the purge ran only
- * when an admin next opened the app — so a company whose owner walked away was
- * scheduled for a deletion that might never arrive.
- */
 export const purgeScheduledCompanies = onSchedule(
   { schedule: '30 3 * * *', timeZone: 'Europe/Berlin', region },
   async () => {
@@ -868,14 +763,12 @@ export const purgeScheduledCompanies = onSchedule(
           logger.info('company purged', { companyId: company.id });
         }
       } catch (error) {
-        // One bad company must not stop the sweep for the rest.
         logger.error('purge failed', { companyId: company.id, error });
       }
     }
   },
 );
 
-/** Remove account-deletion write locks after all pre-deletion ID tokens expire. */
 export const purgeAccountDeletionLocks = onSchedule(
   { schedule: '15 * * * *', timeZone: 'UTC', region },
   async () => {

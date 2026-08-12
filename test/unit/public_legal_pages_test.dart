@@ -9,11 +9,6 @@ String _read(String path) => File(path).readAsStringSync();
 const _operator = 'Kushtrim Mulliqi';
 const _contact = 'kushtrim.mulliqi@outlook.com';
 
-/// Every section the published policy must carry, as `data-i18n` keys.
-///
-/// Listed here rather than counted, so removing a section from the page is a
-/// test failure and not a silent loss. A policy that quietly stops saying who
-/// the controller is, or what is never collected, is the failure that matters.
 const _requiredPrivacyKeys = [
   'privacy_title',
   'privacy_effective',
@@ -70,9 +65,7 @@ void main() {
 
     expect(privacy, contains('data-legal-page="privacy-policy"'));
     expect(privacy, contains('data-release-status="published"'));
-    // The page used to announce that it was not a policy. If that copy ever
-    // comes back, the link handed to Google Play has silently become a
-    // disclaimer again.
+
     expect(privacy, isNot(contains('owner-input-required')));
     expect(privacy, isNot(contains('not an approved privacy policy')));
 
@@ -151,8 +144,6 @@ void main() {
   });
 
   test('every locale of the policy names the controller and the contact', () {
-    // Untranslated boilerplate is the usual way a localized policy goes wrong:
-    // the German page names nobody, and nobody notices because it is German.
     final copy = _staticCopy();
 
     for (final locale in const ['en', 'de', 'sq']) {
@@ -164,7 +155,6 @@ void main() {
       expect(values['privacy_operator_body'], contains(_contact));
       expect(values['privacy_rights_body'], contains(_contact));
       expect(values['privacy_footer'], contains(_contact));
-      // A policy with no date cannot say which version applies.
       expect(values['privacy_effective'], contains('2026'));
     }
   });
@@ -194,7 +184,6 @@ void main() {
       expect(copy['privacy_policy_operator_body'], contains(_contact));
       expect(copy['privacy_policy_rights_body'], contains(_contact));
 
-      // The placeholder copy this replaced must not linger in any locale.
       for (final stale in const [
         'privacy_policy_release_status_title',
         'privacy_policy_release_status_body',
@@ -203,14 +192,16 @@ void main() {
         'privacy_policy_owner_input_title',
         'privacy_policy_owner_input_body',
       ]) {
-        expect(copy, isNot(contains(stale)), reason: '$locale still has $stale');
+        expect(
+          copy,
+          isNot(contains(stale)),
+          reason: '$locale still has $stale',
+        );
       }
     }
   });
 
   test('the app and the notification link agree on the origin', () {
-    // Moving to a custom domain has to move both. Updating one leaves either
-    // the in-app policy link or every web notification pointing at the old host.
     final messaging = _read('functions/src/messaging.ts');
     final origin = PublicRoutePaths.canonicalOrigin;
 

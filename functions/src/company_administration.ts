@@ -733,11 +733,6 @@ async function listCompanyParticipantPaths(
   return [...new Set(paths)];
 }
 
-/**
- * Executes one privileged company mutation and appends its PII-free activity
- * record in the same transaction. The client supplies only the desired action;
- * company, actor, target state and before/after values are server-derived.
- */
 export async function administerCompanyForUser(
   uid: string,
   authTime: unknown,

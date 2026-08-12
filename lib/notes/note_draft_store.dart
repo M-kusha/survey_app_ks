@@ -35,8 +35,6 @@ class NoteDraft {
     if (title is! String || content is! List<dynamic>) return null;
 
     if (value['version'] == 1) {
-      // Version 1 did not record which cloud copy it was based on. Keep it
-      // recoverable, but never auto-restore it over an unknown server version.
       return NoteDraft(
         title: title,
         content: content,
@@ -63,9 +61,6 @@ class NoteDraft {
     );
   }
 
-  /// Both values must match. Released clients do not increment `revision`, but
-  /// they do update the row timestamp; checking both keeps mixed-version
-  /// devices from treating an older client's save as unchanged cloud state.
   bool isSafeToAutoRestore({
     required int cloudRevision,
     required int? cloudUpdatedAtMillis,
@@ -132,10 +127,6 @@ class PendingNoteDeletion {
   }
 }
 
-/// Keeps only an unsaved recovery copy. A successful cloud save removes it.
-///
-/// The UID in the key prevents a different signed-in account on the same
-/// device from opening another user's draft through the app.
 class NoteDraftStore {
   NoteDraftStore({String? userId})
     : _userId = userId ?? FirebaseAuth.instance.currentUser!.uid;
@@ -155,7 +146,7 @@ class NoteDraftStore {
       final draft = NoteDraft.fromJson(jsonDecode(encoded));
       if (draft != null) return draft;
     } on FormatException {
-      // A corrupt recovery record must never prevent the server copy loading.
+      // ignore: empty_catches
     }
 
     await preferences.remove(_key(noteId));

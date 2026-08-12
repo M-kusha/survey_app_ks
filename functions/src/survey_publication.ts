@@ -194,7 +194,6 @@ async function authorizedCompany(transaction: PublicationTransaction, uid: strin
   return companyId;
 }
 
-/** Creates one immutable canonical public/private survey pair. */
 export async function saveSurveyDefinitionForUser(
   uid: string,
   rawRequest: unknown,
@@ -249,18 +248,13 @@ export async function saveSurveyDefinitionForUser(
       companyId,
       questionKeys: request.definition.questionKeys,
     });
-    // A test and a survey are the same document with different consequences, so
-    // the log distinguishes them. The marked answers are written in the same
-    // transaction as the questions and cannot be edited afterwards, so this one
-    // event covers "created" and "answers marked" both.
+
     writeCompanyActivity(transaction, {
       id: `survey-created-${request.surveyId}`,
       companyId,
       action: 'survey.created',
       actorUid: uid,
       entity: {
-        // 1 is a graded test, 0 a plain survey — the same encoding the
-        // document itself stores.
         type: definition.surveyType === 1 ? 'test' : 'survey',
         id: request.surveyId,
         title: activityTitle(definition.surveyName),

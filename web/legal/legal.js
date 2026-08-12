@@ -1,8 +1,6 @@
 (function exposeLegalCopy(global) {
   'use strict';
 
-  // The one place the operator's identity is written. Both the privacy page and
-  // the deletion page interpolate these, so there is nothing to keep in sync.
   const OPERATOR = 'Kushtrim Mulliqi';
   const CONTACT = 'kushtrim.mulliqi@outlook.com';
 
@@ -251,7 +249,6 @@
     try {
       global.localStorage.setItem('echomeet-legal-language', locale);
     } catch (_) {
-      // The page remains usable when storage is unavailable.
     }
   }
 

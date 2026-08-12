@@ -24,7 +24,6 @@ class CompanyActivity {
   final Map<String, dynamic> before;
   final Map<String, dynamic> after;
 
-  /// What a content event was about. Null for every membership event.
   final CompanyActivityEntity? entity;
 
   static CompanyActivity? fromData({
@@ -86,9 +85,6 @@ class CompanyActivity {
         : const <String, dynamic>{};
     if (before == null || after == null) return null;
 
-    // A content event without its subject cannot be described, and a membership
-    // event carrying one came from something this build does not understand.
-    // Both are dropped rather than shown as a half-sentence.
     final entity = CompanyActivityEntity.fromData(data['entity']);
     if (data.containsKey('entity') != (entity != null)) return null;
     if (contentActions.contains(action) != (entity != null)) return null;
@@ -162,9 +158,6 @@ class CompanyActivity {
     required bool hasAfter,
     required Map<String, dynamic> after,
   }) {
-    // Every action that names a target is an administrative change performed
-    // on somebody else. Self-service activity (such as email change) has no
-    // target field at all.
     if (targetUid == actorUid) return false;
 
     bool state(Map<String, dynamic> value, Map<String, Object> expected) =>
@@ -263,10 +256,6 @@ class CompanyActivity {
   }
 }
 
-/// The events that are about a survey, a test or an appointment.
-///
-/// Kept in one place because three things key off it: which actions parse at
-/// all, which of them must name a subject, and which must not name a member.
 const contentActions = {
   'survey.created',
   'survey.deleted',
@@ -284,15 +273,9 @@ class CompanyActivityEntity {
     required this.title,
   });
 
-  /// 'survey', 'test' or 'appointment'.
   final String type;
   final String id;
 
-  /// The title as it stood when the event was written.
-  ///
-  /// Deliberately a copy rather than a live lookup: for deleted content there is
-  /// nothing left to look up, and for edited content the log should say what was
-  /// acted on at the time, not what it is called now.
   final String title;
 
   static CompanyActivityEntity? fromData(Object? value) {
@@ -383,11 +366,6 @@ class CompanyActivityService {
       });
 }
 
-/// Normalizes a directory name before it appears in the immutable audit view.
-///
-/// Newlines and Unicode direction controls can make one row look like several
-/// rows or reorder its sentence. Ignoring malformed or implausibly long values
-/// also means one bad directory document cannot terminate the names stream.
 String? safeActivityMemberName(Object? value) {
   if (value is! String || value.length > 160) return null;
   final normalized = value

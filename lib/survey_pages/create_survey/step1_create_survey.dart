@@ -10,13 +10,6 @@ import 'package:uuid/uuid.dart';
 class Step1CreateSurvey extends StatefulWidget {
   const Step1CreateSurvey({super.key, this.template});
 
-  /// A survey to start from, when the author chose to duplicate one.
-  ///
-  /// It arrives already stripped of everything that identified the original,
-  /// and always with a fresh deadline. Published surveys cannot be edited, so
-  /// duplicating drops the author into this wizard rather than publishing a
-  /// copy outright — the name, the timing and the questions all need a look
-  /// before anyone is asked to answer them again.
   final Survey? template;
 
   @override
@@ -52,8 +45,7 @@ class Step1CreateSurveyState extends State<Step1CreateSurvey> {
             surveyName: _name.text.trim(),
             surveyDescription: _description.text.trim(),
             timeCreated: DateTime.now(),
-            // Copied, not shared: the template belongs to the survey still
-            // listed on the previous screen.
+
             questions: [...?template?.questions],
             id: const Uuid().v4(),
 

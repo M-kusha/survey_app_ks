@@ -1,4 +1,3 @@
-/** Returns the company to notify, or null when this is not a join request. */
 export function joinRequestCompanyId(
   profile: Record<string, unknown>,
   hasCompanyBan: boolean,

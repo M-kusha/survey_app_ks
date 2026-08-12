@@ -358,14 +358,6 @@ class LoginPageState extends State<LoginPage> {
   }
 }
 
-/// Signed-out links to the two public legal and account-data resources.
-/// The two pages that have to be reachable without an account.
-///
-/// These were full-size `TextButton`s in a `Wrap`, so on a narrow screen they
-/// stacked into two tall blocks that read as primary actions competing with
-/// signing in. They are references, not things anybody came here to do, so they
-/// now sit on one quiet line. The tap target stays finger-sized; only the ink
-/// is smaller.
 class PublicLegalLinks extends StatelessWidget {
   const PublicLegalLinks({super.key});
 

@@ -5,10 +5,6 @@ export type SurveyScore = {
   hasPendingReview: boolean;
 };
 
-/**
- * Trusted equivalent of the Flutter SurveyScorer for an initial submission.
- * Free-text questions remain ungraded until a staff member reviews them.
- */
 export function scoreSurveySubmission(
   rawQuestions: unknown,
   rawQuestionKeys: unknown,
@@ -112,8 +108,6 @@ export function scoreSurveySubmission(
           (value) => String(value).trim().length > 0,
         );
         if (!hasWrittenAnswer) {
-          // Timed tests allow a question to expire unanswered. That is a final
-          // incorrect answer, not an unreviewable result stuck in pending.
           gradedCount += 1;
           break;
         }

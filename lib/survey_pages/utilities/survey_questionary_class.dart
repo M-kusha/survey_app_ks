@@ -125,8 +125,6 @@ class Participant {
     this.participations = const [],
   });
 
-  /// Applies the current authoritative directory projection. A missing or
-  /// malformed projection is a resolved, neutral identity state.
   void resolveDirectoryIdentity(Object? fullName) {
     _directoryIdentityResolved = true;
     _directoryName = fullName is String && fullName.trim().isNotEmpty
@@ -139,16 +137,11 @@ class Participant {
     _directoryName = other._directoryName;
   }
 
-  /// Human-readable current-directory rendering. Until the directory has
-  /// resolved, or when the UID is absent there, the historical snapshot is
-  /// deliberately not exposed.
   String displayName([String unavailableLabel = 'Unknown']) =>
       _directoryIdentityResolved && _directoryName != null
       ? _directoryName!
       : unavailableLabel;
 
-  /// Human-readable attribution for authorized exports. The name is a
-  /// rule-verified write-time snapshot; the UID remains the audit identity.
   String auditLabel([String unavailableLabel = 'Unknown']) =>
       '${displayName(unavailableLabel)} · UID $userId';
 

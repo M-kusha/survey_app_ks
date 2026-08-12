@@ -180,7 +180,6 @@ function parseRequest(raw: unknown): SaveRequest {
       };
     }
   } catch {
-    // Converted to the stable callable error below.
   }
   return fail('invalid-argument', 'appointment-request-invalid');
 }
@@ -306,7 +305,6 @@ function canonicalDocument(
   };
 }
 
-/** Creates or revises one canonical appointment definition. */
 export async function saveAppointmentDefinitionForUser(
   uid: string,
   rawRequest: unknown,
@@ -441,8 +439,7 @@ export async function saveAppointmentDefinitionForUser(
       request, companyId, revision, existing.createdBy, existing.createdAt,
       confirmedSlotId, existing.participantUserIds,
     ));
-    // Keyed by the revision it produced. Each edit is its own event, and a
-    // retried edit lands on the event it already wrote.
+
     writeCompanyActivity(transaction, {
       id: `appointment-updated-${request.appointmentId}-r${revision}`,
       companyId,

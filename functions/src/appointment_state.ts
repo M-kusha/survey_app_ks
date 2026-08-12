@@ -27,7 +27,6 @@ function confirmation(data: unknown): AppointmentConfirmation | null {
   return { slotId, startAt, zoneId };
 }
 
-/** Returns only a newly selected canonical slot, never a legacy string slot. */
 export function appointmentConfirmationTransition(
   before: unknown,
   after: unknown,
@@ -37,7 +36,6 @@ export function appointmentConfirmationTransition(
   return next != null && next.slotId !== previous?.slotId ? next : null;
 }
 
-/** A reminder is unnecessary once a canonical slot id has been selected. */
 export function appointmentIsSettled(data: unknown): boolean {
   return confirmation(data) != null;
 }

@@ -3,16 +3,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Loads the app's bundled fonts into the test binding.
-///
-/// Declaring fonts in `pubspec.yaml` is not enough for widget tests: the test
-/// binding substitutes a placeholder face for everything, which draws each
-/// glyph as a filled rectangle. Goldens taken without this show blocks instead
-/// of text, which makes them useless for judging anything visual — they still
-/// catch layout regressions, but you cannot see what the screen says.
-///
-/// Reads the files directly rather than through `rootBundle`, because the asset
-/// bundle in a test run does not include fonts.
 Future<void> loadAppFonts() async {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -49,16 +39,6 @@ Future<void> loadAppFonts() async {
   await _loadMaterialIcons();
 }
 
-/// Loads the Material Icons glyph font from the Flutter SDK.
-///
-/// Icons are a font too, and the test binding substitutes them the same way it
-/// substitutes text — every icon renders as a hollow box. The file ships inside
-/// the SDK rather than the project, so it is located from the `flutter` binary
-/// on PATH.
-///
-/// Best-effort: a machine where the SDK layout differs still gets readable
-/// text, just boxes where the icons are. Failing the whole suite over a
-/// decorative glyph would be worse.
 Future<void> _loadMaterialIcons() async {
   final flutterRoot = _findFlutterRoot();
   if (flutterRoot == null) return;
@@ -77,8 +57,6 @@ String? _findFlutterRoot() {
   final fromEnv = Platform.environment['FLUTTER_ROOT'];
   if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
 
-  // `Platform.resolvedExecutable` is the Dart binary inside the SDK:
-  // <root>/bin/cache/dart-sdk/bin/dart
   final parts = Platform.resolvedExecutable.replaceAll(r'\', '/').split('/');
   final index = parts.lastIndexOf('bin');
   if (index < 4) return null;

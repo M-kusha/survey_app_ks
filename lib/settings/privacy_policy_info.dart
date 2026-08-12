@@ -5,13 +5,6 @@ import 'package:echomeet/core/navigation/public_routes.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// In-app privacy summary, and the route to the full published policy.
-///
-/// Deliberately a summary. The authoritative policy is one static page served
-/// without an account so Google Play and anyone reviewing the app can read it,
-/// and keeping a second full copy in three locales here would only give the two
-/// something to disagree about. The URL is shown as text as well as offered as
-/// a button, so it stays usable if no browser can be opened.
 class PrivacyPolicyInfoPage extends StatelessWidget {
   const PrivacyPolicyInfoPage({super.key});
 
@@ -97,16 +90,13 @@ class PrivacyPolicyInfoPage extends StatelessWidget {
     );
   }
 
-  /// The URL stays on screen either way, so a refusal needs no error surface.
   Future<void> _openFullPolicy() async {
     try {
       await launchUrl(
         Uri.parse(PublicRoutePaths.privacyPolicyUrl),
         mode: LaunchMode.externalApplication,
       );
-    } catch (_) {
-      // No browser, or the platform declined the handoff.
-    }
+    } catch (_) {}
   }
 }
 
