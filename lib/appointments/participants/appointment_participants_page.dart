@@ -111,25 +111,53 @@ class _AppointmentParticipantsPageState
       appBar: AppBar(
         title: Text('all_participants'.tr()),
         actions: [
-          IconButton(
-            tooltip: 'export_participants'.tr(),
-            icon: const Icon(Icons.picture_as_pdf_outlined),
-            onPressed: overview == null
-                ? null
-                : () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AppointmentParticipantsPdf(
-                        appointment: widget.appointment,
-                        overview: overview,
-                      ),
+          if (overview == null)
+            const IconButton(
+              icon: Icon(Icons.picture_as_pdf_outlined),
+              onPressed: null,
+            )
+          else
+            PopupMenuButton<ParticipantExportScope>(
+              tooltip: 'export_participants'.tr(),
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              onSelected: (scope) => _export(overview, scope),
+              itemBuilder: (context) => [
+                if (widget.appointment.confirmedSlotId != null)
+                  PopupMenuItem(
+                    value: ParticipantExportScope.confirmedOnly,
+                    child: _ExportChoice(
+                      icon: Icons.event_available_outlined,
+                      title: 'export_confirmed_time'.tr(),
+                      hint: 'export_confirmed_time_hint'.tr(),
                     ),
                   ),
-          ),
+                PopupMenuItem(
+                  value: ParticipantExportScope.allTimes,
+                  child: _ExportChoice(
+                    icon: Icons.calendar_month_outlined,
+                    title: 'export_all_times'.tr(),
+                    hint: 'export_all_times_hint'.tr(),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(width: Spacing.xs),
         ],
       ),
       body: SafeArea(child: _buildBody(overview)),
+    );
+  }
+
+  void _export(ParticipantOverview overview, ParticipantExportScope scope) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AppointmentParticipantsPdf(
+          appointment: widget.appointment,
+          overview: overview,
+          scope: scope,
+        ),
+      ),
     );
   }
 
@@ -449,6 +477,43 @@ class _StatusMark extends StatelessWidget {
         ),
         child: Icon(voteIcon(current), size: 14, color: color),
       ),
+    );
+  }
+}
+
+class _ExportChoice extends StatelessWidget {
+  const _ExportChoice({
+    required this.icon,
+    required this.title,
+    required this.hint,
+  });
+
+  final IconData icon;
+  final String title;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: theme.colorScheme.primary),
+        const SizedBox(width: Spacing.md),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(title, style: theme.textTheme.bodyMedium),
+            Text(
+              hint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

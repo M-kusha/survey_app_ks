@@ -103,6 +103,8 @@ Future<int> _renderedBytes({
 }
 
 void main() {
+  _scopeTests();
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   initializeDateFormatting();
@@ -134,10 +136,11 @@ void main() {
     expect(document.document.pdfPageList.pages, hasLength(3));
   });
 
-  test('people still awaited are their own page, not a footnote', () async {
+  test('people still awaited follow the last time, without a page of their own',
+      () async {
     final document = await _document(slotCount: 2, memberCount: 3, vote: false);
 
-    expect(document.document.pdfPageList.pages, hasLength(3));
+    expect(document.document.pdfPageList.pages, hasLength(2));
   });
 
   test(
@@ -150,4 +153,99 @@ void main() {
     },
     timeout: const Timeout(Duration(minutes: 3)),
   );
+}
+
+void _scopeTests() {
+  test('the confirmed export carries only the confirmed time', () async {
+    final slots = [
+      TimeSlot(
+        slotId: 'slot-a',
+        start: DateTime.utc(2026, 3, 2, 9),
+        end: DateTime.utc(2026, 3, 2, 10),
+      ),
+      TimeSlot(
+        slotId: 'slot-b',
+        start: DateTime.utc(2026, 3, 3, 9),
+        end: DateTime.utc(2026, 3, 3, 10),
+        isConfirmed: true,
+      ),
+    ];
+    final appointment = Appointment(
+      companyId: 'company',
+      createdBy: 'organizer',
+      appointmentId: 'appointment',
+      title: 'Quarterly planning',
+      description: 'Pick a time',
+      zoneId: 'Europe/Berlin',
+      availableTimeSlots: slots,
+      expirationDate: DateTime.utc(2026, 2, 1),
+      creationDate: DateTime.utc(2026, 1, 1),
+      revision: 2,
+      confirmedSlotId: 'slot-b',
+    );
+    final overview = buildParticipantOverview(
+      slots: slots,
+      votes: [
+        for (final slot in slots)
+          AppointmentParticipants(
+            userId: 'user-0',
+            userName: 'ignored',
+            slotId: slot.slotId,
+            status: VoteStatus.yes.wireName,
+            participated: true,
+          ),
+      ],
+      memberNames: const {'user-0': 'Arta Krasniqi'},
+      unknownName: 'Unknown',
+    );
+
+    final all = await AppointmentParticipantsPdf(
+      appointment: appointment,
+      overview: overview,
+    ).buildDocument(PdfPageFormat.a4, 'en');
+    final confirmed = await AppointmentParticipantsPdf(
+      appointment: appointment,
+      overview: overview,
+      scope: ParticipantExportScope.confirmedOnly,
+    ).buildDocument(PdfPageFormat.a4, 'en');
+
+    expect(all.document.pdfPageList.pages.length, 2);
+    expect(confirmed.document.pdfPageList.pages.length, 1);
+  });
+
+  test('the confirmed export stays valid when nothing is confirmed', () async {
+    final slots = [
+      TimeSlot(
+        slotId: 'slot-a',
+        start: DateTime.utc(2026, 3, 2, 9),
+        end: DateTime.utc(2026, 3, 2, 10),
+      ),
+    ];
+    final appointment = Appointment(
+      companyId: 'company',
+      createdBy: 'organizer',
+      appointmentId: 'appointment',
+      title: 'Quarterly planning',
+      description: 'Pick a time',
+      zoneId: 'Europe/Berlin',
+      availableTimeSlots: slots,
+      expirationDate: DateTime.utc(2026, 2, 1),
+      creationDate: DateTime.utc(2026, 1, 1),
+      revision: 1,
+    );
+    final overview = buildParticipantOverview(
+      slots: slots,
+      votes: const [],
+      memberNames: const {'user-0': 'Arta Krasniqi'},
+      unknownName: 'Unknown',
+    );
+
+    final document = await AppointmentParticipantsPdf(
+      appointment: appointment,
+      overview: overview,
+      scope: ParticipantExportScope.confirmedOnly,
+    ).buildDocument(PdfPageFormat.a4, 'en');
+
+    expect((await document.save()).length, greaterThan(1000));
+  });
 }

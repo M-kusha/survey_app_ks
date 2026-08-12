@@ -730,5 +730,15 @@
   "edit_profile": "Edit profile",
   "profile_saved": "Profile updated",
   "edit_profile_hint": "Your name and birthdate",
-  "signing_in": "Signing you in"
+  "signing_in": "Signing you in",
+  "export_all_times": "All times",
+  "export_confirmed_time": "Confirmed time",
+  "export_all_times_hint": "Every proposed time, one page each",
+  "export_confirmed_time_hint": "Only the time that was agreed",
+  "no_time_confirmed_yet": "No time has been confirmed yet.",
+  "response": "Response",
+  "vote_short_yes": "Yes",
+  "vote_short_maybe": "Maybe",
+  "vote_short_no": "No",
+  "attending": "Attending"
 }
