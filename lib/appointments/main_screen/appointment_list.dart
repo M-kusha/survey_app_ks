@@ -2,10 +2,10 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/participants/appointment_vote_page.dart';
-import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/time/deadline.dart';
 import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
@@ -83,7 +83,6 @@ class AppointmentListItem extends StatelessWidget {
       onTap: () => _open(context),
       muted: deadline.isPassed,
       accent: accent,
-      progress: deadline.progress,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -225,8 +224,6 @@ class _SlotStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final app = context.appColors;
-
     final ordered = [
       ...slots.where((slot) => slot.isConfirmed),
       ...slots.where((slot) => !slot.isConfirmed),
@@ -234,65 +231,121 @@ class _SlotStrip extends StatelessWidget {
     final shown = ordered.take(_maxShown).toList();
     final hidden = ordered.length - shown.length;
 
-    // One time per line. These used to wrap, so two short slots shared a row
-    // and a third sat alone underneath - a ragged block that read as a single
-    // run-on string rather than as a list of times you can scan down.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    // Compact chips, several to a row.
+    //
+    // These were full-width bars, one per line, each holding a whole sentence:
+    // "Wed, Aug 19 · 6:02 AM – 7:32 AM". Three of them turned a card into a
+    // wall of near-identical prose, and the wording repeated on every row while
+    // the only part that differed - the day and the hour - sat buried in the
+    // middle of it. A chip stacks those two figures so they can be compared
+    // down a column, and three fit on one line.
+    final locale = Localizations.maybeLocaleOf(context)?.toLanguageTag() ?? 'en';
+    final viewerZone = context.watch<DeviceTimeZone?>()?.zoneId;
+
+    return Wrap(
+      spacing: Spacing.sm,
+      runSpacing: Spacing.sm,
       children: [
         for (final slot in shown)
-          Container(
-            margin: const EdgeInsets.only(bottom: Spacing.xs),
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(Radii.sm),
-              color: slot.isConfirmed
-                  ? app.success.withValues(alpha: 0.16)
-                  : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-              border: Border.all(
-                color: slot.isConfirmed
-                    ? app.success.withValues(alpha: 0.5)
-                    : Colors.transparent,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (slot.isConfirmed) ...[
-                  Icon(Icons.check_rounded, size: 12, color: app.success),
-                  const SizedBox(width: 4),
-                ],
-                Flexible(
-                  child: AppointmentTimeText(
-                    startAt: slot.startAt,
-                    endAt: slot.endAt,
-                    zoneId: zoneId,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: slot.isConfirmed
-                          ? app.success
-                          : scheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    // A list card has room for the time, not for a second line
-                    // naming the organizer's zone. The vote page shows that.
-                    showOrganizerZone: false,
-                  ),
-                ),
-              ],
-            ),
+          _SlotChip(
+            slot: slot,
+            zoneId: viewerZone,
+            locale: locale,
+            confirmed: slot.isConfirmed,
           ),
         if (hidden > 0)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(Radii.sm),
+              border: Border.all(
+                color: scheme.outlineVariant.withValues(alpha: 0.7),
+              ),
+            ),
             child: Text(
               'more_slots'.tr(namedArgs: {'count': '$hidden'}),
-              style: theme.textTheme.labelMedium?.copyWith(
+              style: theme.textTheme.labelSmall?.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
             ),
           ),
       ],
+    );
+  }
+}
+
+/// One offered time, as a two-line chip: the weekday and date above, the hour
+/// below. Confirmed times carry the success tint and a tick.
+class _SlotChip extends StatelessWidget {
+  const _SlotChip({
+    required this.slot,
+    required this.zoneId,
+    required this.locale,
+    required this.confirmed,
+  });
+
+  final TimeSlot slot;
+
+  /// The reader's zone, or null to fall back to the device's own.
+  final String? zoneId;
+  final String locale;
+  final bool confirmed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final app = context.appColors;
+    final tint = confirmed ? app.success : scheme.onSurfaceVariant;
+
+    final start = zoneId == null
+        ? slot.startAt.toLocal()
+        : appointmentTimeInZone(slot.startAt, zoneId!);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(Radii.sm),
+        color: confirmed
+            ? app.success.withValues(alpha: 0.12)
+            : scheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        border: Border.all(
+          color: confirmed
+              ? app.success.withValues(alpha: 0.45)
+              : Colors.transparent,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (confirmed) ...[
+                Icon(Icons.check_rounded, size: 11, color: app.success),
+                const SizedBox(width: 3),
+              ],
+              Text(
+                DateFormat.MMMEd(locale).format(start).toUpperCase(),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: tint,
+                  fontSize: 9,
+                  letterSpacing: 0.6,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 1),
+          Text(
+            DateFormat.jm(locale).format(start),
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: confirmed ? app.success : scheme.onSurface,
+              height: 1.1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

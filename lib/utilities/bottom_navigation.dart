@@ -118,11 +118,15 @@ class _BottomNavigationState extends State<BottomNavigation> {
     );
   }
 
-  Widget _cappedScale({required BuildContext context, required Widget child}) {
+  Widget _cappedScale({
+    required BuildContext context,
+    required Widget child,
+    double maxScale = 1.15,
+  }) {
     final media = MediaQuery.of(context);
     return MediaQuery(
       data: media.copyWith(
-        textScaler: media.textScaler.clamp(maxScaleFactor: 1.15),
+        textScaler: media.textScaler.clamp(maxScaleFactor: maxScale),
       ),
       child: child,
     );
@@ -137,8 +141,19 @@ class _BottomNavigationState extends State<BottomNavigation> {
           top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
         ),
       ),
+      // At the largest system font size "Appointments" broke across two lines
+      // and pushed its icon up out of the bar.
+      //
+      // It cannot be truncated from here. `NavigationDestination.label` is a
+      // String, and Flutter wraps it in its own `AnimatedDefaultTextStyle` with
+      // `overflow: clip`, which beats any ambient `DefaultTextStyle` this file
+      // could set — verified, not assumed. So the labels are held at their
+      // designed size instead. Page content still honours the reader's setting
+      // in full; only this strip of chrome is fixed, which is the trade every
+      // bottom bar with four labels ends up making.
       child: _cappedScale(
         context: context,
+        maxScale: 1,
         child: NavigationBar(
           selectedIndex: _currentIndex,
           onDestinationSelected: _onDestinationSelected,

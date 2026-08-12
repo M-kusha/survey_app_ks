@@ -15,7 +15,11 @@ import '../support/load_translations.dart';
 /// `RenderFlex children have non-zero flex but incoming width constraints are
 /// unbounded` — which is a red screen on the way in, on desktop only, so it does
 /// not show up on a phone or in a narrow test.
-Future<void> _pumpShell(WidgetTester tester, Size size) async {
+Future<void> _pumpShell(
+  WidgetTester tester,
+  Size size, {
+  double textScale = 1,
+}) async {
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
@@ -26,8 +30,14 @@ Future<void> _pumpShell(WidgetTester tester, Size size) async {
   await tester.pumpWidget(
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => FontSizeProvider())],
-      child: const MaterialApp(
-        home: BottomNavigation(
+      child: MaterialApp(
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
+        home: const BottomNavigation(
           pages: [
             Text('notes'),
             Text('meetings'),
@@ -71,5 +81,35 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.byType(NavigationRail), findsOneWidget);
+  });
+
+  testWidgets('the bottom bar holds its label size at any system scale', (
+    tester,
+  ) async {
+    // At the largest system font size "Appointments" wrapped onto two lines and
+    // pushed its icon up out of the bar. Truncation is not reachable: Flutter
+    // wraps the label in its own `AnimatedDefaultTextStyle` with
+    // `overflow: clip`, which beats any ambient `DefaultTextStyle`. Holding the
+    // scale is what keeps it on one line, so that is what gets pinned.
+    await _pumpShell(tester, const Size(400, 900), textScale: 3);
+
+    expect(tester.takeException(), isNull);
+
+    final scaler = MediaQuery.textScalerOf(
+      tester.element(find.byType(NavigationBar)),
+    );
+    expect(scaler.scale(12), 12);
+  });
+
+  testWidgets('page content still honours the reader font size', (
+    tester,
+  ) async {
+    // The cap is chrome-only. Scaling the whole app down to keep four labels
+    // tidy would be a bad trade, so this fails if the clamp ever leaks past the
+    // bar into the page.
+    await _pumpShell(tester, const Size(400, 900), textScale: 3);
+
+    final scaler = MediaQuery.textScalerOf(tester.element(find.text('notes')));
+    expect(scaler.scale(12), 36);
   });
 }

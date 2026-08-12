@@ -40,6 +40,15 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
   /// and for surveys, which have no right answer to mark.
   List<Set<int>> _answerKey = const [];
 
+  /// True while a test's answer key is still in flight.
+  ///
+  /// Without this the first frames of a test rendered as a survey: no key yet
+  /// means nothing is marked correct, which the option rows read as "just show
+  /// what they picked" — a blue tag. A quarter of a second later the key landed
+  /// and the whole list repainted red and green. Nothing was duplicated; the
+  /// screen was answering a question it did not have the data for yet.
+  late bool _answerKeyPending = _isTest;
+
   bool _saving = false;
 
   bool get _isTest => widget.survey.surveyType != SurveyType.survey;
@@ -72,8 +81,14 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
 
   Future<void> _loadAnswerKey() async {
     final key = await _service.fetchAnswerKeyIndexes(widget.survey.id);
-    if (!mounted || key.isEmpty) return;
-    setState(() => _answerKey = key);
+    if (!mounted) return;
+    // Cleared even when the read came back empty or was refused, so a test
+    // whose key cannot be loaded settles on "unmarked" instead of waiting for
+    // something that is never going to arrive.
+    setState(() {
+      if (key.isNotEmpty) _answerKey = key;
+      _answerKeyPending = false;
+    });
   }
 
   /// The answer key is the only source. Nothing here reads grading fields off
@@ -196,6 +211,7 @@ class _ParticipantAnswersPageState extends State<ParticipantAnswersPage> {
                         const [],
                     isTest: _isTest,
                     correct: _correctFor(i),
+                    keyPending: _answerKeyPending,
                     verdict: _participant
                         .textAnswersReviewed['${widget.survey.id}-${SurveyScorer.answerKey(i)}'],
                     busy: _saving,
@@ -327,6 +343,7 @@ class _QuestionCard extends StatelessWidget {
     required this.answer,
     required this.isTest,
     required this.correct,
+    required this.keyPending,
     required this.verdict,
     required this.busy,
     required this.onReview,
@@ -337,6 +354,9 @@ class _QuestionCard extends StatelessWidget {
   final List<dynamic> answer;
   final bool isTest;
   final Set<int> correct;
+
+  /// The answer key has not arrived yet, so no verdict can be shown.
+  final bool keyPending;
 
   final bool? verdict;
 
@@ -388,6 +408,7 @@ class _QuestionCard extends StatelessWidget {
                     answer: answer,
                     isTest: isTest,
                     correct: correct,
+                    keyPending: keyPending,
                   ),
           ),
         ],
@@ -402,12 +423,14 @@ class _Options extends StatelessWidget {
     required this.answer,
     required this.isTest,
     required this.correct,
+    required this.keyPending,
   });
 
   final Map<String, dynamic> question;
   final List<dynamic> answer;
   final bool isTest;
   final Set<int> correct;
+  final bool keyPending;
 
   @override
   Widget build(BuildContext context) {
@@ -419,9 +442,9 @@ class _Options extends StatelessWidget {
         .map((option) => '$option')
         .toList();
 
-    // Surveys have no right answer, and an empty key means it has not loaded
-    // yet or the caller was refused it. Either way, fall back to showing only
-    // what they picked rather than marking everything wrong.
+    // Surveys have no right answer, and a key that came back empty or refused
+    // means there is nothing to mark against. Either way, fall back to showing
+    // only what they picked rather than marking everything wrong.
     final graded = isTest && correct.isNotEmpty;
 
     return Column(
@@ -435,47 +458,58 @@ class _Options extends StatelessWidget {
             // `lostMark` is the red border: a point that was thrown away,
             // either by picking a wrong option or by leaving a right one
             // untouched. Both need to be findable at a glance.
-            final (color, icon, label, tone, lostMark) = switch ((
-              graded,
-              picked,
-              isRight,
-            )) {
-              (true, true, true) => (
-                app.success,
-                Icons.check_circle_rounded,
-                'chosen_correct',
-                StatusTone.positive,
-                false,
-              ),
-              (true, true, false) => (
-                scheme.error,
-                Icons.cancel_rounded,
-                'chosen_wrong',
-                StatusTone.danger,
-                true,
-              ),
-              (true, false, true) => (
-                app.success,
-                Icons.check_circle_outline_rounded,
-                'missed',
-                StatusTone.danger,
-                true,
-              ),
-              (false, true, _) => (
-                scheme.primary,
-                Icons.radio_button_checked_rounded,
-                'chosen',
-                StatusTone.info,
-                false,
-              ),
-              _ => (
-                scheme.outline,
-                Icons.radio_button_unchecked_rounded,
-                null,
-                StatusTone.neutral,
-                false,
-              ),
-            };
+            // A test whose key is still loading gets no verdict at all — not
+            // even the blue "their answer" a survey would show, which is what
+            // flashed for a quarter of a second before the real marking landed.
+            // A wrong answer shown confidently and corrected a moment later is
+            // worse than one shown a moment late.
+            final (color, icon, label, tone, lostMark) = keyPending
+                ? (
+                    scheme.outline,
+                    picked
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    null,
+                    StatusTone.neutral,
+                    false,
+                  )
+                : switch ((graded, picked, isRight)) {
+                    (true, true, true) => (
+                      app.success,
+                      Icons.check_circle_rounded,
+                      'chosen_correct',
+                      StatusTone.positive,
+                      false,
+                    ),
+                    (true, true, false) => (
+                      scheme.error,
+                      Icons.cancel_rounded,
+                      'chosen_wrong',
+                      StatusTone.danger,
+                      true,
+                    ),
+                    (true, false, true) => (
+                      app.success,
+                      Icons.check_circle_outline_rounded,
+                      'missed',
+                      StatusTone.danger,
+                      true,
+                    ),
+                    (false, true, _) => (
+                      scheme.primary,
+                      Icons.radio_button_checked_rounded,
+                      'chosen',
+                      StatusTone.info,
+                      false,
+                    ),
+                    _ => (
+                      scheme.outline,
+                      Icons.radio_button_unchecked_rounded,
+                      null,
+                      StatusTone.neutral,
+                      false,
+                    ),
+                  };
 
             final border = lostMark ? scheme.error : color;
 

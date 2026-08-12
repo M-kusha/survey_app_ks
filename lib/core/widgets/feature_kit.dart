@@ -67,6 +67,15 @@ class EmptyState extends StatelessWidget {
   }
 }
 
+/// A card. Its state, if any, is the colour of its outline.
+///
+/// There is deliberately no progress rule any more. A 2px part-filled line
+/// pinned to the bottom edge, inset from both corners, was read as a broken or
+/// half-drawn border every time somebody looked at it — and it was telling the
+/// reader something the card already says in words two lines above ("Closes
+/// Wed, Aug 19"), with the urgency already carried by the status pill's colour.
+/// A decoration that adds no information and looks like a rendering fault is
+/// just a rendering fault.
 class ContentCard extends StatelessWidget {
   const ContentCard({
     super.key,
@@ -75,21 +84,16 @@ class ContentCard extends StatelessWidget {
     this.accent,
     this.muted = false,
     this.padding = const EdgeInsets.all(Spacing.md),
-    this.progress,
   });
 
   final Widget child;
   final VoidCallback? onTap;
-
-  final double? progress;
 
   final Color? accent;
 
   final bool muted;
 
   final EdgeInsetsGeometry padding;
-
-  static const _inset = 18.0;
 
   @override
   Widget build(BuildContext context) {
@@ -128,75 +132,13 @@ class ContentCard extends StatelessWidget {
             ),
           ),
 
-          child: Stack(
-            children: [
-              Padding(padding: padding, child: child),
-
-              if (progress case final progress?)
-                Positioned(
-                  left: _inset,
-                  right: _inset,
-                  bottom: 0,
-                  height: 2,
-                  child: _ProgressRule(
-                    value: progress,
-                    color: accent ?? scheme.primary,
-                  ),
-                ),
-            ],
-          ),
+          child: Padding(padding: padding, child: child),
         ),
       ),
     );
   }
 }
 
-class _ProgressRule extends StatelessWidget {
-  const _ProgressRule({required this.value, required this.color});
-
-  final double value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final radius = BorderRadius.circular(2);
-
-    return LayoutBuilder(
-      builder: (context, constraints) => DecoratedBox(
-        // The track. Without it only the filled part was drawn, so a card 10%
-        // of the way through its window showed a short coloured stub floating
-        // at the bottom left with nothing behind it to say what it measured -
-        // which reads as a rendering artefact, not as progress.
-        decoration: BoxDecoration(
-          color: scheme.outlineVariant.withValues(alpha: 0.45),
-          borderRadius: radius,
-        ),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Container(
-            width: constraints.maxWidth * value.clamp(0.0, 1.0),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [color.withValues(alpha: 0.25), color],
-              ),
-              borderRadius: radius,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A vertical list of cards, one per row.
-///
-/// This briefly laid two columns out on wide windows to fill the space a single
-/// reading-width column leaves empty. Seen in the app that read as a grid rather
-/// than a list: two unrelated meetings side by side invite comparison that means
-/// nothing, and the eye has to choose a scan direction. One per row it is —
-/// what fixed the sparseness was giving the cards a visible edge, not doubling
-/// them up.
 class CardColumns extends StatelessWidget {
   const CardColumns({
     super.key,

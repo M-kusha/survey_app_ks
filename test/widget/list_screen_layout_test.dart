@@ -134,25 +134,28 @@ void main() {
     }
   });
 
-  testWidgets('a card with a deadline rule still lays out in a list', (
+  testWidgets('cards still lay out in a list without a deadline rule', (
     tester,
   ) async {
+    // `ContentCard` no longer takes a `progress`. The 2px part-filled line it
+    // drew along the bottom edge was read as a broken border, and it repeated
+    // the closing date the card already states in words — so it went, and this
+    // test keeps the layout it used to guard.
     await _pump(
       tester,
       ListView(
         children: [
-          for (final progress in [0.0, 0.4, 1.0])
+          for (final label in ['a', 'b', 'c'])
             ContentCard(
               accent: const Color(0xFF00FF00),
-              progress: progress,
-              child: Text('p $progress'),
+              child: Text('card $label'),
             ),
         ],
       ),
     );
 
     expect(tester.takeException(), isNull);
-    expect(find.text('p 0.4'), findsOneWidget);
+    expect(find.text('card b'), findsOneWidget);
   });
 
   testWidgets('the header, search pill and section label render together', (

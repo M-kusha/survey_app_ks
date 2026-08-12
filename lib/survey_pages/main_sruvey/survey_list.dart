@@ -86,7 +86,6 @@ class SurveyListItem extends StatelessWidget {
       onTap: open ? () => _openSurvey(context) : null,
       muted: !open,
       accent: accent,
-      progress: deadline.progress,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
