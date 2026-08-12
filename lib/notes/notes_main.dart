@@ -9,6 +9,7 @@ import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/notes/add_item_widget.dart';
 import 'package:echomeet/notes/detailed_notes.dart';
 import 'package:echomeet/notes/note_draft_store.dart';
+import 'package:echomeet/core/widgets/confirm_dialog.dart';
 import 'package:echomeet/notes/note_query.dart';
 import 'package:echomeet/notes/notes_logics.dart';
 import 'package:flutter/material.dart';
@@ -150,6 +151,21 @@ class TodoListState extends State<TodoList> {
   }
 
   Future<void> _delete(NoteItem note) async {
+    // Deleting used to happen the instant the icon was pressed, with only an
+    // undo snackbar to catch it. Undo is still there — the grace period is what
+    // lets other devices reconcile an offline deletion — but a note is somebody
+    // 's writing, and a mis-tap should not be the last word on it.
+    final confirmed = await confirmDestructive(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'delete_note'.tr(),
+      message: 'delete_note_confirm'.tr(
+        namedArgs: {'title': note.title.trim().isEmpty ? '—' : note.title},
+      ),
+      confirmLabel: 'delete'.tr(),
+    );
+    if (!confirmed || !mounted) return;
+
     final deletion = PendingNoteDeletion(
       noteId: note.id,
       // Other devices wait long enough for an offline undo to synchronize.

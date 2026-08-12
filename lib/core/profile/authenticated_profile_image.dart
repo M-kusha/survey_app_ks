@@ -88,18 +88,55 @@ class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
     }
   }
 
+  /// Says why nothing was drawn, in debug builds only.
+  ///
+  /// Rendering nothing on failure is deliberate — a private object must never
+  /// fall back to a network image — but it also means every failure looks
+  /// identical to "no photo set": a blank avatar over the initials, with no way
+  /// to tell a rules denial from an unreachable bucket from a path this build
+  /// refuses to resolve. Release builds stay silent; a storage path is not
+  /// something to print in front of a user.
+  void _explain(Object reason) {
+    assert(() {
+      debugPrint(
+        'EchoMeet: profile image not shown for "${widget.storedReference}" — '
+        '$reason',
+      );
+      return true;
+    }());
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Uint8List?>(
       future: _bytes,
       builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox.shrink();
+        }
+        if (snapshot.error case final error?) {
+          _explain(error);
+          return const SizedBox.shrink();
+        }
         final bytes = snapshot.data;
-        if (bytes == null || bytes.isEmpty) return const SizedBox.shrink();
+        if (bytes == null) {
+          // `profileImageReference` refused the stored value: a path outside
+          // this bucket, or one that is not an EchoMeet avatar.
+          _explain('the stored reference did not resolve to an avatar object');
+          return const SizedBox.shrink();
+        }
+        if (bytes.isEmpty) {
+          _explain('the stored object is empty');
+          return const SizedBox.shrink();
+        }
         return Image.memory(
           bytes,
           fit: widget.fit,
           gaplessPlayback: true,
-          errorBuilder: (context, error, stackTrace) => const SizedBox.shrink(),
+          errorBuilder: (context, error, stackTrace) {
+            _explain('the bytes are not a decodable image ($error)');
+            return const SizedBox.shrink();
+          },
         );
       },
     );

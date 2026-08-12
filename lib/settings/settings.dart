@@ -379,9 +379,11 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
 
         if (_isSuperAdmin && inCompany)
           SettingsTile(
+            // `domain_disabled` is a building with a slash through it, which
+            // reads as "no building" rather than "wind this company down".
             icon: membership!.isClosing
-                ? Icons.undo_rounded
-                : Icons.domain_disabled_outlined,
+                ? Icons.restore_rounded
+                : Icons.business_center_outlined,
             title: membership.isClosing
                 ? 'cancel_deletion'.tr()
                 : 'close_company'.tr(),

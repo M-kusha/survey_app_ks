@@ -168,6 +168,19 @@ class DeferredOnboardingGate extends StatefulWidget {
 }
 
 class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
+  /// The account this gate has already cleared, for this run of the app.
+  ///
+  /// The gate wraps every protected route, so it remounts on each navigation.
+  /// Without this it repeated a Firestore read and flashed the full-screen
+  /// "Finishing registration" panel on the way into settings, the survey list
+  /// and every wizard step — long enough to see, too short to read, and
+  /// meaningless to somebody who registered weeks ago.
+  ///
+  /// Keyed by uid rather than a bare flag, so signing in as a different account
+  /// is checked properly. Onboarding happens once per account, so a resolved
+  /// uid stays resolved.
+  static String? _resolvedForUid;
+
   final _service = DeferredOnboardingService();
   final _companyNameController = TextEditingController();
 
@@ -175,13 +188,19 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
   OnboardingFailure? _failure;
   List<OnboardingCompanyOption> _companies = const [];
   String? _selectedCompanyId;
-  bool _loading = true;
-  bool _completed = false;
+  late bool _loading = !_alreadyResolved;
+  late bool _completed = _alreadyResolved;
+
+  bool get _alreadyResolved {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    return uid != null && uid == _resolvedForUid;
+  }
 
   @override
   void initState() {
     super.initState();
     _companyNameController.addListener(_nameChanged);
+    if (_completed) return;
     unawaited(_resume());
   }
 
@@ -241,6 +260,9 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
 
   void _finish() {
     FirebaseServices.invalidateCache();
+    // Remember for the rest of this run, so navigating anywhere else does not
+    // repeat the read or show the panel again.
+    _resolvedForUid = FirebaseAuth.instance.currentUser?.uid;
     if (!mounted) return;
     setState(() {
       _completed = true;
