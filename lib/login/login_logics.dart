@@ -104,7 +104,7 @@ class AuthManager {
     }
     try {
       await _auth.signOut();
-      await UserPreferences.clearSession();
+      await UserPreferences.endSession();
       FirebaseServices.invalidateCache();
       // Avatar bytes are cached on the device. They are keyed per user so they
       // could never be served to the wrong account, but leaving one person's

@@ -20,7 +20,7 @@ void main() {
     expect(service, isNot(contains('.updateEmail(')));
   });
 
-  test('startup sync runs after fresh Auth and before the profile read', () {
+  test('the verified-email sync only ever runs on a freshly minted token', () {
     final source = File(
       'lib/register/deferred_onboarding.dart',
     ).readAsStringSync();
@@ -30,16 +30,36 @@ void main() {
     final sync = source.indexOf(
       'await _emailChangeService.syncAfterAuthenticationRefresh()',
     );
-    final profile = source.indexOf(
-      "_firestore.collection('users').doc(user.uid).get()",
-    );
+
     expect(reload, greaterThanOrEqualTo(0));
     expect(token, greaterThan(reload));
     expect(sync, greaterThan(token));
-    expect(profile, greaterThan(sync));
     expect(
-      source.substring(sync, profile),
+      source.substring(sync, sync + 200),
       contains('OnboardingFailure.retryable'),
+      reason: 'a failed sync must still stop sign-in with a retryable failure',
+    );
+  });
+
+  test('a returning member is not held behind the onboarding round trips', () {
+    final source = File(
+      'lib/register/deferred_onboarding.dart',
+    ).readAsStringSync();
+
+    final read = source.indexOf('await _readIntent(user.uid)');
+    final reload = source.indexOf('await user.reload()');
+
+    expect(
+      read,
+      allOf(greaterThanOrEqualTo(0), lessThan(reload)),
+      reason:
+          'the pending-onboarding read has to come first, or every sign-in '
+          'waits on a reload, a forced token refresh and an email-sync '
+          'callable it does not need',
+    );
+    expect(
+      source.substring(read, reload),
+      contains('unawaited(_refreshVerifiedSession())'),
     );
   });
 

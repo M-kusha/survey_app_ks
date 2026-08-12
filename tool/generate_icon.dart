@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -28,7 +29,7 @@ void main() {
 
   /// Which mark to ship. The others stay in the file as the record of what was
   /// considered — deleting them just means the next person re-invents them.
-  const chosen = _Mark.overlap;
+  const chosen = _Mark.echo;
 
   test('generates the icon sources', () async {
     await _write('assets/icon/icon.png', size, (canvas) {
@@ -76,6 +77,10 @@ void main() {
 }
 
 enum _Mark {
+  /// The mark the app itself draws: an arc and its echo. Shipping anything else
+  /// here means the icon and the product disagree about what the logo is.
+  echo,
+
   /// Two circles meeting, with the lens between them lit. What the app does:
   /// find the time a group can all make, the answers a company shares.
   overlap,
@@ -95,6 +100,8 @@ enum _Mark {
     canvas.translate(-size / 2, -size / 2);
 
     switch (this) {
+      case _Mark.echo:
+        _paintEcho(canvas, size);
       case _Mark.overlap:
         _paintOverlap(canvas, size);
       case _Mark.tally:
@@ -105,6 +112,36 @@ enum _Mark {
 
     canvas.restore();
   }
+}
+
+void _paintEcho(Canvas canvas, double size) {
+  const degree = math.pi / 180;
+
+  // The same geometry BrandMark paints, in the same proportions, so the icon and
+  // the mark in the rail are one drawing at two sizes. Heavier here: an icon is
+  // seen at 48px against a wallpaper, where the widget's weight thins out.
+  // BrandMark's ratios, not guessed ones: stroke half the inner radius, outer
+  // radius 1.9x the inner. At a heavier stroke the inner arc fills in and the
+  // mark reads as a solid kidney shape instead of an arc.
+  final weight = size * 0.079;
+  final centre = Offset(size * 0.308, size / 2);
+
+  Paint strokeAt(double alpha) => Paint()
+    ..color = Colors.white.withValues(alpha: alpha)
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = weight
+    ..strokeCap = StrokeCap.round;
+
+  void arc(double radiusFactor, double alpha) => canvas.drawArc(
+    Rect.fromCircle(center: centre, radius: size * radiusFactor),
+    -58 * degree,
+    116 * degree,
+    false,
+    strokeAt(alpha),
+  );
+
+  arc(0.300, 0.5);
+  arc(0.158, 1);
 }
 
 void _paintOverlap(Canvas canvas, double size) {

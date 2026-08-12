@@ -38,4 +38,9 @@ class UserPreferences {
       _prefs.remove(_keyRememberMe),
     ]);
   }
+
+  static Future<void> endSession() async {
+    if (getRememberMe()) return;
+    await clearSession();
+  }
 }

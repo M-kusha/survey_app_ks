@@ -80,6 +80,12 @@ class DeferredOnboardingService {
       );
     }
 
+    final intent = await _readIntent(user.uid);
+    if (intent == null && user.emailVerified) {
+      unawaited(_refreshVerifiedSession());
+      return null;
+    }
+
     await user.reload();
     final refreshed = _auth.currentUser;
     if (refreshed?.emailVerified != true) {
@@ -94,7 +100,18 @@ class DeferredOnboardingService {
       throw const OnboardingCompletionException(OnboardingFailure.retryable);
     }
 
-    final snapshot = await _firestore.collection('users').doc(user.uid).get();
+    return intent ?? await _readIntent(refreshed.uid);
+  }
+
+  Future<void> _refreshVerifiedSession() async {
+    try {
+      await _auth.currentUser?.getIdToken(true);
+      await _emailChangeService.syncAfterAuthenticationRefresh();
+    } catch (_) {}
+  }
+
+  Future<DeferredOnboardingIntent?> _readIntent(String uid) async {
+    final snapshot = await _firestore.collection('users').doc(uid).get();
     final data = snapshot.data();
     final type = data?['pendingOnboardingType'];
     if (type == 'createCompany') {
@@ -328,20 +345,26 @@ class _DeferredOnboardingGateState extends State<DeferredOnboardingGate> {
     );
   }
 
-  Widget _loadingView() => Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      const CircularProgressIndicator(),
-      const SizedBox(height: Spacing.lg),
-      Text(
-        'finishing_registration'.tr(),
-        textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleLarge,
-      ),
-      const SizedBox(height: Spacing.sm),
-      Text('finishing_registration_body'.tr(), textAlign: TextAlign.center),
-    ],
-  );
+  Widget _loadingView() {
+    final finishing = _intent != null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const CircularProgressIndicator(),
+        const SizedBox(height: Spacing.lg),
+        Text(
+          (finishing ? 'finishing_registration' : 'signing_in').tr(),
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (finishing) ...[
+          const SizedBox(height: Spacing.sm),
+          Text('finishing_registration_body'.tr(), textAlign: TextAlign.center),
+        ],
+      ],
+    );
+  }
 
   Widget _resolver() {
     final failure = _failure ?? OnboardingFailure.retryable;

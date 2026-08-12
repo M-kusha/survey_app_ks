@@ -29,22 +29,22 @@ CompanyActivity contentActivity(
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('survey and test creation are explicit in EN, DE and SQ', () async {
+  test('survey and quiz creation are explicit in EN, DE and SQ', () async {
     const expected = {
       'en': (
         survey: 'Ada created the survey “Quarterly planning”',
         test:
-            'Ada created the test “Quarterly planning” and marked its correct answers',
+            'Ada created the quiz “Quarterly planning” and marked its correct answers',
       ),
       'de': (
         survey: 'Ada hat die Umfrage „Quarterly planning“ erstellt',
         test:
-            'Ada hat den Test „Quarterly planning“ erstellt und die richtigen Antworten festgelegt',
+            'Ada hat das Quiz „Quarterly planning“ erstellt und die richtigen Antworten festgelegt',
       ),
       'sq': (
         survey: 'Ada krijoi anketën “Quarterly planning”',
         test:
-            'Ada krijoi testin “Quarterly planning” dhe shënoi përgjigjet e sakta',
+            'Ada krijoi kuizin “Quarterly planning” dhe shënoi përgjigjet e sakta',
       ),
     };
 

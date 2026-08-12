@@ -43,8 +43,22 @@ class LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
-    _useBiometricAuthentication = UserPreferences.getBiometricAuthEnabled();
     _restoreRememberedUser();
+    _resolveBiometricOffer();
+  }
+
+  Future<void> _resolveBiometricOffer() async {
+    if (!UserPreferences.getBiometricAuthEnabled() ||
+        FirebaseAuth.instance.currentUser == null) {
+      return;
+    }
+
+    final service = AuthService();
+    final usable =
+        await service.canCheckBiometrics() && await service.isDeviceSupported();
+    if (!mounted || !usable) return;
+
+    setState(() => _useBiometricAuthentication = true);
   }
 
   @override
