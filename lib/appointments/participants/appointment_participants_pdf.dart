@@ -3,11 +3,13 @@ import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/participants/participant_overview.dart';
 import 'package:echomeet/appointments/utilities/vote_tally.dart';
 import 'package:echomeet/core/time/appointment_time.dart';
+import 'package:echomeet/core/time/device_time_zone.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/pdf_kit.dart';
 import 'package:echomeet/survey_pages/admin/print_pages/pdf_viewer_page.dart';
 import 'package:flutter/widgets.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:provider/provider.dart';
 
 /// The participants page as a printable roll call.
 ///
@@ -27,16 +29,23 @@ class AppointmentParticipantsPdf extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final locale = Localizations.localeOf(context).toLanguageTag();
+    // The zone the person exporting is reading in, so the printed times match
+    // the ones they just looked at on screen.
+    final viewerZone = context.watch<DeviceTimeZone?>()?.zoneId;
 
     return PdfViewerPage(
       title: 'export_participants'.tr(),
       fileName: pdfFileNameFrom([appointment.title, 'all_participants'.tr()]),
-      build: (format) => buildDocument(format, locale),
+      build: (format) => buildDocument(format, locale, viewerZone: viewerZone),
     );
   }
 
   @visibleForTesting
-  Future<pw.Document> buildDocument(PdfPageFormat format, String locale) async {
+  Future<pw.Document> buildDocument(
+    PdfPageFormat format,
+    String locale, {
+    String? viewerZone,
+  }) async {
     final pdf = pw.Document(theme: await PdfKit.theme());
     final slots = appointment.availableTimeSlots;
     final total = overview.rows.length;
@@ -48,7 +57,7 @@ class AppointmentParticipantsPdf extends StatelessWidget {
           title: appointment.title,
           subtitle:
               '${DateFormat.yMMMd(locale).format(DateTime.now())} · '
-              '${'appointment_organizer_time'.tr()}: ${appointment.zoneId}',
+              '${viewerZone ?? appointment.zoneId}',
         ),
         footer: PdfKit.footer,
         build: (context) => [
@@ -66,8 +75,18 @@ class AppointmentParticipantsPdf extends StatelessWidget {
             ),
             PdfKit.stat('time_slots'.tr(), '${slots.length}'),
           ]),
-          for (final slot in slots) ..._slotSection(slot, locale),
-          if (overview.awaitingCount > 0) ..._awaitingSection(),
+          // Every time starts its own page. The list for one slot is the thing
+          // an organizer actually uses — printed and taken to that meeting, or
+          // sent to the people in it — and that is only true if it can be
+          // separated from the others without a pair of scissors.
+          for (final (index, slot) in slots.indexed) ...[
+            if (index > 0) pw.NewPage(),
+            ..._slotSection(slot, locale, viewerZone),
+          ],
+          if (overview.awaitingCount > 0) ...[
+            pw.NewPage(),
+            ..._awaitingSection(),
+          ],
         ],
       ),
     );
@@ -75,7 +94,7 @@ class AppointmentParticipantsPdf extends StatelessWidget {
     return pdf;
   }
 
-  List<pw.Widget> _slotSection(TimeSlot slot, String locale) {
+  List<pw.Widget> _slotSection(TimeSlot slot, String locale, String? viewer) {
     final totals = overview.totalsBySlotId[slot.slotId];
     final byStatus = <VoteStatus, List<ParticipantRow>>{};
     for (final row in overview.rows) {
@@ -83,20 +102,30 @@ class AppointmentParticipantsPdf extends StatelessWidget {
       if (status != null) (byStatus[status] ??= []).add(row);
     }
 
+    String at(String? zone) => formatAppointmentRange(
+      startAt: slot.startAt,
+      endAt: slot.endAt,
+      zoneId: zone,
+      locale: locale,
+    );
+
+    final here = at(viewer);
+    final there = at(appointment.zoneId);
+
     return [
+      // The exporter's own time leads, as it does on screen. A printed page
+      // travels, so the zone is always named rather than left implied - and
+      // the organizer's reading is added only when it differs, which is the
+      // one case where the two are not interchangeable.
       _heading(
-        // Only the organizer's zone. A printed page travels away from the
-        // device that made it, so "your time" would name a reader we cannot
-        // know; the zone and offset are stated instead.
-        '${formatAppointmentRange(
-          startAt: slot.startAt,
-          endAt: slot.endAt,
-          zoneId: appointment.zoneId,
-          locale: locale,
-        )} '
-        '(${appointmentUtcOffset(slot.startAt, appointment.zoneId)})',
+        '$here (${viewer ?? appointment.zoneId})',
         confirmed: slot.isConfirmed,
       ),
+      if (here != there)
+        _note(
+          '${'appointment_organizer_time'.tr()}: $there '
+          '(${appointment.zoneId})',
+        ),
       if (totals != null && totals.responses == 0)
         _note('nobody_voted_yet'.tr())
       else

@@ -234,14 +234,17 @@ class _SlotStrip extends StatelessWidget {
     final shown = ordered.take(_maxShown).toList();
     final hidden = ordered.length - shown.length;
 
-    return Wrap(
-      spacing: Spacing.sm,
-      runSpacing: Spacing.sm,
+    // One time per line. These used to wrap, so two short slots shared a row
+    // and a third sat alone underneath - a ragged block that read as a single
+    // run-on string rather than as a list of times you can scan down.
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         for (final slot in shown)
           Container(
-            constraints: const BoxConstraints(maxWidth: 480),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            margin: const EdgeInsets.only(bottom: Spacing.xs),
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(Radii.sm),
               color: slot.isConfirmed
@@ -271,6 +274,9 @@ class _SlotStrip extends StatelessWidget {
                           : scheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
+                    // A list card has room for the time, not for a second line
+                    // naming the organizer's zone. The vote page shows that.
+                    showOrganizerZone: false,
                   ),
                 ),
               ],

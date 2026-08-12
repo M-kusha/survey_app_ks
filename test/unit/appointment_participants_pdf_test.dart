@@ -5,6 +5,7 @@ import 'package:echomeet/appointments/utilities/vote_tally.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 TimeSlot _slot(int index) => TimeSlot(
   slotId: 'slot-$index',
@@ -34,6 +35,38 @@ AppointmentParticipants _vote(String userId, String slotId, VoteStatus status) =
       status: status.wireName,
       participated: true,
     );
+
+Future<pw.Document> _document({
+  required int slotCount,
+  required int memberCount,
+  required bool vote,
+  String? viewerZone,
+}) async {
+  final slots = [for (var i = 0; i < slotCount; i++) _slot(i)];
+  final names = {
+    for (var i = 0; i < memberCount; i++) 'user-$i': 'Person $i',
+  };
+  final overview = buildParticipantOverview(
+    slots: slots,
+    votes: [
+      if (vote)
+        for (var i = 0; i < memberCount; i++)
+          for (final slot in slots)
+            _vote(
+              'user-$i',
+              slot.slotId,
+              VoteStatus.values[(i + slots.indexOf(slot)) % 3],
+            ),
+    ],
+    memberNames: names,
+    unknownName: 'Unknown',
+  );
+
+  return AppointmentParticipantsPdf(
+    appointment: _appointment(slots),
+    overview: overview,
+  ).buildDocument(PdfPageFormat.a4, 'en', viewerZone: viewerZone);
+}
 
 Future<int> _renderedBytes({
   required int slotCount,
@@ -97,6 +130,28 @@ void main() {
       await _renderedBytes(slotCount: 1, memberCount: 0, vote: false),
       greaterThan(0),
     );
+  });
+
+  test('each time gets its own page, so one slot can be handed out', () async {
+    // The list for a single time is what an organizer actually uses — printed
+    // and taken to that meeting. Running two slots down one page defeats that.
+    final document = await _document(
+      slotCount: 3,
+      memberCount: 2,
+      vote: true,
+    );
+
+    expect(document.document.pdfPageList.pages, hasLength(3));
+  });
+
+  test('people still awaited are their own page, not a footnote', () async {
+    final document = await _document(
+      slotCount: 2,
+      memberCount: 3,
+      vote: false,
+    );
+
+    expect(document.document.pdfPageList.pages, hasLength(3));
   });
 
   test('paginates the largest meeting the schema allows', () async {

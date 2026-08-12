@@ -7,98 +7,146 @@ import 'package:provider/provider.dart';
 
 import '../support/load_translations.dart';
 
+Future<DeviceTimeZone> _zone(
+  WidgetTester tester,
+  String Function() reported,
+) async {
+  final deviceTimeZone = DeviceTimeZone(
+    loader: () async => reported(),
+    startAutomatically: false,
+  );
+  addTearDown(deviceTimeZone.dispose);
+  await deviceTimeZone.refresh();
+  return deviceTimeZone;
+}
+
+Future<void> _pump(
+  WidgetTester tester,
+  DeviceTimeZone deviceTimeZone, {
+  required DateTime startAt,
+  required DateTime endAt,
+  String organizerZone = 'Europe/Berlin',
+  bool showOrganizerZone = true,
+}) async {
+  await tester.pumpWidget(
+    ChangeNotifierProvider<DeviceTimeZone>.value(
+      value: deviceTimeZone,
+      child: MaterialApp(
+        home: Scaffold(
+          body: AppointmentTimeText(
+            startAt: startAt,
+            endAt: endAt,
+            zoneId: organizerZone,
+            showOrganizerZone: showOrganizerZone,
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+List<String> _lines(WidgetTester tester) => tester
+    .widgetList<Text>(find.byType(Text))
+    .map((text) => text.data)
+    .whereType<String>()
+    .toList();
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     await loadAppTranslations();
   });
 
-  testWidgets('viewer time refreshes when the reported IANA zone changes', (
+  testWidgets('the reader in the organizer zone sees one unlabelled time', (
     tester,
   ) async {
-    var reportedZone = 'Europe/Berlin';
-    final deviceTimeZone = DeviceTimeZone(
-      loader: () async => reportedZone,
-      startAutomatically: false,
-    );
-    addTearDown(deviceTimeZone.dispose);
-    await deviceTimeZone.refresh();
-
-    await tester.pumpWidget(
-      ChangeNotifierProvider<DeviceTimeZone>.value(
-        value: deviceTimeZone,
-        child: MaterialApp(
-          home: Scaffold(
-            body: AppointmentTimeText(
-              startAt: DateTime.utc(2026, 8, 10, 9),
-              endAt: DateTime.utc(2026, 8, 10, 10),
-              zoneId: 'Europe/Berlin',
-            ),
-          ),
-        ),
-      ),
+    // The whole point of the change: no "Your time:" prefix and no second line
+    // repeating the identical clock reading back at them.
+    final deviceTimeZone = await _zone(tester, () => 'Europe/Berlin');
+    await _pump(
+      tester,
+      deviceTimeZone,
+      startAt: DateTime.utc(2026, 8, 10, 9),
+      endAt: DateTime.utc(2026, 8, 10, 10),
     );
 
-    expect(_lineStartingWith(tester, 'Your time:'), contains('11:00'));
-    expect(
-      _lineStartingWith(tester, 'Your time:'),
-      contains('(Europe/Berlin, UTC+02:00)'),
+    final lines = _lines(tester);
+    expect(lines, hasLength(1));
+    expect(lines.single, contains('11:00'));
+    expect(lines.single, isNot(contains('Europe/Berlin')));
+  });
+
+  testWidgets('a reader elsewhere sees their own time, then the organizer’s', (
+    tester,
+  ) async {
+    var reported = 'Europe/Berlin';
+    final deviceTimeZone = await _zone(tester, () => reported);
+    await _pump(
+      tester,
+      deviceTimeZone,
+      startAt: DateTime.utc(2026, 8, 10, 9),
+      endAt: DateTime.utc(2026, 8, 10, 10),
     );
 
-    reportedZone = 'America/New_York';
+    reported = 'America/New_York';
     await deviceTimeZone.refresh();
     await tester.pump();
 
-    expect(_lineStartingWith(tester, 'Your time:'), contains('5:00'));
-    expect(
-      _lineStartingWith(tester, 'Your time:'),
-      contains('(America/New_York, UTC-04:00)'),
-    );
-    expect(_lineStartingWith(tester, 'Organizer time:'), contains('11:00'));
+    final lines = _lines(tester);
+    expect(lines, hasLength(2));
+    // Converted to the reader's clock, and it is the line that leads.
+    expect(lines.first, contains('5:00'));
+    expect(lines.first, isNot(contains('11:00')));
+    // The organizer's reading is kept, because "nine o'clock" is ambiguous
+    // across zones and somebody has to say whose nine.
+    expect(lines.last, contains('11:00'));
+    expect(lines.last, contains('Europe/Berlin'));
   });
 
-  testWidgets('fall-back crossing labels both endpoint offsets', (
+  testWidgets('a compact caller can suppress the organizer line', (
     tester,
   ) async {
-    final deviceTimeZone = DeviceTimeZone(
-      loader: () async => 'Europe/Berlin',
-      startAutomatically: false,
+    final deviceTimeZone = await _zone(tester, () => 'America/New_York');
+    await _pump(
+      tester,
+      deviceTimeZone,
+      startAt: DateTime.utc(2026, 8, 10, 9),
+      endAt: DateTime.utc(2026, 8, 10, 10),
+      showOrganizerZone: false,
     );
-    addTearDown(deviceTimeZone.dispose);
-    await deviceTimeZone.refresh();
+
+    expect(_lines(tester), hasLength(1));
+  });
+
+  testWidgets('a meeting across the clock change still warns about it', (
+    tester,
+  ) async {
+    // Losing this would let a meeting read as an hour longer than it runs.
+    final deviceTimeZone = await _zone(tester, () => 'Europe/Berlin');
     final startAt = resolveAppointmentWallTime(
       zoneId: 'Europe/Berlin',
       wallTime: DateTime.utc(2026, 10, 25, 2, 30),
     ).instants.first;
 
-    await tester.pumpWidget(
-      ChangeNotifierProvider<DeviceTimeZone>.value(
-        value: deviceTimeZone,
-        child: MaterialApp(
-          home: Scaffold(
-            body: AppointmentTimeText(
-              startAt: startAt,
-              endAt: startAt.add(const Duration(hours: 1)),
-              zoneId: 'Europe/Berlin',
-            ),
-          ),
-        ),
-      ),
+    await _pump(
+      tester,
+      deviceTimeZone,
+      startAt: startAt,
+      endAt: startAt.add(const Duration(hours: 1)),
     );
 
-    expect(
-      _lineStartingWith(tester, 'Your time:'),
-      contains('UTC+02:00 → UTC+01:00'),
+    expect(_lines(tester).first, contains('UTC+02:00 → UTC+01:00'));
+  });
+
+  testWidgets('an ordinary meeting carries no offset clutter', (tester) async {
+    final deviceTimeZone = await _zone(tester, () => 'Europe/Berlin');
+    await _pump(
+      tester,
+      deviceTimeZone,
+      startAt: DateTime.utc(2026, 8, 10, 9),
+      endAt: DateTime.utc(2026, 8, 10, 10),
     );
-    expect(
-      _lineStartingWith(tester, 'Organizer time:'),
-      contains('UTC+02:00 → UTC+01:00'),
-    );
+
+    expect(_lines(tester).single, isNot(contains('UTC')));
   });
 }
-
-String _lineStartingWith(WidgetTester tester, String prefix) => tester
-    .widgetList<Text>(find.byType(Text))
-    .map((text) => text.data)
-    .whereType<String>()
-    .singleWhere((text) => text.startsWith(prefix));
