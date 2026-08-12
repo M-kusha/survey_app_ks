@@ -1,11 +1,21 @@
 import { getAuth } from 'firebase-admin/auth';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import {
+  activityTitle,
+  companyActivityDocument,
+  type CompanyActivityEntity,
+  type CompanyActivityInput,
+} from './activity_log';
 
 type EntityType = 'survey' | 'appointment';
 type ErrorCode = 'invalid-argument' | 'failed-precondition' |
   'permission-denied' | 'not-found';
 type DeleteRequest = { entityType: EntityType; entityId: string };
-type DeleteTarget = DeleteRequest & { parentPath: string };
+type DeleteTarget = DeleteRequest & {
+  parentPath: string;
+  companyId: string;
+  entity: CompanyActivityEntity;
+};
 interface DeletionTransaction {
   get(path: string): Promise<Record<string, unknown> | undefined>;
   update(path: string, data: Record<string, unknown>): void;
@@ -15,7 +25,10 @@ export type ContentDeletionDependencies = {
   runTransaction?: <T>(work: (transaction: DeletionTransaction) => Promise<T>) => Promise<T>;
   deleteParticipants?: (parentPath: string) => Promise<void>;
   participantsRemain?: (parentPath: string) => Promise<boolean>;
-  commitFinalDeletes?: (paths: string[]) => Promise<void>;
+  commitFinalDeletes?: (
+    paths: string[],
+    activity: CompanyActivityInput,
+  ) => Promise<void>;
   nowMillis?: () => number;
 };
 export type DeleteContentResult = DeleteRequest & { deleted: true };
@@ -98,7 +111,19 @@ async function establishBarrier(
         deletionStartedAt: Timestamp.fromMillis(nowMillis),
       });
     }
-    return { ...request, parentPath };
+    return {
+      ...request,
+      parentPath,
+      companyId,
+      entity: {
+        type: request.entityType === 'appointment' ? 'appointment'
+          : target.surveyType === 1 ? 'test' : 'survey',
+        id: request.entityId,
+        title: activityTitle(
+          request.entityType === 'survey' ? target.surveyName : target.title,
+        ),
+      },
+    };
   });
 }
 
@@ -115,9 +140,14 @@ async function participantsRemain(parentPath: string): Promise<boolean> {
   return !(await getFirestore().collection(`${parentPath}/participants`)
     .limit(1).get()).empty;
 }
-async function commitFinalDeletes(paths: string[]): Promise<void> {
+async function commitFinalDeletes(
+  paths: string[],
+  activity: CompanyActivityInput,
+): Promise<void> {
   const db = getFirestore();
   const batch = db.batch();
+  const activityDocument = companyActivityDocument(activity);
+  batch.create(db.doc(activityDocument.path), activityDocument.event);
   for (const path of paths) batch.delete(db.doc(path));
   await batch.commit();
 }
@@ -154,9 +184,22 @@ export async function deleteContentForUser(
   if (await (dependencies.participantsRemain ?? participantsRemain)(target.parentPath)) {
     throw new Error('Content descendants remain after deletion sweep.');
   }
-  await (dependencies.commitFinalDeletes ?? commitFinalDeletes)([
-    ...(request.entityType === 'survey' ? [`surveyAnswerKeys/${request.entityId}`] : []),
-    target.parentPath,
-  ]);
+  await (dependencies.commitFinalDeletes ?? commitFinalDeletes)(
+    [
+      ...(request.entityType === 'survey'
+        ? [`surveyAnswerKeys/${request.entityId}`]
+        : []),
+      target.parentPath,
+    ],
+    {
+      id: `${request.entityType}-deleted-${request.entityId}`,
+      companyId: target.companyId,
+      action: request.entityType === 'survey' ? 'survey.deleted'
+        : 'appointment.deleted',
+      actorUid: uid,
+      entity: target.entity,
+      occurredAt: Timestamp.fromMillis(nowMillis),
+    },
+  );
   return { ...request, deleted: true };
 }

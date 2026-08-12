@@ -127,9 +127,9 @@ class SurveyDataProvider extends ChangeNotifier {
               return;
             }
 
-            final nextSurveys = snapshot.docs
-                .map((doc) => Survey.fromFirestore(doc.data()))
-                .toList();
+            final nextSurveys = readSurveySnapshot(
+              snapshot.docs.map((doc) => doc.data()),
+            );
             final nextRevisions = {
               for (final survey in nextSurveys)
                 survey.id: survey.responsesRevision,
@@ -541,6 +541,44 @@ class SurveyDataProvider extends ChangeNotifier {
     unawaited(_participantMembersSubscription?.cancel());
     super.dispose();
   }
+}
+
+/// Reads the independently useful rows in a survey-list snapshot.
+///
+/// A trusted deletion first stamps the parent with [deletionStartedAt], then
+/// clears its descendants and removes it. The stamped survey must leave the
+/// list immediately. Any other unreadable document is isolated to that row so
+/// it cannot keep the previous complete list on screen by throwing out of the
+/// stream callback before assignment and notification.
+List<Survey> readSurveySnapshot(
+  Iterable<Map<String, dynamic>> documents, {
+  void Function(Object error)? onUnreadable,
+}) {
+  final surveys = <Survey>[];
+  for (final document in documents) {
+    try {
+      if (document.containsKey('deletionStartedAt')) {
+        if (document['deletionStartedAt'] is! Timestamp) {
+          throw const FormatException('Survey deletion state is invalid.');
+        }
+        continue;
+      }
+      surveys.add(Survey.fromFirestore(document));
+    } on Object catch (error) {
+      // The try/catch is deliberately limited to decoding this one Firestore
+      // row. In particular, TypeError from a malformed Timestamp or collection
+      // cast is data-local and must not terminate the list listener.
+      (onUnreadable ?? _reportUnreadableSurvey)(error);
+    }
+  }
+  return surveys;
+}
+
+void _reportUnreadableSurvey(Object error) {
+  assert(() {
+    debugPrint('Skipped an unreadable survey: $error');
+    return true;
+  }());
 }
 
 enum UserRole { admin, moderator, user }

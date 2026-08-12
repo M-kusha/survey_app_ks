@@ -1,5 +1,6 @@
 import { getAuth } from 'firebase-admin/auth';
 import { Timestamp, getFirestore } from 'firebase-admin/firestore';
+import { activityTitle, writeCompanyActivity } from './activity_log';
 
 const limits = {
   deadline: 253_402_300_799_999,
@@ -247,6 +248,24 @@ export async function saveSurveyDefinitionForUser(
       surveyId: request.surveyId,
       companyId,
       questionKeys: request.definition.questionKeys,
+    });
+    // A test and a survey are the same document with different consequences, so
+    // the log distinguishes them. The marked answers are written in the same
+    // transaction as the questions and cannot be edited afterwards, so this one
+    // event covers "created" and "answers marked" both.
+    writeCompanyActivity(transaction, {
+      id: `survey-created-${request.surveyId}`,
+      companyId,
+      action: 'survey.created',
+      actorUid: uid,
+      entity: {
+        // 1 is a graded test, 0 a plain survey — the same encoding the
+        // document itself stores.
+        type: definition.surveyType === 1 ? 'test' : 'survey',
+        id: request.surveyId,
+        title: activityTitle(definition.surveyName),
+      },
+      occurredAt: Timestamp.fromMillis(nowMillis),
     });
     return { surveyId: request.surveyId };
   });

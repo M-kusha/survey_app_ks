@@ -81,6 +81,53 @@ void main() {
     expect(appointment.confirmedSlotId, isNull);
   });
 
+  test(
+    'confirmation uses the trusted callable with the current revision',
+    () async {
+      late Map<String, dynamic> captured;
+      final service = AppointmentService(
+        definitionCallable: (payload) async {
+          captured = payload;
+          return {'appointmentId': 'appointment-a', 'revision': 8};
+        },
+      );
+      final slot = definition().availableTimeSlots.single;
+
+      expect(
+        await service.confirmTimeSlot(
+          'appointment-a',
+          slot,
+          expectedRevision: 7,
+        ),
+        8,
+      );
+      expect(captured, {
+        'action': 'confirm',
+        'appointmentId': 'appointment-a',
+        'expectedRevision': 7,
+        'slotId': 'slot-a',
+      });
+    },
+  );
+
+  test('confirmation rejects an inconsistent callable receipt', () async {
+    final service = AppointmentService(
+      definitionCallable: (_) async => {
+        'appointmentId': 'other-appointment',
+        'revision': 8,
+      },
+    );
+
+    expect(
+      service.confirmTimeSlot(
+        'appointment-a',
+        definition().availableTimeSlots.single,
+        expectedRevision: 7,
+      ),
+      throwsA(isA<StateError>()),
+    );
+  });
+
   test('invalid callable results fail closed', () async {
     final service = AppointmentService(
       appointmentIdFactory: () => 'appointment-a',

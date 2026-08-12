@@ -108,6 +108,7 @@ class Appointment {
     this.revision = 0,
     this.confirmedSlotId,
     this.participantUserIds = const [],
+    this.isBeingDeleted = false,
   }) : expirationAt = canonicalAppointmentInstant(expirationDate),
        createdAt = canonicalAppointmentInstant(creationDate) {
     _applyConfirmation();
@@ -127,6 +128,14 @@ class Appointment {
   int revision;
   String? confirmedSlotId;
   List<String> participantUserIds;
+
+  /// Set while the server is taking this appointment apart.
+  ///
+  /// Deletion is two-phase: the callable stamps the parent, clears the votes,
+  /// then removes the parent. Between the stamp and the removal the document is
+  /// still readable and still matches every list query, so anything showing it
+  /// has to know it is on its way out and drop it.
+  final bool isBeingDeleted;
 
   DateTime get expirationDate => expirationAt.toLocal();
   set expirationDate(DateTime value) {
@@ -151,24 +160,36 @@ class Appointment {
   }
 
   factory Appointment.fromFirestore(Map<String, dynamic> map) {
-    if (!_hasExactKeys(map, const {
-          'schemaVersion',
-          'revision',
-          'appointmentId',
-          'companyId',
-          'createdBy',
-          'title',
-          'description',
-          'zoneId',
-          'expirationAt',
-          'slots',
-          'slotIds',
-          'confirmedSlotId',
-          'participantUserIds',
-          'createdAt',
-        }) ||
+    if (!_hasExactKeys(
+          map,
+          const {
+            'schemaVersion',
+            'revision',
+            'appointmentId',
+            'companyId',
+            'createdBy',
+            'title',
+            'description',
+            'zoneId',
+            'expirationAt',
+            'slots',
+            'slotIds',
+            'confirmedSlotId',
+            'participantUserIds',
+            'createdAt',
+          },
+          optional: const {'deletionStartedAt'},
+        ) ||
         map['schemaVersion'] != schemaVersion) {
       throw const FormatException('Unsupported appointment schema.');
+    }
+    // Only its presence is read. The instant is the server's own bookkeeping for
+    // resuming an interrupted delete, and nothing on screen has any use for it.
+    // Still validate it: a value with the right field name but the wrong wire
+    // type is an unreadable document, not a legitimate deletion barrier.
+    final isBeingDeleted = map.containsKey('deletionStartedAt');
+    if (isBeingDeleted && map['deletionStartedAt'] is! Timestamp) {
+      throw const FormatException('Appointment deletion state is invalid.');
     }
     final rawConfirmedSlotId = map['confirmedSlotId'];
     if (rawConfirmedSlotId != null && rawConfirmedSlotId is! String) {
@@ -235,6 +256,7 @@ class Appointment {
       revision: revision,
       confirmedSlotId: confirmedSlotId,
       participantUserIds: List<String>.from(rawParticipants),
+      isBeingDeleted: isBeingDeleted,
     );
   }
 
@@ -351,5 +373,16 @@ DateTime _requiredTimestamp(Map<String, dynamic> map, String key) {
 
 final _identifier = RegExp(r'^[A-Za-z0-9_-]{1,128}$');
 
-bool _hasExactKeys(Map<String, dynamic> map, Set<String> expected) =>
-    map.length == expected.length && expected.every(map.containsKey);
+/// Whether [map] carries exactly [expected], allowing only [optional] extras.
+///
+/// The strictness is the point: an unexpected field means the writer and this
+/// reader disagree, and guessing is how a half-migrated document gets shown as
+/// if it were whole. [optional] is for the fields the server owns and adds on
+/// its own schedule, which are absent far more often than they are present.
+bool _hasExactKeys(
+  Map<String, dynamic> map,
+  Set<String> expected, {
+  Set<String> optional = const {},
+}) =>
+    expected.every(map.containsKey) &&
+    map.keys.every((key) => expected.contains(key) || optional.contains(key));

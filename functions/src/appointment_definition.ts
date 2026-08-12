@@ -1,5 +1,6 @@
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { activityTitle, writeCompanyActivity } from './activity_log';
 
 const maxMillis = 253_402_300_799_999;
 const parentKeys = [
@@ -23,7 +24,7 @@ type Definition = {
   expirationAtMillis: number;
   slots: Slot[];
 };
-type SaveRequest =
+type DefinitionRequest =
   | { action: 'create'; appointmentId: string; definition: Definition }
   | {
       action: 'update';
@@ -32,6 +33,13 @@ type SaveRequest =
       reopenVoting: boolean;
       definition: Definition;
     };
+type ConfirmRequest = {
+  action: 'confirm';
+  appointmentId: string;
+  expectedRevision: number;
+  slotId: string;
+};
+type SaveRequest = DefinitionRequest | ConfirmRequest;
 type StoredSlot = { slotId: string; startAt: Timestamp; endAt: Timestamp };
 type StoredAppointment = {
   revision: number;
@@ -64,6 +72,7 @@ interface AppointmentTransaction {
   list(path: string): Promise<Record<string, unknown>[]>;
   create(path: string, data: Record<string, unknown>): void;
   set(path: string, data: Record<string, unknown>): void;
+  update(path: string, data: Record<string, unknown>): void;
 }
 export type AppointmentDefinitionDependencies = {
   runTransaction?: <T>(work: (transaction: AppointmentTransaction) => Promise<T>) => Promise<T>;
@@ -148,17 +157,26 @@ function parseRequest(raw: unknown): SaveRequest {
   if (!record(raw)) return fail('invalid-argument', 'appointment-request-invalid');
   try {
     const appointmentId = identifier(raw.appointmentId);
-    const definition = parseDefinition(raw.definition);
     if (raw.action === 'create' && exact(raw, ['action', 'appointmentId', 'definition'])) {
-      return { action: 'create', appointmentId, definition };
+      return { action: 'create', appointmentId, definition: parseDefinition(raw.definition) };
     }
     if (raw.action === 'update' && exact(raw, [
       'action', 'appointmentId', 'expectedRevision', 'reopenVoting', 'definition',
     ]) && typeof raw.reopenVoting === 'boolean') {
       return {
-        action: 'update', appointmentId, definition,
+        action: 'update', appointmentId, definition: parseDefinition(raw.definition),
         expectedRevision: integer(raw.expectedRevision, 1, Number.MAX_SAFE_INTEGER - 1),
         reopenVoting: raw.reopenVoting,
+      };
+    }
+    if (raw.action === 'confirm' && exact(raw, [
+      'action', 'appointmentId', 'expectedRevision', 'slotId',
+    ])) {
+      return {
+        action: 'confirm',
+        appointmentId,
+        expectedRevision: integer(raw.expectedRevision, 1, Number.MAX_SAFE_INTEGER - 1),
+        slotId: identifier(raw.slotId),
       };
     }
   } catch {
@@ -182,6 +200,7 @@ async function runFirestoreTransaction<T>(
     },
     create: (path, data) => transaction.create(firestore.doc(path), data),
     set: (path, data) => transaction.set(firestore.doc(path), data),
+    update: (path, data) => transaction.update(firestore.doc(path), data),
   }));
 }
 
@@ -256,7 +275,7 @@ function readStoredAppointment(
 }
 
 function canonicalDocument(
-  request: SaveRequest,
+  request: DefinitionRequest,
   companyId: string,
   revision: number,
   createdBy: string,
@@ -313,19 +332,68 @@ export async function saveAppointmentDefinitionForUser(
     const companyId = await authorizedCompany(transaction, uid);
     const nowMillis = (dependencies.nowMillis ?? Date.now)();
     if (!Number.isSafeInteger(nowMillis) || nowMillis < 0) throw new Error('Invalid server clock.');
+
+    const path = `appointments/${request.appointmentId}`;
+    const existingData = await transaction.get(path);
+    if (request.action === 'confirm') {
+      if (!existingData) fail('not-found', 'appointment-not-found');
+      const existing = readStoredAppointment(existingData, request.appointmentId);
+      if (existing.companyId !== companyId) {
+        fail('permission-denied', 'appointment-company-mismatch');
+      }
+      if (existing.revision !== request.expectedRevision) {
+        fail('aborted', 'appointment-revision-conflict');
+      }
+      const slot = existing.slots.find((candidate) => candidate.slotId === request.slotId);
+      if (!slot) fail('not-found', 'appointment-slot-not-found');
+      if (existing.confirmedSlotId != null) {
+        fail('failed-precondition', 'appointment-slot-already-confirmed');
+      }
+
+      const revision = existing.revision + 1;
+      transaction.update(path, {
+        confirmedSlotId: request.slotId,
+        revision,
+      });
+      writeCompanyActivity(transaction, {
+        id: `appointment-slot-confirmed-${request.appointmentId}-r${revision}`,
+        companyId,
+        action: 'appointment.slot_confirmed',
+        actorUid: uid,
+        entity: {
+          type: 'appointment',
+          id: request.appointmentId,
+          title: activityTitle(existingData.title),
+        },
+        occurredAt: Timestamp.fromMillis(nowMillis),
+        after: { confirmedStartAt: slot.startAt },
+      });
+      return { appointmentId: request.appointmentId, revision };
+    }
+
     const earliestStart = request.definition.slots[0].startAtMillis;
     if (request.definition.expirationAtMillis <= nowMillis ||
         request.definition.expirationAtMillis >= earliestStart) {
       fail('invalid-argument', 'appointment-deadline-invalid');
     }
 
-    const path = `appointments/${request.appointmentId}`;
-    const existingData = await transaction.get(path);
     if (request.action === 'create') {
       if (existingData) fail('already-exists', 'appointment-id-conflict');
       transaction.create(path, canonicalDocument(
         request, companyId, 1, uid, Timestamp.fromMillis(nowMillis), null, [],
       ));
+      writeCompanyActivity(transaction, {
+        id: `appointment-created-${request.appointmentId}`,
+        companyId,
+        action: 'appointment.created',
+        actorUid: uid,
+        entity: {
+          type: 'appointment',
+          id: request.appointmentId,
+          title: activityTitle(request.definition.title),
+        },
+        occurredAt: Timestamp.fromMillis(nowMillis),
+      });
       return { appointmentId: request.appointmentId, revision: 1 };
     }
 
@@ -373,6 +441,20 @@ export async function saveAppointmentDefinitionForUser(
       request, companyId, revision, existing.createdBy, existing.createdAt,
       confirmedSlotId, existing.participantUserIds,
     ));
+    // Keyed by the revision it produced. Each edit is its own event, and a
+    // retried edit lands on the event it already wrote.
+    writeCompanyActivity(transaction, {
+      id: `appointment-updated-${request.appointmentId}-r${revision}`,
+      companyId,
+      action: 'appointment.updated',
+      actorUid: uid,
+      entity: {
+        type: 'appointment',
+        id: request.appointmentId,
+        title: activityTitle(request.definition.title),
+      },
+      occurredAt: Timestamp.fromMillis(nowMillis),
+    });
     return { appointmentId: request.appointmentId, revision };
   });
 }

@@ -1359,7 +1359,7 @@ describe('voting on an appointment', () => {
     );
   });
 
-  it('allows only a null-to-offered-slot confirmation with revision +1', async () => {
+  it('reserves every slot confirmation for the trusted callable', async () => {
     const ref = doc(as(ADA), 'appointments', appt());
 
     await assertFails(updateDoc(ref, { confirmedSlotId: slot.slotId }));
@@ -1369,7 +1369,7 @@ describe('voting on an appointment', () => {
     await assertFails(
       updateDoc(ref, { confirmedSlotId: slot.slotId, revision: 3 }),
     );
-    await assertSucceeds(
+    await assertFails(
       updateDoc(ref, { confirmedSlotId: slot.slotId, revision: 2 }),
     );
 
@@ -1602,12 +1602,12 @@ describe('voting on an appointment', () => {
       voteId(BOB),
     );
     await assertSucceeds(setDoc(selfRef, voteDocument(BOB)));
-    await assertSucceeds(
-      updateDoc(doc(as(ADA), 'appointments', appt()), {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await updateDoc(doc(ctx.firestore(), 'appointments', appt()), {
         confirmedSlotId: slot.slotId,
         revision: 2,
-      }),
-    );
+      });
+    });
 
     await assertFails(deleteDoc(selfRef));
     await assertSucceeds(

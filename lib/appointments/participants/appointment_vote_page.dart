@@ -307,6 +307,7 @@ class _AppointmentVotePageState extends State<AppointmentVotePage> {
       final revision = await _service.confirmTimeSlot(
         _appointment.appointmentId,
         slot,
+        expectedRevision: _appointment.revision,
       );
       if (!mounted) return;
       setState(() {
@@ -599,4 +600,3 @@ class _Notice extends StatelessWidget {
     );
   }
 }
-

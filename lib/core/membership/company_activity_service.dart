@@ -12,6 +12,7 @@ class CompanyActivity {
     required this.before,
     required this.after,
     this.targetUid,
+    this.entity,
   });
 
   final String id;
@@ -23,25 +24,30 @@ class CompanyActivity {
   final Map<String, dynamic> before;
   final Map<String, dynamic> after;
 
+  /// What a content event was about. Null for every membership event.
+  final CompanyActivityEntity? entity;
+
   static CompanyActivity? fromData({
     required String id,
     required Map<String, dynamic> data,
   }) {
+    if (!_validId(id, maxLength: 400)) return null;
     const topLevelFields = {
       'schemaVersion',
       'companyId',
       'action',
       'actorUid',
       'targetUid',
+      'entity',
       'occurredAt',
       'before',
       'after',
     };
     if (data.keys.any((key) => !topLevelFields.contains(key))) return null;
 
-    final companyId = _string(data['companyId']);
-    final action = _string(data['action']);
-    final actorUid = _string(data['actorUid']);
+    final companyId = _id(data['companyId']);
+    final action = data['action'];
+    final actorUid = _id(data['actorUid']);
     final occurredAt = data['occurredAt'] is Timestamp
         ? (data['occurredAt'] as Timestamp).toDate()
         : null;
@@ -58,51 +64,69 @@ class CompanyActivity {
       'company.created',
       'company.ownership_transferred',
       'account.email_changed',
+      ...contentActions,
     };
     if (data['schemaVersion'] != 1 ||
-        companyId.isEmpty ||
+        companyId == null ||
+        action is! String ||
         !actions.contains(action) ||
-        actorUid.isEmpty ||
+        actorUid == null ||
         occurredAt == null) {
       return null;
     }
 
     final targetValue = data['targetUid'];
-    if (targetValue != null &&
-        (targetValue is! String || targetValue.trim().isEmpty)) {
-      return null;
-    }
-    final before = _changeMap(data['before']);
-    final after = _changeMap(data['after']);
+    final target = targetValue == null ? null : _id(targetValue);
+    if (data.containsKey('targetUid') && target == null) return null;
+    final before = data.containsKey('before')
+        ? _changeMap(data['before'])
+        : const <String, dynamic>{};
+    final after = data.containsKey('after')
+        ? _changeMap(data['after'])
+        : const <String, dynamic>{};
     if (before == null || after == null) return null;
 
-    final target = targetValue is String ? targetValue.trim() : '';
-    const targetActions = {
-      'member.approved',
-      'member.role_changed',
-      'member.banned',
-      'member.unbanned',
-      'member.removed',
-      'member.company_data_erased',
-      'company.ownership_transferred',
-    };
-    if (targetActions.contains(action) && target.isEmpty) return null;
+    // A content event without its subject cannot be described, and a membership
+    // event carrying one came from something this build does not understand.
+    // Both are dropped rather than shown as a half-sentence.
+    final entity = CompanyActivityEntity.fromData(data['entity']);
+    if (data.containsKey('entity') != (entity != null)) return null;
+    if (contentActions.contains(action) != (entity != null)) return null;
+    if (!_validActionShape(
+      action: action,
+      actorUid: actorUid,
+      targetUid: target,
+      entity: entity,
+      hasBefore: data.containsKey('before'),
+      before: before,
+      hasAfter: data.containsKey('after'),
+      after: after,
+    )) {
+      return null;
+    }
     return CompanyActivity(
       id: id,
       companyId: companyId,
       action: action,
       actorUid: actorUid,
-      targetUid: target.isEmpty ? null : target,
+      targetUid: target,
       occurredAt: occurredAt,
       before: before,
       after: after,
+      entity: entity,
     );
   }
 
-  static String _string(Object? value) => value is String ? value.trim() : '';
+  static String? _id(Object? value) =>
+      value is String && _validId(value, maxLength: 128) ? value : null;
+
+  static bool _validId(String value, {required int maxLength}) =>
+      value.isNotEmpty &&
+      value.length <= maxLength &&
+      value == value.trim() &&
+      !value.contains('/');
 
   static Map<String, dynamic>? _changeMap(Object? value) {
-    if (value == null) return const {};
     if (value is! Map) return null;
 
     final result = <String, dynamic>{};
@@ -124,8 +148,172 @@ class CompanyActivity {
       value is String && const {'open', 'approval'}.contains(value),
     'ownerUid' => value is String && value.trim().isNotEmpty,
     'deletionScheduledFor' => value is Timestamp,
+    'confirmedStartAt' => value is Timestamp,
     _ => false,
   };
+
+  static bool _validActionShape({
+    required String action,
+    required String actorUid,
+    required String? targetUid,
+    required CompanyActivityEntity? entity,
+    required bool hasBefore,
+    required Map<String, dynamic> before,
+    required bool hasAfter,
+    required Map<String, dynamic> after,
+  }) {
+    // Every action that names a target is an administrative change performed
+    // on somebody else. Self-service activity (such as email change) has no
+    // target field at all.
+    if (targetUid == actorUid) return false;
+
+    bool state(Map<String, dynamic> value, Map<String, Object> expected) =>
+        value.length == expected.length &&
+        expected.entries.every((entry) => value[entry.key] == entry.value);
+    bool oneOf(String key, Map<String, dynamic> value, Set<String> values) =>
+        value.length == 1 && values.contains(value[key]);
+    const memberships = {'active', 'pending'};
+    const roles = {'user', 'moderator', 'admin', 'superadmin'};
+    final noTarget = targetUid == null;
+    final noState = !hasBefore && !hasAfter;
+
+    return switch (action) {
+      'member.approved' =>
+        targetUid != null &&
+            hasBefore &&
+            state(before, const {'membership': 'pending'}) &&
+            hasAfter &&
+            state(after, const {'membership': 'active'}),
+      'member.role_changed' =>
+        targetUid != null &&
+            hasBefore &&
+            oneOf('role', before, roles) &&
+            hasAfter &&
+            oneOf('role', after, roles) &&
+            before['role'] != after['role'],
+      'member.banned' =>
+        targetUid != null &&
+            hasBefore &&
+            oneOf('membership', before, memberships) &&
+            hasAfter &&
+            state(after, const {'membership': 'pending'}),
+      'member.unbanned' =>
+        targetUid != null &&
+            (noState ||
+                (hasBefore &&
+                    state(before, const {'membership': 'pending'}) &&
+                    hasAfter &&
+                    oneOf('membership', after, memberships))),
+      'member.removed' || 'member.company_data_erased' =>
+        targetUid != null &&
+            (action == 'member.company_data_erased' && noState ||
+                hasBefore &&
+                    before.length == 2 &&
+                    roles.contains(before['role']) &&
+                    memberships.contains(before['membership']) &&
+                    hasAfter &&
+                    state(after, const {
+                      'role': 'user',
+                      'membership': 'active',
+                    })),
+      'company.join_policy_changed' =>
+        noTarget &&
+            hasBefore &&
+            oneOf('joinPolicy', before, const {'open', 'approval'}) &&
+            hasAfter &&
+            oneOf('joinPolicy', after, const {'open', 'approval'}) &&
+            before['joinPolicy'] != after['joinPolicy'],
+      'company.deletion_scheduled' =>
+        noTarget &&
+            !hasBefore &&
+            hasAfter &&
+            after.length == 1 &&
+            after['deletionScheduledFor'] is Timestamp,
+      'company.deletion_cancelled' =>
+        noTarget &&
+            hasBefore &&
+            before.length == 1 &&
+            before['deletionScheduledFor'] is Timestamp &&
+            !hasAfter,
+      'company.created' =>
+        noTarget &&
+            !hasBefore &&
+            hasAfter &&
+            state(after, {'ownerUid': actorUid}),
+      'company.ownership_transferred' =>
+        targetUid != null &&
+            hasBefore &&
+            state(before, {'ownerUid': actorUid}) &&
+            hasAfter &&
+            state(after, {'ownerUid': targetUid}),
+      'account.email_changed' => noTarget && noState,
+      'survey.created' || 'survey.deleted' =>
+        noTarget && noState && const {'survey', 'test'}.contains(entity?.type),
+      'appointment.created' || 'appointment.updated' || 'appointment.deleted' =>
+        noTarget && noState && entity?.type == 'appointment',
+      'appointment.slot_confirmed' =>
+        noTarget &&
+            !hasBefore &&
+            hasAfter &&
+            after.length == 1 &&
+            after['confirmedStartAt'] is Timestamp &&
+            entity?.type == 'appointment',
+      _ => false,
+    };
+  }
+}
+
+/// The events that are about a survey, a test or an appointment.
+///
+/// Kept in one place because three things key off it: which actions parse at
+/// all, which of them must name a subject, and which must not name a member.
+const contentActions = {
+  'survey.created',
+  'survey.deleted',
+  'appointment.created',
+  'appointment.updated',
+  'appointment.deleted',
+  'appointment.slot_confirmed',
+};
+
+@immutable
+class CompanyActivityEntity {
+  const CompanyActivityEntity({
+    required this.type,
+    required this.id,
+    required this.title,
+  });
+
+  /// 'survey', 'test' or 'appointment'.
+  final String type;
+  final String id;
+
+  /// The title as it stood when the event was written.
+  ///
+  /// Deliberately a copy rather than a live lookup: for deleted content there is
+  /// nothing left to look up, and for edited content the log should say what was
+  /// acted on at the time, not what it is called now.
+  final String title;
+
+  static CompanyActivityEntity? fromData(Object? value) {
+    if (value is! Map) return null;
+    if (value.length != 3 ||
+        value.keys.any((key) => !const {'type', 'id', 'title'}.contains(key))) {
+      return null;
+    }
+    final type = value['type'];
+    final id = value['id'];
+    final title = value['title'];
+    if (!const {'survey', 'test', 'appointment'}.contains(type) ||
+        id is! String ||
+        !CompanyActivity._validId(id, maxLength: 128) ||
+        title is! String ||
+        title.length > 120 ||
+        title != title.trim()) {
+      return null;
+    }
+    return CompanyActivityEntity(type: type as String, id: id, title: title);
+  }
 }
 
 @immutable
@@ -186,10 +374,30 @@ class CompanyActivityService {
       .where('companyId', isEqualTo: companyId)
       .snapshots()
       .map((snapshot) {
-        return Map.unmodifiable({
-          for (final member in snapshot.docs)
-            if ((member.data()['fullName'] as String? ?? '').trim().isNotEmpty)
-              member.id: (member.data()['fullName'] as String).trim(),
-        });
+        final names = <String, String>{};
+        for (final member in snapshot.docs) {
+          final name = safeActivityMemberName(member.data()['fullName']);
+          if (name != null) names[member.id] = name;
+        }
+        return Map.unmodifiable(names);
       });
+}
+
+/// Normalizes a directory name before it appears in the immutable audit view.
+///
+/// Newlines and Unicode direction controls can make one row look like several
+/// rows or reorder its sentence. Ignoring malformed or implausibly long values
+/// also means one bad directory document cannot terminate the names stream.
+String? safeActivityMemberName(Object? value) {
+  if (value is! String || value.length > 160) return null;
+  final normalized = value
+      .replaceAll(
+        RegExp(
+          r'[\u0000-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2060-\u206f\ufeff]',
+        ),
+        ' ',
+      )
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  return normalized.isEmpty ? null : normalized;
 }

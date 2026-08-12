@@ -43,6 +43,7 @@ class MemoryStore {
       },
       create: (path, data) => writes.push({ kind: 'create', path, data: copy(data) }),
       set: (path, data) => writes.push({ kind: 'set', path, data: copy(data) }),
+      update: (path, data) => writes.push({ kind: 'update', path, data: copy(data) }),
     };
     const result = await operation(transaction);
     if (this.failCommit) throw new Error('injected-commit-failure');
@@ -51,7 +52,12 @@ class MemoryStore {
       if (write.kind === 'create' && next.has(write.path)) {
         throw new Error(`already exists: ${write.path}`);
       }
-      next.set(write.path, write.data);
+      if (write.kind === 'update') {
+        if (!next.has(write.path)) throw new Error(`not found: ${write.path}`);
+        next.set(write.path, { ...next.get(write.path), ...write.data });
+      } else {
+        next.set(write.path, write.data);
+      }
     }
     this.documents = next;
     return result;
@@ -91,6 +97,8 @@ class ConcurrentVoteStore extends MemoryStore {
         writes.push({ kind: 'create', path, data: copy(data) }),
       set: (path, data) =>
         writes.push({ kind: 'set', path, data: copy(data) }),
+      update: (path, data) =>
+        writes.push({ kind: 'update', path, data: copy(data) }),
     };
     const result = await operation(transaction);
 
@@ -105,7 +113,14 @@ class ConcurrentVoteStore extends MemoryStore {
       if (write.kind === 'create' && this.documents.has(write.path)) {
         throw new Error(`already exists: ${write.path}`);
       }
-      this.set(write.path, write.data);
+      if (write.kind === 'update') {
+        if (!this.documents.has(write.path)) {
+          throw new Error(`not found: ${write.path}`);
+        }
+        this.set(write.path, { ...this.get(write.path), ...write.data });
+      } else {
+        this.set(write.path, write.data);
+      }
     }
     return result;
   }
@@ -147,6 +162,13 @@ function updateRequest(expectedRevision, overrides = {}) {
   return {
     action: 'update', appointmentId, expectedRevision, reopenVoting: false,
     definition: definition(), ...overrides,
+  };
+}
+
+function confirmRequest(expectedRevision, overrides = {}) {
+  return {
+    action: 'confirm', appointmentId, expectedRevision, slotId: 'slot_early',
+    ...overrides,
   };
 }
 
@@ -200,6 +222,17 @@ test('creates the exact canonical v2 Timestamp document sorted by instant', asyn
   assert.deepEqual(appointment.participantUserIds, []);
   assert.equal('expirationDate' in appointment, false);
   assert.equal(JSON.stringify(appointment).includes('T00:'), false);
+  assert.deepEqual(
+    store.get(`companies/${companyId}/activity/appointment-created-${appointmentId}`),
+    {
+      schemaVersion: 1,
+      companyId,
+      action: 'appointment.created',
+      actorUid: uid,
+      entity: { type: 'appointment', id: appointmentId, title: 'Planning' },
+      occurredAt: Timestamp.fromMillis(nowMillis),
+    },
+  );
 });
 
 test('enforces strict server now < expirationAt < earliest startAt boundaries', async () => {
@@ -303,6 +336,19 @@ test('update is revision-safe, preserves identity and rejects retained slot reti
   assert.equal(edited.confirmedSlotId, 'slot_early');
   assert.deepEqual(edited.participantUserIds, ['voter_1']);
   assert.deepEqual(store.collectionReads, []);
+  assert.deepEqual(
+    store.get(`companies/${companyId}/activity/appointment-updated-${appointmentId}-r3`),
+    {
+      schemaVersion: 1,
+      companyId,
+      action: 'appointment.updated',
+      actorUid: uid,
+      entity: {
+        type: 'appointment', id: appointmentId, title: 'Edited planning',
+      },
+      occurredAt: Timestamp.fromMillis(nowMillis),
+    },
+  );
 
   await expectDefinitionError(
     () => saveAppointmentDefinitionForUser(uid, updateRequest(2), dependencies(store)),
@@ -316,6 +362,101 @@ test('update is revision-safe, preserves identity and rejects retained slot reti
       uid, updateRequest(3, { definition: retimed }), dependencies(store),
     ),
     'invalid-argument', 'appointment-slot-id-reused',
+  );
+});
+
+test('confirms one offered slot and records its trusted actor atomically', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  await createAppointment(store);
+
+  assert.deepEqual(
+    await saveAppointmentDefinitionForUser(
+      uid, confirmRequest(1), dependencies(store),
+    ),
+    { appointmentId, revision: 2 },
+  );
+  const appointment = store.get(`appointments/${appointmentId}`);
+  assert.equal(appointment.confirmedSlotId, 'slot_early');
+  assert.equal(appointment.revision, 2);
+  assert.deepEqual(
+    store.get(
+      `companies/${companyId}/activity/appointment-slot-confirmed-${appointmentId}-r2`,
+    ),
+    {
+      schemaVersion: 1,
+      companyId,
+      action: 'appointment.slot_confirmed',
+      actorUid: uid,
+      entity: { type: 'appointment', id: appointmentId, title: 'Planning' },
+      occurredAt: Timestamp.fromMillis(nowMillis),
+      after: { confirmedStartAt: Timestamp.fromMillis(nowMillis + 120_000) },
+    },
+  );
+});
+
+test('confirmation fails closed for stale, absent and already-set slots', async () => {
+  for (const [request, code, message, prepare] of [
+    [confirmRequest(2), 'aborted', 'appointment-revision-conflict'],
+    [
+      confirmRequest(1, { slotId: 'missing' }),
+      'not-found',
+      'appointment-slot-not-found',
+    ],
+    [
+      confirmRequest(1),
+      'failed-precondition',
+      'appointment-slot-already-confirmed',
+      (appointment) => { appointment.confirmedSlotId = 'slot_late'; },
+    ],
+    [
+      confirmRequest(1),
+      'failed-precondition',
+      'appointment-state-invalid',
+      (appointment) => {
+        appointment.deletionStartedAt = Timestamp.fromMillis(nowMillis);
+      },
+    ],
+  ]) {
+    const store = new MemoryStore();
+    seedStaff(store);
+    await createAppointment(store);
+    const path = `appointments/${appointmentId}`;
+    const appointment = store.get(path);
+    prepare?.(appointment);
+    store.set(path, appointment);
+
+    await expectDefinitionError(
+      () => saveAppointmentDefinitionForUser(uid, request, dependencies(store)),
+      code,
+      message,
+    );
+    assert.equal(store.get(path).revision, 1);
+    assert.equal(
+      [...store.documents.keys()].some((candidate) =>
+        candidate.includes('/activity/appointment-slot-confirmed-')),
+      false,
+    );
+  }
+});
+
+test('a failed confirmation commit changes neither appointment nor activity', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  await createAppointment(store);
+  store.failCommit = true;
+
+  await assert.rejects(
+    () => saveAppointmentDefinitionForUser(
+      uid, confirmRequest(1), dependencies(store),
+    ),
+    /injected-commit-failure/,
+  );
+  assert.equal(store.get(`appointments/${appointmentId}`).confirmedSlotId, null);
+  assert.equal(
+    [...store.documents.keys()].some((path) =>
+      path.includes('/activity/appointment-slot-confirmed-')),
+    false,
   );
 });
 

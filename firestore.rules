@@ -865,22 +865,6 @@ service cloud.firestore {
           );
       }
 
-      function validDirectConfirmation() {
-        return validAppointmentDocument(resource.data)
-          && validAppointmentDocument(request.resource.data)
-          && !('deletionStartedAt' in resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'confirmedSlotId', 'revision'
-          ])
-          && request.resource.data.diff(resource.data).affectedKeys().hasAll([
-            'confirmedSlotId', 'revision'
-          ])
-          && resource.data.confirmedSlotId == null
-          && request.resource.data.confirmedSlotId is string
-          && request.resource.data.confirmedSlotId in resource.data.slotIds
-          && request.resource.data.revision == resource.data.revision + 1;
-      }
-
       function appointmentAcceptsVotes(data) {
         return validAppointmentDocument(data)
           && !('deletionStartedAt' in data)
@@ -903,9 +887,9 @@ service cloud.firestore {
 
       // Staff may only make the one latency-sensitive transition directly.
       // Clearing/reopening and all content edits return to the callable.
-      allow update: if accountActive()
-        && adminOf(resource.data.companyId)
-        && validDirectConfirmation();
+      // Definition edits and confirmation are trusted-only so the immutable
+      // activity entry and the appointment revision change commit together.
+      allow update: if false;
 
       // Participant ids are stable '<uid>-<slotId>' keys.
       match /participants/{participantId} {

@@ -123,13 +123,21 @@ class AppointmentService {
             : Appointment.fromFirestore(data).confirmedTimeSlots;
       });
 
+  /// The one appointment, or null once it is gone — including while it is going.
+  ///
+  /// An appointment mid-deletion still reads, so a page watching this would
+  /// otherwise sit on a live-looking screen whose votes are being cleared under
+  /// it. Reporting it as absent lets the page do what it already does for a
+  /// deleted appointment.
   Stream<Appointment?> watchAppointment(String appointmentId) => _db
       .collection('appointments')
       .doc(appointmentId)
       .snapshots()
       .map((snapshot) {
         final data = snapshot.data();
-        return data == null ? null : Appointment.fromFirestore(data);
+        if (data == null) return null;
+        final appointment = Appointment.fromFirestore(data);
+        return appointment.isBeingDeleted ? null : appointment;
       });
 
   Stream<List<AppointmentParticipants>> watchParticipants(
@@ -188,35 +196,21 @@ class AppointmentService {
 
   Future<int> confirmTimeSlot(
     String appointmentId,
-    TimeSlot timeSlotToConfirm,
-  ) {
-    final docRef = _db.collection('appointments').doc(appointmentId);
-
-    return _db.runTransaction<int>((transaction) async {
-      final snapshot = await transaction.get(docRef);
-      final data = snapshot.data();
-      if (data == null) throw StateError('Appointment not found.');
-
-      final slotIds = List<String>.from(data['slotIds'] as List? ?? const []);
-      if (!slotIds.contains(timeSlotToConfirm.slotId)) {
-        throw StateError('Time slot not found in appointment.');
-      }
-      final current = data['confirmedSlotId'] as String?;
-      final revision = data['revision'];
-      if (revision is! int || revision < 1) {
-        throw StateError('Appointment revision is unavailable.');
-      }
-      if (current == timeSlotToConfirm.slotId) return revision;
-      if (current != null) {
-        throw StateError('Another time slot is already confirmed.');
-      }
-      final nextRevision = revision + 1;
-      transaction.update(docRef, {
-        'confirmedSlotId': timeSlotToConfirm.slotId,
-        'revision': nextRevision,
-      });
-      return nextRevision;
+    TimeSlot timeSlotToConfirm, {
+    required int expectedRevision,
+  }) async {
+    final result = await _saveDefinition({
+      'action': 'confirm',
+      'appointmentId': appointmentId,
+      'expectedRevision': expectedRevision,
+      'slotId': timeSlotToConfirm.slotId,
     });
+    final returnedId = result['appointmentId'];
+    final revision = result['revision'];
+    if (returnedId != appointmentId || revision is! int || revision < 1) {
+      throw StateError('The appointment service returned an invalid result.');
+    }
+    return revision;
   }
 
   Future<List<AppointmentParticipants>> fetchAllParticipants(

@@ -6,6 +6,7 @@ const {
   ContentDeletionError,
   deleteContentForUser,
 } = require('../lib/content_deletion');
+const { companyActivityDocument } = require('../lib/activity_log');
 
 const uid = 'staff_1';
 const companyId = 'company_1';
@@ -36,6 +37,12 @@ class MemoryStore {
     return result;
   }
 
+  activity() {
+    return [...this.documents.entries()]
+      .filter(([path]) => path.startsWith(`companies/${companyId}/activity/`))
+      .map(([, data]) => data);
+  }
+
   async deleteParticipants(parentPath, fail = false) {
     const prefix = `${parentPath}/participants/`;
     assert.equal(this.get(parentPath).deletionStartedAt instanceof Timestamp, true);
@@ -46,10 +53,18 @@ class MemoryStore {
     }
   }
 
-  async commitFinalDeletes(paths) {
+  async commitFinalDeletes(paths, activity, fail = false) {
     this.events.push('final');
     this.finalPaths = [...paths];
-    for (const path of paths) this.documents.delete(path);
+    const next = new Map(this.documents);
+    const activityDocument = companyActivityDocument(activity);
+    if (next.has(activityDocument.path)) {
+      throw new Error(`exists: ${activityDocument.path}`);
+    }
+    next.set(activityDocument.path, activityDocument.event);
+    for (const path of paths) next.delete(path);
+    if (fail) throw new Error('injected-final-commit-failure');
+    this.documents = next;
   }
 
   async participantsRemain(parentPath) {
@@ -82,7 +97,12 @@ function dependencies(store, overrides = {}) {
     deleteParticipants: (path) =>
       store.deleteParticipants(path, overrides.failChildren === true),
     participantsRemain: store.participantsRemain.bind(store),
-    commitFinalDeletes: store.commitFinalDeletes.bind(store),
+    commitFinalDeletes: (paths, activity) =>
+      store.commitFinalDeletes(
+        paths,
+        activity,
+        overrides.failFinal === true,
+      ),
   };
 }
 
@@ -98,7 +118,9 @@ async function expectDeletionError(operation, code, message) {
 test('barriers a survey before deleting children and finalizes its exact pair atomically', async () => {
   const store = new MemoryStore();
   seedStaff(store);
-  store.set('surveys/survey_1', { companyId });
+  store.set('surveys/survey_1', {
+    companyId, surveyType: 0, surveyName: 'Staff satisfaction',
+  });
   store.set('surveys/survey_1/participants/user_1', { userId: 'user_1' });
   store.set('surveyAnswerKeys/survey_1', { companyId });
 
@@ -116,13 +138,49 @@ test('barriers a survey before deleting children and finalizes its exact pair at
     'surveyAnswerKeys/survey_1',
     'surveys/survey_1',
   ]);
-  assert.equal([...store.documents.keys()].some((path) => path.includes('survey_1')), false);
+  // The survey and its key are gone from every content root. The activity entry
+  // is not content and is meant to outlive them — it is the only remaining record
+  // that this survey ever existed, which is the entire point of an audit trail.
+  assert.equal(
+    [...store.documents.keys()].some(
+      (path) => path.startsWith('surveys/') || path.startsWith('surveyAnswerKeys/'),
+    ),
+    false,
+  );
+  assert.deepEqual(store.activity(), [{
+    schemaVersion: 1,
+    companyId,
+    action: 'survey.deleted',
+    actorUid: uid,
+    entity: { type: 'survey', id: 'survey_1', title: 'Staff satisfaction' },
+    occurredAt: Timestamp.fromMillis(nowMillis),
+  }]);
+});
+
+test('a graded test deletion is logged as a test', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  // surveyType 1 is a graded test. The log distinguishes the two because the
+  // consequences of losing one differ.
+  store.set('surveys/survey_2', {
+    companyId, surveyType: 1, surveyName: 'Onboarding quiz',
+  });
+  store.set('surveyAnswerKeys/survey_2', { companyId });
+  await deleteContentForUser(
+    uid,
+    { entityType: 'survey', entityId: 'survey_2' },
+    dependencies(store),
+  );
+  assert.deepEqual(
+    store.activity().map((event) => event.entity.type),
+    ['test'],
+  );
 });
 
 test('appointment cleanup removes votes and never targets a survey answer key', async () => {
   const store = new MemoryStore();
   seedStaff(store);
-  store.set('appointments/meeting_1', { companyId });
+  store.set('appointments/meeting_1', { companyId, title: 'Sprint review' });
   store.set('appointments/meeting_1/participants/user_1-slot_1', { userId: 'user_1' });
 
   await deleteContentForUser(
@@ -133,6 +191,14 @@ test('appointment cleanup removes votes and never targets a survey answer key', 
   assert.deepEqual(store.finalPaths, [
     'appointments/meeting_1',
   ]);
+  assert.deepEqual(store.activity(), [{
+    schemaVersion: 1,
+    companyId,
+    action: 'appointment.deleted',
+    actorUid: uid,
+    entity: { type: 'appointment', id: 'meeting_1', title: 'Sprint review' },
+    occurredAt: Timestamp.fromMillis(nowMillis),
+  }]);
 });
 
 test('a child cleanup failure leaves the parent, key, and marker for an explicit retry', async () => {
@@ -156,6 +222,7 @@ test('a child cleanup failure leaves the parent, key, and marker for an explicit
     true,
   );
   assert.deepEqual(store.events, ['barrier', 'children']);
+  assert.equal(store.activity().length, 0);
 
   await deleteContentForUser(
     uid,
@@ -163,6 +230,7 @@ test('a child cleanup failure leaves the parent, key, and marker for an explicit
     dependencies(store),
   );
   assert.deepEqual(store.events, ['barrier', 'children', 'barrier', 'children', 'final']);
+  assert.equal(store.activity().length, 1);
 });
 
 test('an invalid existing deletion marker fails closed', async () => {
@@ -196,6 +264,28 @@ test('the final parent delete is withheld when the zero-child check fails', asyn
   );
   assert.equal(store.has('appointments/meeting_1'), true);
   assert.deepEqual(store.events, ['barrier', 'children']);
+  assert.equal(store.activity().length, 0);
+});
+
+test('a failed final commit leaves both content and deletion event absent', async () => {
+  const store = new MemoryStore();
+  seedStaff(store);
+  store.set('surveys/survey_1', {
+    companyId, surveyType: 0, surveyName: 'Staff satisfaction',
+  });
+  store.set('surveyAnswerKeys/survey_1', { companyId });
+
+  await assert.rejects(
+    () => deleteContentForUser(
+      uid,
+      { entityType: 'survey', entityId: 'survey_1' },
+      dependencies(store, { failFinal: true }),
+    ),
+    /injected-final-commit-failure/,
+  );
+  assert.equal(store.has('surveys/survey_1'), true);
+  assert.equal(store.has('surveyAnswerKeys/survey_1'), true);
+  assert.equal(store.activity().length, 0);
 });
 
 test('malformed, missing, cross-company, inactive, banned, and unavailable callers fail', async (t) => {

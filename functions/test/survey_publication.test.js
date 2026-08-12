@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { Timestamp } = require('firebase-admin/firestore');
 
 const {
   SurveyPublicationError,
@@ -120,6 +121,17 @@ test('creates only the exact canonical public/private pair in one transaction', 
   assert.equal(key.schemaVersion, 1);
   assert.equal(JSON.stringify(survey).includes('correctAnswer'), false);
   assert.deepEqual(key.questionKeys[0], { type: 'Single', correctAnswer: 1 });
+  assert.deepEqual(
+    store.get(`companies/${companyId}/activity/survey-created-survey_1`),
+    {
+      schemaVersion: 1,
+      companyId,
+      action: 'survey.created',
+      actorUid: uid,
+      entity: { type: 'test', id: 'survey_1', title: 'Canonical test' },
+      occurredAt: Timestamp.fromMillis(nowMillis),
+    },
+  );
 });
 
 test('rejects unknown fields and invalid definitions', async () => {
@@ -143,6 +155,10 @@ test('a failed transaction leaves neither authoritative document', async () => {
   await assert.rejects(() => createPublished(store), /injected-commit-failure/);
   assert.equal(store.get('surveys/survey_1'), undefined);
   assert.equal(store.get('surveyAnswerKeys/survey_1'), undefined);
+  assert.equal(
+    store.get(`companies/${companyId}/activity/survey-created-survey_1`),
+    undefined,
+  );
 });
 
 test('rechecks Auth, deletion, company, ban, membership and staff role', async () => {
