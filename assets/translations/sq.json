@@ -91,7 +91,7 @@
   "another_time_slot_is_confirmed": "Një kohë tjetër është e konfirmuar.",
   "answer": "Përgjigje",
   "answers": "Përgjigjet",
-  "app_title": "Anketa & Takime",
+  "app_title": "EchoMeet",
   "appearance": "Pamja",
   "appointment_created_successfully": "Takimi juaj është krijuar me sukses!",
   "appointment_deleted": "Takimi u fshi",
@@ -720,5 +720,14 @@
   "you_are_banned_body": "{company} ju ka bllokuar. Llogaria dhe shënimet tuaja nuk preken — mund të bashkoheni me një kompani tjetër.",
   "you_will_be_redirected": "Ju do të ktheheni në faqen e hyrjes për brenda",
   "your_answer": "Pergjigjja juaj",
-  "your_id_information": "Informacioni Juaj ID:"
+  "your_id_information": "Informacioni Juaj ID:",
+  "nav_notes": "Shënime",
+  "nav_appointments": "Takimet",
+  "nav_surveys": "Anketa",
+  "nav_settings": "Opsionet",
+  "unban_user_confirm": "{name} rifiton qasjen në këtë kompani. Roli dhe përgjigjet e mëparshme nuk ndryshojnë.",
+  "add_note_body": "Jepni një titull shënimit. Mund ta shkruani në ekranin tjetër.",
+  "edit_profile": "Redakto profilin",
+  "profile_saved": "Profili u përditësua",
+  "edit_profile_hint": "Emri dhe datëlindja juaj"
 }

@@ -18,6 +18,7 @@ class AppTextField extends StatefulWidget {
     this.trailing,
     this.enabled = true,
     this.maxLength,
+    this.autofocus = false,
   });
 
   final String label;
@@ -33,6 +34,9 @@ class AppTextField extends StatefulWidget {
   final Widget? trailing;
   final bool enabled;
   final int? maxLength;
+
+  /// Focuses on first build. For a dialog whose only job is one field.
+  final bool autofocus;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -109,6 +113,7 @@ class _AppTextFieldState extends State<AppTextField> {
                 obscureText: widget.obscure,
                 enabled: widget.enabled,
                 maxLength: widget.maxLength,
+                autofocus: widget.autofocus,
                 keyboardType: widget.keyboardType,
                 textInputAction: widget.textInputAction,
                 autofillHints: widget.autofillHints,

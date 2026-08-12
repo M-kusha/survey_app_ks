@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:echomeet/core/profile/profile_image_cache.dart';
 import 'package:echomeet/core/notifications/push_service.dart';
 import 'package:echomeet/login/user_preferences.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
@@ -105,6 +106,11 @@ class AuthManager {
       await _auth.signOut();
       await UserPreferences.clearSession();
       FirebaseServices.invalidateCache();
+      // Avatar bytes are cached on the device. They are keyed per user so they
+      // could never be served to the wrong account, but leaving one person's
+      // photo on a shared phone after they have signed out is not this app's
+      // business.
+      await ProfileImageCache.clear();
       return true;
     } catch (_) {
       // Auth still owns the same profile, so restore the saved notification

@@ -202,7 +202,7 @@ abstract final class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: scheme.surfaceContainer,
+        backgroundColor: scheme.navSurface,
         // Matches the rail, so the phone and the desktop agree on what
         // "selected" looks like.
         indicatorColor: scheme.primary.withValues(alpha: 0.14),
@@ -227,7 +227,7 @@ abstract final class AppTheme {
         ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: scheme.pageSurface,
+        backgroundColor: scheme.navSurface,
         // The selected destination now carries the accent colour, on both the
         // icon and the label. Material's default pairs `onSecondaryContainer`
         // with a pale pill, which is a very dark navy on very pale blue — it
@@ -391,6 +391,18 @@ extension AppSurfaces on ColorScheme {
   /// A card whose content is finished or expired: present, but not competing.
   Color get mutedCardSurface =>
       _isDark ? surfaceContainerLowest : surfaceContainer;
+
+  /// Behind the navigation, bottom bar and rail alike.
+  ///
+  /// A faint wash of the accent rather than plain grey. With a neutral bar the
+  /// only colour in the navigation was the selected pill, so the whole strip
+  /// read as switched off until you tapped something. Kept to a few percent —
+  /// enough to tint, not enough to compete with the selected destination or to
+  /// move the contrast of the labels drawn on it.
+  Color get navSurface => Color.alphaBlend(
+    primary.withValues(alpha: _isDark ? 0.10 : 0.06),
+    _isDark ? surfaceContainerLow : surfaceContainer,
+  );
 
   /// Cards carry a real shadow in light mode. In dark mode a shadow is a
   /// darker smudge on an already dark page, so tone alone does the work.

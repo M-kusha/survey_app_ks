@@ -20,27 +20,59 @@ import 'package:provider/provider.dart';
 /// the profile block sized to it have to agree.
 const double _extendedRailWidth = 256;
 
+/// Identifies the compact-width bar for tests.
+///
+/// Needed because the bar is this app's own widget rather than Material's, so
+/// there is no public type to search for — and a test that searched for the
+/// wrong Material type would report "no bottom bar" on a screen that has one.
+const Key bottomNavigationBarKey = Key('echomeet.bottomNavigationBar');
+
 class _Destination {
-  const _Destination(this.icon, this.selectedIcon, this.labelKey);
+  const _Destination(
+    this.icon,
+    this.selectedIcon,
+    this.labelKey,
+    this.shortLabelKey,
+  );
 
   final IconData icon;
   final IconData selectedIcon;
   final String labelKey;
+
+  /// The bottom bar's label, which has a quarter of the screen and no more.
+  ///
+  /// Separate from [labelKey] so the bar reads well rather than merely fitting.
+  /// `_BottomBarItem` truncates anything too long, but an ellipsis is a poor
+  /// label — "Meetings" beats "Appointme…" at 320px. The rail, which has room,
+  /// still uses the full [labelKey].
+  final String shortLabelKey;
 }
 
 const _destinations = <_Destination>[
-  _Destination(Icons.edit_note_rounded, Icons.sticky_note_2_rounded, 'notes'),
+  _Destination(
+    Icons.edit_note_rounded,
+    Icons.sticky_note_2_rounded,
+    'notes',
+    'nav_notes',
+  ),
   _Destination(
     Icons.calendar_today_outlined,
     Icons.calendar_month_rounded,
     'appointments',
+    'nav_appointments',
   ),
   _Destination(
     Icons.insert_chart_outlined_rounded,
     Icons.insert_chart_rounded,
     'survey',
+    'nav_surveys',
   ),
-  _Destination(Icons.settings_outlined, Icons.settings_rounded, 'settings'),
+  _Destination(
+    Icons.settings_outlined,
+    Icons.settings_rounded,
+    'settings',
+    'nav_settings',
+  ),
 ];
 
 class BottomNavigation extends StatefulWidget {
@@ -141,32 +173,21 @@ class _BottomNavigationState extends State<BottomNavigation> {
           top: BorderSide(color: scheme.outlineVariant.withValues(alpha: 0.6)),
         ),
       ),
-      // At the largest system font size "Appointments" broke across two lines
-      // and pushed its icon up out of the bar.
+      // Material's own `NavigationBar` cannot be used here. Its label is a
+      // String rendered by a `Text` with no `maxLines`, inside a `Material` that
+      // installs a fresh `DefaultTextStyle` — so a label wider than its quarter
+      // of the screen wraps to a second line and shoves the icon out of the bar,
+      // and nothing outside the widget can stop it. Holding the text size was
+      // not enough: it still wrapped at ordinary phone widths.
       //
-      // It cannot be truncated from here. `NavigationDestination.label` is a
-      // String, and Flutter wraps it in its own `AnimatedDefaultTextStyle` with
-      // `overflow: clip`, which beats any ambient `DefaultTextStyle` this file
-      // could set — verified, not assumed. So the labels are held at their
-      // designed size instead. Page content still honours the reader's setting
-      // in full; only this strip of chrome is fixed, which is the trade every
-      // bottom bar with four labels ends up making.
+      // `_BottomBar` is the same design with the label under this file's
+      // control, so it truncates instead of wrapping and the row cannot grow.
       child: _cappedScale(
         context: context,
-        maxScale: 1,
-        child: NavigationBar(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: _onDestinationSelected,
-          height: 66,
-          labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          destinations: [
-            for (final destination in _destinations)
-              NavigationDestination(
-                icon: Icon(destination.icon),
-                selectedIcon: Icon(destination.selectedIcon),
-                label: destination.labelKey.tr(),
-              ),
-          ],
+        maxScale: 1.1,
+        child: _BottomBar(
+          currentIndex: _currentIndex,
+          onSelected: _onDestinationSelected,
         ),
       ),
     );
@@ -183,6 +204,11 @@ class _BottomNavigationState extends State<BottomNavigation> {
           selectedIndex: _currentIndex,
           onDestinationSelected: _onDestinationSelected,
           extended: extended,
+          // A phone held sideways is 384px tall, and four destinations plus the
+          // profile block and footer do not fit in it — the rail overflowed,
+          // which is what the reported landscape overflow was. Scrolling the
+          // destination group is the rail's own answer to being too short.
+          scrollable: true,
 
           labelType: extended
               ? NavigationRailLabelType.none
@@ -213,18 +239,29 @@ class _BottomNavigationState extends State<BottomNavigation> {
               NavigationRailDestination(
                 icon: Icon(destination.icon),
                 selectedIcon: Icon(destination.selectedIcon),
-                label: Text(destination.labelKey.tr()),
+                // Unlike the bottom bar's, this label is a widget, so the
+                // full name can be used and simply truncated when the collapsed
+                // rail is narrower than it.
+                label: Text(
+                  destination.labelKey.tr(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
               ),
           ],
 
-          trailing: Expanded(
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: Spacing.lg),
-                child: _RailFooter(extended: extended),
-              ),
-            ),
+          // Load-bearing, and not obvious: `trailingAtBottom` defaults to
+          // false, which puts the trailing widget *inside* the scrolling
+          // destination group. There it rides up directly under the last
+          // destination — and any `Expanded` around it throws, because a scroll
+          // view offers unbounded height. True moves it into the rail's outer
+          // column, where the destination group's `Flexible` claims the slack
+          // and pushes this to the bottom on its own.
+          trailingAtBottom: true,
+          trailing: Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.lg),
+            child: _RailFooter(extended: extended),
           ),
 
           indicatorColor: scheme.secondaryContainer,
@@ -443,6 +480,128 @@ class _RailBrand extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The compact-width navigation bar.
+///
+/// Exists because `NavigationBar`'s label is a bare String it renders without
+/// `maxLines`, which wraps and breaks the bar's height on narrow phones. Here
+/// the label is a widget, so it truncates and the bar keeps its height whatever
+/// the locale or the reader's font size.
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({required this.currentIndex, required this.onSelected});
+
+  final int currentIndex;
+  final ValueChanged<int> onSelected;
+
+  static const double _height = 66;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      key: bottomNavigationBarKey,
+      // The tinted nav surface, shared with the rail so a phone and a desktop
+      // agree on what the navigation looks like.
+      color: scheme.navSurface,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: _height,
+          child: Row(
+            children: [
+              for (final (index, destination) in _destinations.indexed)
+                Expanded(
+                  child: _BottomBarItem(
+                    destination: destination,
+                    selected: index == currentIndex,
+                    position: index,
+                    total: _destinations.length,
+                    onTap: () => onSelected(index),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomBarItem extends StatelessWidget {
+  const _BottomBarItem({
+    required this.destination,
+    required this.selected,
+    required this.position,
+    required this.total,
+    required this.onTap,
+  });
+
+  final _Destination destination;
+  final bool selected;
+  final int position;
+  final int total;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final label = destination.shortLabelKey.tr();
+
+    return Semantics(
+      // One node per destination, carrying what Material's own destinations
+      // report — so a screen reader announces "Notes, selected, tab" rather
+      // than an unlabelled button next to a stray text node.
+      selected: selected,
+      button: true,
+      inMutuallyExclusiveGroup: true,
+      label: label,
+      container: true,
+      excludeSemantics: true,
+      child: InkWell(
+        onTap: onTap,
+        excludeFromSemantics: true,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+              decoration: BoxDecoration(
+                color: selected
+                    ? scheme.primary.withValues(alpha: 0.14)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(Radii.sm),
+              ),
+              child: Icon(
+                selected ? destination.selectedIcon : destination.icon,
+                size: 22,
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 3),
+            // The whole point of this widget. `softWrap: false` with one line
+            // and an ellipsis means a long label shortens rather than pushing
+            // the icon out of the bar.
+            Text(
+              label,
+              maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

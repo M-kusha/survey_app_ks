@@ -8,6 +8,8 @@ import 'package:echomeet/core/profile/profile_image_sanitizer.dart';
 import 'package:echomeet/core/profile/profile_image_revision.dart';
 import 'package:echomeet/core/profile/profile_image_upload_error.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/feature_kit.dart';
+import 'package:echomeet/settings/edit_profile.dart';
 import 'package:echomeet/utilities/reusable_widgets.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -146,10 +148,28 @@ class _ProfileSectionState extends State<ProfileSection> {
                   ],
                 ),
               ),
+              // Editing lives on the thing being edited, rather than as its own
+              // row further down the settings list. The avatar is already
+              // tappable for a new photo, so the pencil takes the name and
+              // birthdate.
+              CircleAction(
+                icon: Icons.edit_outlined,
+                tooltip: 'edit_profile'.tr(),
+                onTap: () => _editProfile(),
+              ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Future<void> _editProfile() async {
+    await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditProfilePage(userId: widget.userId),
+      ),
     );
   }
 

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../support/load_translations.dart';
+
 /// Golden tests for the responsive shell.
 ///
 /// These render the real navigation widget at four widths and write a PNG for
@@ -61,9 +63,9 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
   // Deliberately no EasyLocalization wrapper. It loads its translation files
   // asynchronously off the test clock and renders a placeholder until they
   // arrive, which never resolves inside a widget test's fake-async zone — only
-  // the first test in a file would ever render. `.tr()` falls back to returning
-  // the key, so the rail and bar still show readable labels, and what is under
-  // test here is layout rather than copy.
+  // the first test in a file would ever render. `loadAppTranslations` in
+  // `setUpAll` primes the same static synchronously, so `.tr()` returns real
+  // copy without the widget.
   await tester.pumpWidget(
     MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -94,11 +96,15 @@ Future<void> _pumpAt(WidgetTester tester, Size size) async {
 }
 
 void main() {
-  setUpAll(() {
+  setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     // Anything reaching for SharedPreferences gets an empty store rather than
     // a MissingPluginException.
     SharedPreferences.setMockInitialValues({});
+    // Real labels, not raw keys. Without this the goldens showed
+    // "nav_appointments" where the label goes, which defeats the point of
+    // looking at an image to judge whether the bar fits.
+    await loadAppTranslations();
   });
 
   group('adaptive navigation', () {
@@ -114,14 +120,18 @@ void main() {
 
     testWidgets('a phone gets a bottom bar and no rail', (tester) async {
       await _pumpAt(tester, _viewports['compact_phone']!);
-      expect(find.byType(BottomNavigationBar), findsOneWidget);
+      // Keyed, not typed: the bar is this app's own widget, so there is no
+      // public Material type to find. This assertion used to look for
+      // `BottomNavigationBar`, which the app has never used — so it reported no
+      // bottom bar on every screen that had one.
+      expect(find.byKey(bottomNavigationBarKey), findsOneWidget);
       expect(find.byType(NavigationRail), findsNothing);
     });
 
     testWidgets('a tablet gets a rail and no bottom bar', (tester) async {
       await _pumpAt(tester, _viewports['medium_tablet_portrait']!);
       expect(find.byType(NavigationRail), findsOneWidget);
-      expect(find.byType(BottomNavigationBar), findsNothing);
+      expect(find.byKey(bottomNavigationBarKey), findsNothing);
     });
 
     testWidgets('the rail only extends on a large window', (tester) async {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/widgets/app_text_field.dart';
 import 'package:echomeet/notes/notes_logics.dart';
@@ -59,20 +61,50 @@ class _AddNoteDialogState extends State<_AddNoteDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    // An AlertDialog sizes to its content, and a lone text field asks for almost
+    // nothing — so this came out as a tall, skinny box with a cramped field in
+    // it, on desktop especially. Naming a comfortable width fixes that, and
+    // taking the screen into account keeps it inside a small phone: 64px covers
+    // the dialog's own insets on both sides.
+    final width = math.min(
+      440.0,
+      MediaQuery.sizeOf(context).width - 64,
+    );
+
     return AlertDialog(
       title: Text('add_note'.tr()),
-      content: Form(
-        key: _formKey,
-        child: AppTextField(
-          label: 'note_title'.tr(),
-          hint: 'write_note'.tr(),
-          controller: _controller,
-          textInputAction: TextInputAction.done,
-
-          onSubmitted: (_) => _submit(),
-          validator: (value) => (value == null || value.trim().isEmpty)
-              ? 'note_title_required'.tr()
-              : null,
+      content: SizedBox(
+        width: width,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // The dialog only collects a title; the note itself is written on
+              // the next screen. Saying so stops the single field reading like a
+              // form that lost its other half.
+              Text(
+                'add_note_body'.tr(),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              AppTextField(
+                label: 'note_title'.tr(),
+                hint: 'write_note'.tr(),
+                controller: _controller,
+                textInputAction: TextInputAction.done,
+                autofocus: true,
+                onSubmitted: (_) => _submit(),
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? 'note_title_required'.tr()
+                    : null,
+              ),
+            ],
+          ),
         ),
       ),
       actions: [

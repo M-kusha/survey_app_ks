@@ -23,13 +23,34 @@ import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:echomeet/utilities/bottom_navigation.dart';
 import 'package:echomeet/utilities/firebase_services.dart';
 import 'package:echomeet/utilities/routes.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart'
     show FlutterQuillLocalizations;
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+
+/// Picks how Firestore talks to the network on the web.
+///
+/// The browser console was filling with `WebChannelConnection RPC 'Listen'
+/// stream transport errored` and 400s on the Listen channel. That is Firestore's
+/// bidirectional WebChannel stream failing — it is blocked by a good deal of
+/// network equipment, browser extensions and proxies — after which the SDK
+/// retries and logs again. Auto-detect makes it notice the failure once and fall
+/// back to long polling for the session, so the stream stays up and the console
+/// stays quiet.
+///
+/// Web only: the mobile SDKs use gRPC and have neither the problem nor the
+/// setting.
+void _configureFirestoreTransport() {
+  if (!kIsWeb) return;
+  FirebaseFirestore.instance.settings = const Settings(
+    webExperimentalAutoDetectLongPolling: true,
+  );
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +60,7 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    _configureFirestoreTransport();
     await UserPreferences.init();
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting();

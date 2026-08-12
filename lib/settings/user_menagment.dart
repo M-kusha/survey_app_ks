@@ -170,24 +170,41 @@ class UserManagementPageState extends State<UserManagementPage> {
     }
   }
 
-  Future<void> _ban(UserModel user) async {
+  /// Bans or lifts the ban, whichever this member currently needs.
+  ///
+  /// Lifting used to be possible only from the separate banned-members screen,
+  /// which meant the row that says "Banned" was the one place you could not act
+  /// on it. Both directions are optimistic and both roll back on failure, so a
+  /// refused call does not leave the list claiming something the server refused.
+  Future<void> _toggleBan(UserModel user) async {
+    final lifting = user.banned;
+    final scheme = Theme.of(context).colorScheme;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('ban_user'.tr()),
-        content: Text('ban_user_confirm'.tr(namedArgs: {'name': user.name})),
+        title: Text((lifting ? 'unban_user' : 'ban_user').tr()),
+        content: Text(
+          (lifting ? 'unban_user_confirm' : 'ban_user_confirm').tr(
+            namedArgs: {'name': user.name},
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('cancel'.tr()),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(context).colorScheme.error,
-              foregroundColor: Theme.of(context).colorScheme.onError,
-            ),
+            // Lifting a ban restores access, so it is not styled as a
+            // destructive action the way banning is.
+            style: lifting
+                ? null
+                : FilledButton.styleFrom(
+                    backgroundColor: scheme.error,
+                    foregroundColor: scheme.onError,
+                  ),
             onPressed: () => Navigator.pop(context, true),
-            child: Text('ban_user'.tr()),
+            child: Text((lifting ? 'unban_user' : 'ban_user').tr()),
           ),
         ],
       ),
@@ -195,18 +212,30 @@ class UserManagementPageState extends State<UserManagementPage> {
     if (confirmed != true || !mounted) return;
 
     setState(() {
-      _bannedUserIds.add(user.id);
-      user.banned = true;
+      if (lifting) {
+        _bannedUserIds.remove(user.id);
+      } else {
+        _bannedUserIds.add(user.id);
+      }
+      user.banned = !lifting;
     });
 
     try {
-      await _adminService.ban(user.id);
+      if (lifting) {
+        await _adminService.unban(user.id);
+      } else {
+        await _adminService.ban(user.id);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _bannedUserIds.remove(user.id);
+        if (lifting) {
+          _bannedUserIds.add(user.id);
+        } else {
+          _bannedUserIds.remove(user.id);
+        }
         for (final entry in _users) {
-          if (entry.id == user.id) entry.banned = false;
+          if (entry.id == user.id) entry.banned = lifting;
         }
       });
       UIUtils.showSnackBar(context, 'error_occurred'.tr());
@@ -333,7 +362,7 @@ class UserManagementPageState extends State<UserManagementPage> {
           isSelf: user.id == widget.userId,
           canManagePeople: _canManagePeople,
           onRoleChanged: (role) => _changeRole(user, role),
-          onBan: () => _ban(user),
+          onBan: () => _toggleBan(user),
           onApprove: () => _approve(user),
           onRemove: () => _remove(user),
         );
@@ -440,10 +469,11 @@ class _UserRow extends StatelessWidget {
                             ? Icons.lock_open_rounded
                             : Icons.block_rounded,
                         size: 18,
-                        color: scheme.error,
+                        // Lifting a ban is not a destructive action.
+                        color: user.banned ? scheme.primary : scheme.error,
                       ),
                       const SizedBox(width: Spacing.md),
-                      Text('ban_user'.tr()),
+                      Text((user.banned ? 'unban_user' : 'ban_user').tr()),
                     ],
                   ),
                 ),

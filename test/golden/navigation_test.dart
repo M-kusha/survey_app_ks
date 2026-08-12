@@ -59,11 +59,15 @@ void main() {
   testWidgets('phone shows the bottom bar', (tester) async {
     await _pump(tester, AppTheme.dark, size: const Size(393, 700));
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    // Keyed rather than typed: the compact bar is this app's own widget now,
+    // because Material's `NavigationBar` renders its label through a `Text` with
+    // no `maxLines` and wrapped long labels onto a second line, pushing the icon
+    // out of the bar.
+    expect(find.byKey(bottomNavigationBarKey), findsOneWidget);
     expect(find.byType(NavigationRail), findsNothing);
 
     await expectLater(
-      find.byType(NavigationBar),
+      find.byKey(bottomNavigationBarKey),
       matchesGoldenFile('goldens/nav_bar_dark.png'),
     );
   });
@@ -74,7 +78,7 @@ void main() {
     await _pump(tester, AppTheme.dark, size: const Size(1200, 800));
 
     expect(find.byType(NavigationRail), findsOneWidget);
-    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byKey(bottomNavigationBarKey), findsNothing);
 
     await expectLater(
       find.byType(NavigationRail),

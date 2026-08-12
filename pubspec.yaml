@@ -20,6 +20,9 @@ dependencies:
   timezone: ^0.11.1
   flutter_timezone: ^5.1.0
   shared_preferences: ^2.0.17
+  # Names the on-device cache directory for avatar bytes, so turning the phone
+  # does not re-download every face on screen (see profile_image_cache.dart).
+  path_provider: ^2.1.4
   firebase_storage: ^13.4.6
   cloud_firestore: ^6.8.0
   cloud_functions: ^6.3.5

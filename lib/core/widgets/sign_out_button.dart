@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
+import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/login/login.dart';
 import 'package:echomeet/login/login_logics.dart';
 import 'package:flutter/material.dart';
@@ -55,11 +56,14 @@ class SignOutButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // A tinted rounded square, matching the app's other icon actions. It was a
+    // grey circle with a grey glyph, which read as disabled next to them — and a
+    // circle at this size sits oddly against the squared cards around it.
     return Tooltip(
       message: 'log_out'.tr(),
       child: Material(
-        color: scheme.surfaceContainerHigh.withValues(alpha: 0.55),
-        shape: const CircleBorder(),
+        color: scheme.primary.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(Radii.sm),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => confirmSignOut(context),
@@ -68,7 +72,7 @@ class SignOutButton extends StatelessWidget {
             child: Icon(
               Icons.logout_rounded,
               size: 18,
-              color: scheme.onSurfaceVariant,
+              color: scheme.primary,
             ),
           ),
         ),

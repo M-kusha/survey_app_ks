@@ -1,3 +1,4 @@
+import 'package:echomeet/core/widgets/sign_out_button.dart';
 import 'package:echomeet/settings/font_size_provider.dart';
 import 'package:echomeet/utilities/bottom_navigation.dart';
 import 'package:flutter/material.dart';
@@ -64,6 +65,15 @@ void main() {
     ('an expanded window, collapsed rail', Size(1000, 800)),
     ('a medium window', Size(700, 900)),
     ('a compact window, bottom bar', Size(400, 900)),
+    // A phone held sideways. 832x384 is a Galaxy S25 Ultra in landscape, which
+    // is `medium` — so it gets the rail, in a viewport too short for four
+    // destinations plus the profile block and the footer. The rail overflowed
+    // there, which is the reported landscape overflow; it is fixed by letting
+    // the destination group scroll.
+    ('a phone in landscape', Size(832, 384)),
+    // Landscape with the system font enlarged, which is the same squeeze again
+    // with taller destinations.
+    ('a small phone in landscape', Size(740, 340)),
   ]) {
     testWidgets('the shell lays out in $name', (tester) async {
       await _pumpShell(tester, size);
@@ -83,33 +93,29 @@ void main() {
     expect(find.byType(NavigationRail), findsOneWidget);
   });
 
-  testWidgets('the bottom bar holds its label size at any system scale', (
+  testWidgets('the rail footer sits at the bottom, not under the tabs', (
     tester,
   ) async {
-    // At the largest system font size "Appointments" wrapped onto two lines and
-    // pushed its icon up out of the bar. Truncation is not reachable: Flutter
-    // wraps the label in its own `AnimatedDefaultTextStyle` with
-    // `overflow: clip`, which beats any ambient `DefaultTextStyle`. Holding the
-    // scale is what keeps it on one line, so that is what gets pinned.
-    await _pumpShell(tester, const Size(400, 900), textScale: 3);
+    // `NavigationRail.trailingAtBottom` defaults to false, which places the
+    // trailing widget inside the scrolling destination group — so turning on
+    // `scrollable` to fix the landscape overflow moved the theme, language and
+    // sign-out controls up under the last tab. No exception is thrown when that
+    // happens, so only a position assertion catches it.
+    await _pumpShell(tester, const Size(1000, 800));
 
-    expect(tester.takeException(), isNull);
+    final rail = tester.getRect(find.byType(NavigationRail));
+    final footer = tester.getRect(find.byType(SignOutButton));
 
-    final scaler = MediaQuery.textScalerOf(
-      tester.element(find.byType(NavigationBar)),
+    expect(
+      footer.center.dy,
+      greaterThan(rail.center.dy),
+      reason: 'the footer rode up into the destination group',
     );
-    expect(scaler.scale(12), 12);
+    expect(rail.bottom - footer.bottom, lessThan(80));
   });
 
-  testWidgets('page content still honours the reader font size', (
-    tester,
-  ) async {
-    // The cap is chrome-only. Scaling the whole app down to keep four labels
-    // tidy would be a bad trade, so this fails if the clamp ever leaks past the
-    // bar into the page.
-    await _pumpShell(tester, const Size(400, 900), textScale: 3);
-
-    final scaler = MediaQuery.textScalerOf(tester.element(find.text('notes')));
-    expect(scaler.scale(12), 36);
-  });
+  // The bottom bar's own behaviour — one-line labels, truncation, the scale cap
+  // and its semantics — lives in `bottom_navigation_label_test.dart`, which
+  // targets the widget directly. It used to be asserted here against Material's
+  // `NavigationBar`, which this app no longer uses.
 }

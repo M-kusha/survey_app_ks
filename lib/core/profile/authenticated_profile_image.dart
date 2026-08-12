@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:echomeet/core/profile/profile_image_cache.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
@@ -73,10 +74,24 @@ class AuthenticatedProfileImage extends StatefulWidget {
 class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
   late Future<Uint8List?> _bytes;
 
+  /// Resolves through the cache, which fetches only for a reference and
+  /// revision it does not already hold.
+  ///
+  /// This used to call Storage directly on every `initState`. Rotating the phone
+  /// moves the shell to a different layout branch, which disposes these widgets
+  /// and builds new ones, so every turn of the device re-downloaded every avatar
+  /// on screen. [refreshKey] carries the profile-image revision, so a genuinely
+  /// new photo still misses the cache and is fetched.
+  Future<Uint8List?> _load() => ProfileImageCache.resolve(
+    storedReference: widget.storedReference,
+    revision: widget.refreshKey,
+    fetch: () => loadAuthenticatedProfileImage(widget.storedReference),
+  );
+
   @override
   void initState() {
     super.initState();
-    _bytes = loadAuthenticatedProfileImage(widget.storedReference);
+    _bytes = _load();
   }
 
   @override
@@ -84,7 +99,7 @@ class _AuthenticatedProfileImageState extends State<AuthenticatedProfileImage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.storedReference != widget.storedReference ||
         oldWidget.refreshKey != widget.refreshKey) {
-      _bytes = loadAuthenticatedProfileImage(widget.storedReference);
+      _bytes = _load();
     }
   }
 
