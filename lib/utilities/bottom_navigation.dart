@@ -4,6 +4,7 @@ import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/membership/app_banner.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/profile/authenticated_profile_image.dart';
+import 'package:echomeet/core/widgets/brand_mark.dart';
 import 'package:echomeet/notes/notes_main.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/widgets/language_button.dart';
@@ -315,11 +316,20 @@ class _RailProfile extends StatelessWidget {
     final user = context.watch<UserDataProvider?>()?.currentUser;
     final membership = context.watch<MembershipProvider?>()?.membership;
 
+    // A ring rather than a filled disc: at this size a solid block of
+    // primaryContainer was the brightest thing in the rail, which put the
+    // loudest element on the one row that is only there for reference.
     final avatar = ClipOval(
       child: Container(
-        height: 38,
-        width: 38,
-        color: scheme.primaryContainer,
+        height: 36,
+        width: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.8),
+          ),
+        ),
         alignment: Alignment.center,
         child: Stack(
           fit: StackFit.expand,
@@ -327,8 +337,8 @@ class _RailProfile extends StatelessWidget {
             Center(
               child: Text(
                 _initials(user?.name),
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: scheme.onPrimaryContainer,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -386,7 +396,11 @@ class _RailProfile extends StatelessWidget {
   }
 }
 
-/// The wordmark, at the foot of the rail where it belongs.
+/// The mark and wordmark, at the foot of the rail.
+///
+/// Quiet by construction: one stroke weight, one muted colour, no fill and no
+/// gradient. It marks the product without asking to be looked at, which is the
+/// job of a footer.
 class _RailBrand extends StatelessWidget {
   const _RailBrand({required this.extended});
 
@@ -395,40 +409,22 @@ class _RailBrand extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final muted = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75);
 
-    final glyph = Container(
-      height: 26,
-      width: 26,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, scheme.tertiary],
-        ),
-      ),
-      child: Icon(
-        Icons.calendar_month_rounded,
-        color: scheme.onPrimary,
-        size: 15,
-      ),
-    );
-
-    if (!extended) return glyph;
+    if (!extended) return BrandMark(size: 20, color: muted);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        glyph,
+        BrandMark(size: 18, color: muted),
         const SizedBox(width: Spacing.sm),
         Text(
           'app_title'.tr(),
           style: theme.textTheme.labelMedium?.copyWith(
             fontFamily: AppTheme.displayFontFamily,
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurfaceVariant,
-            letterSpacing: -0.2,
+            fontWeight: FontWeight.w600,
+            color: muted,
+            letterSpacing: 0.1,
           ),
         ),
       ],
