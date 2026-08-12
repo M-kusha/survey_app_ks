@@ -373,9 +373,11 @@ class ParticipantsSummary extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       average == null ? '—' : '${average.round()}%',
-                      // Same size as every other score in the app, so a figure
-                      // reads as a figure wherever it appears.
-                      style: theme.textTheme.titleLarge?.copyWith(
+                      // Same size as the pass/fail tallies beside it. Larger
+                      // made the one figure that is only context — an average
+                      // says nothing about any individual — the loudest thing
+                      // on the page. Colour and position carry it instead.
+                      style: theme.textTheme.titleMedium?.copyWith(
                         color: averageColour,
                         height: 1,
                       ),

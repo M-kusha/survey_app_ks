@@ -741,7 +741,10 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
         SettingsTile(
           icon: Icons.logout_rounded,
           title: 'log_out'.tr(),
-          tint: scheme.onSurfaceVariant,
+          // Was `onSurfaceVariant`, the one grey icon in a column of coloured
+          // ones — which read as disabled rather than as understated. Signing
+          // out is an ordinary thing to do; only deleting the account below is
+          // dangerous, and it keeps the red to itself.
           showChevron: false,
           onTap: _signOut,
         ),

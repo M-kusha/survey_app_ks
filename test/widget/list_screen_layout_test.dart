@@ -78,49 +78,60 @@ void main() {
     expect(find.text('row 2'), findsOneWidget);
   });
 
-  testWidgets('the accent stripe stays clear of the rounded corners', (
+  testWidgets('the accent colours the whole outline, not one edge', (
     tester,
   ) async {
+    const accent = Color(0xFF00FF00);
     await _pump(
       tester,
       ListView(
         children: [
           const ContentCard(
-            accent: Color(0xFF00FF00),
+            accent: accent,
             child: SizedBox(height: 120, child: Text('tall')),
           ),
         ],
       ),
     );
 
-    final card = tester.getRect(find.byType(ContentCard));
-    // By colour, not by type: Material and the ink machinery contribute their
-    // own decorated boxes, and `.first` picked one of those.
-    final stripe = tester.getRect(
+    // No coloured block anywhere: the stripe is gone. Two shapes were tried
+    // before this. Full height was sliced by the 18px corner radius, leaving a
+    // sliver in each corner and stacking with the progress rule at the bottom.
+    // Inset by that radius it stopped short at both ends and read as a border
+    // that had failed to finish drawing — which is what prompted replacing it.
+    expect(
       find.byWidgetPredicate(
         (widget) =>
+            widget is ColoredBox && widget.color == accent ||
             widget is DecoratedBox &&
-            widget.decoration is BoxDecoration &&
-            (widget.decoration as BoxDecoration).color ==
-                const Color(0xFF00FF00),
+                widget.decoration is BoxDecoration &&
+                (widget.decoration as BoxDecoration).color == accent,
       ),
+      findsNothing,
     );
 
-    expect(stripe.width, 4);
+    // The outline carries it instead, so it follows the corners exactly and has
+    // no ends to get wrong at any card height.
+    final outline = tester
+        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
+        .map((box) => box.decoration)
+        .whereType<BoxDecoration>()
+        .map((decoration) => decoration.border)
+        .whereType<Border>()
+        .firstWhere((border) => border.top.color.a > 0);
 
-    // Inset by the corner radius at both ends, and not by accident.
-    //
-    // This used to run the full height of the card. The Material clips to an
-    // 18px radius, so the last 18px at each end were being sliced by the curve
-    // and left a coloured sliver in the corner - at the bottom it met the
-    // progress rule and the two stacked, which is what read as colour leaking
-    // out of the card.
-    expect(stripe.top - card.top, 18);
-    expect(card.bottom - stripe.bottom, 18);
-
-    // Still the dominant vertical mark, not a stray dash beside the title.
-    expect(stripe.height, card.height - 36);
-    expect(stripe.height, greaterThan(card.height * 0.6));
+    expect(outline.top.color.r, accent.r);
+    expect(outline.top.color.g, accent.g);
+    expect(outline.top.color.b, accent.b);
+    // All four sides, or it is a stripe again by another name.
+    for (final side in [
+      outline.top,
+      outline.bottom,
+      outline.left,
+      outline.right,
+    ]) {
+      expect(side.color.g, accent.g);
+    }
   });
 
   testWidgets('a card with a deadline rule still lays out in a list', (

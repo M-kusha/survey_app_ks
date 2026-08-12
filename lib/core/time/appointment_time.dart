@@ -97,11 +97,22 @@ String formatAppointmentRange({
   final end = zoneId == null
       ? canonicalAppointmentInstant(endAt).toLocal()
       : appointmentTimeInZone(endAt, zoneId);
-  final startFormat = DateFormat.yMMMd(locale).add_jm();
-  final endFormat = _sameCalendarDay(start, end)
-      ? DateFormat.jm(locale)
-      : DateFormat.yMMMd(locale).add_jm();
-  return '${startFormat.format(start)} – ${endFormat.format(end)}';
+  // Read as "Wed, Aug 19 · 6:02 – 7:32 AM", not "Aug 19, 2026 6:02 AM – 7:32
+  // AM". The old string put the year — which is almost always this year and
+  // never what anybody is checking — in the middle of the sentence, and led
+  // with the date when the thing being compared between slots is the time. A
+  // middle dot separates the two facts so the eye can land on either.
+  //
+  // The weekday is worth its four characters: nobody schedules by date alone.
+  final sameDay = _sameCalendarDay(start, end);
+  final day = DateFormat.MMMEd(locale).format(start);
+  final from = DateFormat.jm(locale).format(start);
+  final endTime = DateFormat.jm(locale).format(end);
+  final to = sameDay
+      ? endTime
+      : '${DateFormat.MMMEd(locale).format(end)} $endTime';
+
+  return '$day · $from – $to';
 }
 
 bool isValidAppointmentDeadline({

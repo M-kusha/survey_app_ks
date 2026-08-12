@@ -203,18 +203,44 @@ abstract final class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: scheme.surfaceContainer,
-        indicatorColor: scheme.secondaryContainer,
+        // Matches the rail, so the phone and the desktop agree on what
+        // "selected" looks like.
+        indicatorColor: scheme.primary.withValues(alpha: 0.14),
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        labelTextStyle: WidgetStatePropertyAll(textTheme.labelMedium),
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+          ),
+        ),
+        labelTextStyle: WidgetStateProperty.resolveWith(
+          (states) => textTheme.labelMedium?.copyWith(
+            color: states.contains(WidgetState.selected)
+                ? scheme.primary
+                : scheme.onSurfaceVariant,
+            fontWeight: states.contains(WidgetState.selected)
+                ? FontWeight.w600
+                : null,
+          ),
+        ),
       ),
       navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: scheme.surface,
-        indicatorColor: scheme.secondaryContainer,
-        selectedIconTheme: IconThemeData(color: scheme.onSecondaryContainer),
-        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
+        backgroundColor: scheme.pageSurface,
+        // The selected destination now carries the accent colour, on both the
+        // icon and the label. Material's default pairs `onSecondaryContainer`
+        // with a pale pill, which is a very dark navy on very pale blue — it
+        // reads as black, so the only colour in the whole rail was the pill
+        // itself and the nav looked switched off.
+        indicatorColor: scheme.primary.withValues(alpha: 0.14),
+        selectedIconTheme: IconThemeData(color: scheme.primary, size: 24),
+        unselectedIconTheme: IconThemeData(
+          color: scheme.onSurfaceVariant,
+          size: 24,
+        ),
         selectedLabelTextStyle: textTheme.labelMedium?.copyWith(
-          color: scheme.onSurface,
+          color: scheme.primary,
           fontWeight: FontWeight.w600,
         ),
         unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(

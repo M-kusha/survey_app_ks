@@ -2,7 +2,6 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/widgets/appointment_time_dialogs.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
-import 'package:echomeet/core/theme/app_colors.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
 import 'package:echomeet/core/time/appointment_time.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
@@ -97,7 +96,6 @@ class _SlotRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final app = context.appColors;
 
     final start = appointmentTimeInZone(slot.startAt, zoneId);
     final end = appointmentTimeInZone(slot.endAt, zoneId);
@@ -140,29 +138,28 @@ class _SlotRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // The time leads, because that is what differs between the
+                // slots being compared. The date sits beneath it with the zone
+                // and duration, since those only matter once you have picked.
                 Text(
-                  DateFormat.MMMMEEEEd().format(start),
+                  '${DateFormat.jm().format(start)} – '
+                  '${DateFormat.jm().format(end)}',
                   style: theme.textTheme.bodyLarge,
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Text(
-                      '${DateFormat.jm().format(start)} – '
-                      '${DateFormat.jm().format(end)} · $zoneId',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.sm),
-                    Text(
-                      _durationLabel(slot),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: app.info,
-                      ),
-                    ),
-                  ],
+                // One ellipsizing line, not a Row of two unconstrained Texts —
+                // that combination overflowed by ~28px on a phone and drew
+                // Flutter's yellow-and-black overflow stripes across the card.
+                Text(
+                  '${DateFormat.MMMEd().format(start)} · '
+                  '${_durationLabel(slot)} · $zoneId',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (isPast) ...[
                   const SizedBox(height: Spacing.xs),

@@ -111,10 +111,20 @@ class ContentCard extends StatelessWidget {
         child: DecoratedBox(
           decoration: BoxDecoration(
             borderRadius: radius,
+            // The state colour is the whole outline, not a stripe down one edge.
+            //
+            // Two earlier shapes both failed. A full-height stripe was sliced by
+            // the 18px corner radius, leaving a coloured sliver in each corner
+            // and colliding with the progress rule at the bottom. Insetting it
+            // by that radius fixed the slivers but read as a line that had
+            // failed to finish drawing itself — a half border. An outline has no
+            // ends to get wrong: it follows the geometry exactly, at any card
+            // height, and still says the same thing at a glance.
             border: Border.all(
-              color: scheme.outlineVariant.withValues(
-                alpha: muted ? 0.4 : 0.75,
-              ),
+              color: accent != null
+                  ? accent!.withValues(alpha: muted ? 0.35 : 0.65)
+                  : scheme.outlineVariant.withValues(alpha: muted ? 0.4 : 0.75),
+              width: accent != null ? 1.5 : 1,
             ),
           ),
 
@@ -122,19 +132,6 @@ class ContentCard extends StatelessWidget {
             children: [
               Padding(padding: padding, child: child),
 
-              if (accent case final accent?)
-                Positioned(
-                  left: 0,
-                  top: _inset,
-                  bottom: _inset,
-                  width: 4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: accent,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
               if (progress case final progress?)
                 Positioned(
                   left: _inset,

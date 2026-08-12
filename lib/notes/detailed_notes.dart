@@ -536,7 +536,7 @@ class _Editor extends StatelessWidget {
             ),
             child: QuillSimpleToolbar(
               controller: controller,
-              config: const QuillSimpleToolbarConfig(
+              config: QuillSimpleToolbarConfig(
                 multiRowsDisplay: false,
                 showFontFamily: false,
                 showFontSize: false,
@@ -544,6 +544,31 @@ class _Editor extends StatelessWidget {
                 showSubscript: false,
                 showSuperscript: false,
                 showSearchButton: false,
+                // Quill's defaults are sized for a desktop toolbar. Left alone
+                // on a phone, B / I / U came out as 40px filled circles that
+                // took a third of the screen above a note with one line in it.
+                toolbarSize: context.isCompact ? 34 : 42,
+                buttonOptions: QuillSimpleToolbarButtonOptions(
+                  base: QuillToolbarBaseButtonOptions(
+                    iconTheme: QuillIconTheme(
+                      iconButtonSelectedData: IconButtonData(
+                        style: IconButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary.withValues(
+                            alpha: 0.14,
+                          ),
+                          foregroundColor: theme.colorScheme.primary,
+                          minimumSize: const Size.square(30),
+                        ),
+                      ),
+                      iconButtonUnselectedData: IconButtonData(
+                        style: IconButton.styleFrom(
+                          foregroundColor: theme.colorScheme.onSurfaceVariant,
+                          minimumSize: const Size.square(30),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
