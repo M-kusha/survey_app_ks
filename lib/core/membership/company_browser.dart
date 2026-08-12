@@ -4,6 +4,7 @@ import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/membership/membership.dart';
 import 'package:echomeet/core/widgets/feature_kit.dart';
 import 'package:echomeet/core/widgets/status_pill.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 class CompanyBrowserPage extends StatefulWidget {
@@ -23,6 +24,14 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
   bool _hasError = false;
   String? _joining;
 
+  /// Why the load failed, shown only in debug builds.
+  ///
+  /// A bare "something went wrong" is untestable: it cannot distinguish a
+  /// permission rule from an offline device from an empty directory, so the
+  /// first thing anyone asks is what it actually said. Release builds keep the
+  /// generic wording, because an error string can name internal collections.
+  Object? _error;
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +49,7 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
     setState(() {
       _loading = true;
       _hasError = false;
+      _error = null;
     });
 
     try {
@@ -55,10 +65,11 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
         _banned = banned;
         _loading = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _hasError = true;
+        _error = error;
         _loading = false;
       });
     }
@@ -130,6 +141,7 @@ class _CompanyBrowserPageState extends State<CompanyBrowserPage> {
       return EmptyState(
         icon: Icons.cloud_off_rounded,
         title: 'error_occurred'.tr(),
+        body: kDebugMode ? '$_error' : null,
         action: TextButton(onPressed: _load, child: Text('retry'.tr())),
       );
     }

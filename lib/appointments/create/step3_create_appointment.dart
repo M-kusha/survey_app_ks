@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
 import 'package:echomeet/appointments/create/appointment_deadline_picker.dart';
+import 'package:echomeet/appointments/create/appointment_draft_route.dart';
 import 'package:echomeet/appointments/create/step4_create_appointment.dart';
 import 'package:echomeet/appointments/firebase/appointment_services.dart';
 import 'package:echomeet/appointments/widgets/appointment_time_text.dart';
@@ -29,8 +30,15 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_appointment != null) return;
-    _appointment = ModalRoute.of(context)!.settings.arguments as Appointment;
-    final appointment = _appointment!;
+
+    final draft = appointmentDraftOf(context);
+    if (draft == null) {
+      restartAppointmentWizard(context);
+      return;
+    }
+
+    _appointment = draft;
+    final appointment = draft;
     if (appointment.availableTimeSlots.isNotEmpty &&
         !isValidAppointmentDeadline(
           now: DateTime.now(),
@@ -110,7 +118,12 @@ class Step3CreateAppointmentState extends State<Step3CreateAppointment> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final appointment = _appointment!;
+    final appointment = _appointment;
+    // One frame between discovering the draft is missing and the wizard
+    // restarting. Nothing to draw, and nothing to crash on.
+    if (appointment == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
 
     return WizardScaffold(
       step: 3,

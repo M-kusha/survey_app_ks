@@ -71,3 +71,6 @@ ui-debug.log
 Thumbs.db
 *.tmp
 *.bak
+
+# Local dev server config; carries the App Check debug token.
+/.claude/launch.json

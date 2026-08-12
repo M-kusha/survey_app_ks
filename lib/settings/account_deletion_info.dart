@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/navigation/public_routes.dart';
+import 'package:echomeet/utilities/bottom_navigation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -55,10 +56,23 @@ class AccountDeletionInfoPage extends StatelessWidget {
               ),
               const SizedBox(height: Spacing.xl),
               FilledButton.icon(
-                onPressed: () => Navigator.pushNamed(
-                  context,
-                  signedIn ? '/settings' : '/login',
-                ),
+                // Settings is a tab, not a page: it has no app bar, because
+                // inside the shell the bottom bar is how you leave it. Pushing
+                // it as a route stranded people with no back button and no
+                // navigation - on a phone the only way out was to kill the app.
+                // Enter the shell on the settings tab instead, replacing this
+                // stack so Android's back gesture behaves as it does anywhere
+                // else in the app.
+                onPressed: () => signedIn
+                    ? Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute<void>(
+                          builder: (context) =>
+                              const BottomNavigation(initialIndex: 3),
+                        ),
+                        (route) => false,
+                      )
+                    : Navigator.pushNamed(context, '/login'),
                 icon: Icon(
                   signedIn ? Icons.settings_outlined : Icons.login_rounded,
                 ),

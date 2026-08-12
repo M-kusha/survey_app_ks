@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/appointments/appointment_data.dart';
+import 'package:echomeet/appointments/create/appointment_draft_route.dart';
 import 'package:echomeet/appointments/create/time_slot_editor.dart';
 import 'package:echomeet/core/widgets/wizard_scaffold.dart';
 import 'package:flutter/material.dart';
@@ -17,8 +18,14 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (_appointment != null) return;
 
-    _appointment ??= ModalRoute.of(context)!.settings.arguments as Appointment;
+    final draft = appointmentDraftOf(context);
+    if (draft == null) {
+      restartAppointmentWizard(context);
+      return;
+    }
+    _appointment = draft;
   }
 
   void _setSlots(List<TimeSlot> slots) {
@@ -38,7 +45,12 @@ class Step2CreateAppointmentState extends State<Step2CreateAppointment> {
 
   @override
   Widget build(BuildContext context) {
-    final appointment = _appointment!;
+    final appointment = _appointment;
+    // One frame between discovering the draft is missing and the wizard
+    // restarting. Nothing to draw, and nothing to crash on.
+    if (appointment == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
     final slots = appointment.availableTimeSlots;
 
     return WizardScaffold(
