@@ -402,11 +402,17 @@ class _SettingsPageUIState extends State<SettingsPageUI> {
             onTap: membership.isClosing ? _cancelClosure : _closeCompany,
           ),
         if (activeCompanyAdmin && inCompany) ...[
-          Material(
-            type: MaterialType.transparency,
-            child: SwitchListTile(
-              secondary: const Icon(Icons.door_front_door_outlined),
-              title: Text('open_to_join'.tr()),
+          // Was a raw `SwitchListTile`, the only row in Settings that was not a
+          // `SettingsTile`. It therefore took the plain list-tile icon colour —
+          // grey, with no tinted square — while every neighbour had a blue one,
+          // so the odd row out was the one control here that changes who can
+          // walk into the company.
+          SettingsTile(
+            icon: Icons.door_front_door_outlined,
+            title: 'open_to_join'.tr(),
+            showChevron: false,
+            onTap: () => _setJoinPolicy(!_openToJoin),
+            trailing: Switch(
               value: _openToJoin,
               onChanged: _setJoinPolicy,
             ),

@@ -192,13 +192,14 @@ class _ProgressRule extends StatelessWidget {
   }
 }
 
-/// One column of cards on a narrow window, two on a wide one.
+/// A vertical list of cards, one per row.
 ///
-/// A single column capped at reading width leaves most of a desktop window
-/// empty, which is what made the lists look sparse. Cards vary in height, so
-/// the two columns are packed independently and items alternate between them,
-/// rather than being laid out in rows: a row-based grid stretches every card to
-/// the tallest in its row and puts the empty space straight back.
+/// This briefly laid two columns out on wide windows to fill the space a single
+/// reading-width column leaves empty. Seen in the app that read as a grid rather
+/// than a list: two unrelated meetings side by side invite comparison that means
+/// nothing, and the eye has to choose a scan direction. One per row it is —
+/// what fixed the sparseness was giving the cards a visible edge, not doubling
+/// them up.
 class CardColumns extends StatelessWidget {
   const CardColumns({
     super.key,
@@ -211,33 +212,14 @@ class CardColumns extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget stack(List<Widget> items) => Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final item in items)
+        for (final child in children)
           Padding(
             padding: EdgeInsets.only(bottom: spacing),
-            child: item,
+            child: child,
           ),
-      ],
-    );
-
-    // A lone card keeps its column rather than stretching across both, so a
-    // one-item section lines up with the sections above and below it.
-    if (!context.canShowTwoPanes) return stack(children);
-
-    final left = <Widget>[];
-    final right = <Widget>[];
-    for (final (index, child) in children.indexed) {
-      (index.isEven ? left : right).add(child);
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: stack(left)),
-        SizedBox(width: spacing),
-        Expanded(child: stack(right)),
       ],
     );
   }

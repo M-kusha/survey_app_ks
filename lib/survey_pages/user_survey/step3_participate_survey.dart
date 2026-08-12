@@ -174,8 +174,11 @@ class _ScoreCard extends StatelessWidget {
             children: [
               Text(
                 grade.scoreAvailable ? '${grade.percentage.round()}%' : '—',
-                style: theme.textTheme.displaySmall?.copyWith(
-                  fontWeight: FontWeight.w700,
+                // Was `displaySmall` at weight 700 — around 36px in the display
+                // face, roughly two and a half times the body text beside it.
+                // A score should read as a figure, not as a headline.
+                // `titleLarge` is what every other score in the app now uses.
+                style: theme.textTheme.titleLarge?.copyWith(
                   color: tone,
                   height: 1,
                 ),

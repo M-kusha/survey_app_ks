@@ -232,9 +232,7 @@ class AppointmentPageUIState extends State<AppointmentPageUI> {
     return Scaffold(
       body: SafeArea(
         child: PageBody(
-          // Wide enough for two columns of cards where there is room for them,
-          // and reading width where there is not.
-          maxWidth: context.canShowTwoPanes ? 1100 : 720,
+          maxWidth: 720,
           scrollable: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,

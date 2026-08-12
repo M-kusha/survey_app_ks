@@ -15,6 +15,10 @@ import 'package:echomeet/survey_pages/utilities/survey_data_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+/// The extended rail's width, declared once because both `NavigationRail` and
+/// the profile block sized to it have to agree.
+const double _extendedRailWidth = 256;
+
 class _Destination {
   const _Destination(this.icon, this.selectedIcon, this.labelKey);
 
@@ -167,20 +171,25 @@ class _BottomNavigationState extends State<BottomNavigation> {
           labelType: extended
               ? NavigationRailLabelType.none
               : NavigationRailLabelType.all,
-          // Who you are, then where you can go, then the controls. The rail
-          // used to open with the product's own logo — which the person using
-          // it already knows — and nothing anywhere said which account they
-          // were signed in as.
-          leading: Padding(
-            padding: const EdgeInsets.fromLTRB(
-              Spacing.sm,
-              Spacing.lg,
-              Spacing.sm,
-              Spacing.lg,
-            ),
-            child: _RailProfile(
-              extended: extended,
-              onTap: () => _onDestinationSelected(_destinations.length - 1),
+          // The rail is an unconstrained child of the shell's Row, because
+          // NavigationRail sizes itself from its destinations. That leaves
+          // `leading` with an unbounded width, so anything flexible inside it
+          // throws during layout. Naming the extended width here and sizing the
+          // leading to it gives the profile row something finite to divide.
+          minExtendedWidth: _extendedRailWidth,
+          leading: SizedBox(
+            width: extended ? _extendedRailWidth : null,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Spacing.sm,
+                Spacing.lg,
+                Spacing.sm,
+                Spacing.lg,
+              ),
+              child: _RailProfile(
+                extended: extended,
+                onTap: () => _onDestinationSelected(_destinations.length - 1),
+              ),
             ),
           ),
           destinations: [
@@ -300,8 +309,11 @@ class _RailProfile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final user = context.watch<UserDataProvider>().currentUser;
-    final membership = context.watch<MembershipProvider>().membership;
+    // Nullable reads on purpose. The rail is chrome, not a feature: if a screen
+    // ever hosts it without these providers it should draw a plain avatar, not
+    // bring the whole shell down.
+    final user = context.watch<UserDataProvider?>()?.currentUser;
+    final membership = context.watch<MembershipProvider?>()?.membership;
 
     final avatar = ClipOval(
       child: Container(

@@ -373,7 +373,9 @@ class ParticipantsSummary extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       average == null ? '—' : '${average.round()}%',
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                      // Same size as every other score in the app, so a figure
+                      // reads as a figure wherever it appears.
+                      style: theme.textTheme.titleLarge?.copyWith(
                         color: averageColour,
                         height: 1,
                       ),
