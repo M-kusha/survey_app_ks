@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:echomeet/core/layout/breakpoints.dart';
 import 'package:echomeet/core/layout/page_body.dart';
 import 'package:echomeet/core/theme/app_theme.dart';
+import 'package:echomeet/core/widgets/brand_mark.dart';
 import 'package:echomeet/core/widgets/aurora_background.dart';
 import 'package:echomeet/core/widgets/language_button.dart';
 import 'package:echomeet/core/widgets/theme_toggle_button.dart';
@@ -209,11 +210,7 @@ class _Wordmark extends StatelessWidget {
               colors: [scheme.primary, scheme.tertiary],
             ),
           ),
-          child: Icon(
-            Icons.calendar_month_rounded,
-            color: scheme.onPrimary,
-            size: 19,
-          ),
+          child: Center(child: BrandMark(size: 20, color: scheme.onPrimary)),
         ),
         const SizedBox(width: Spacing.md),
         Text(
