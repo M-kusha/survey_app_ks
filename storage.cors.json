@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://echomeet-app.web.app",
+      "https://echomeet-app.firebaseapp.com",
+      "http://localhost:4200",
+      "http://localhost:5000"
+    ],
+    "method": ["GET", "HEAD"],
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Range"],
+    "maxAgeSeconds": 3600
+  }
+]
