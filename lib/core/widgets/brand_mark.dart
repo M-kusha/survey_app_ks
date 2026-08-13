@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 class BrandMark extends StatelessWidget {
@@ -28,30 +26,28 @@ class _MarkPainter extends CustomPainter {
 
   final Color color;
 
-  static const _degree = math.pi / 180;
-
   @override
   void paint(Canvas canvas, Size size) {
-    final weight = size.width * 0.10;
+    final radius = size.width * 0.225;
+    final centre = Offset(size.width / 2, size.height / 2);
+    final left = centre.translate(-size.width * 0.105, 0);
+    final right = centre.translate(size.width * 0.105, 0);
 
-    final centre = Offset(size.width * 0.26, size.height / 2);
+    final leftCircle = Path()
+      ..addOval(Rect.fromCircle(center: left, radius: radius));
+    final rightCircle = Path()
+      ..addOval(Rect.fromCircle(center: right, radius: radius));
 
-    Paint strokeAt(double alpha) => Paint()
-      ..color = color.withValues(alpha: color.a * alpha)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = weight
-      ..strokeCap = StrokeCap.round;
+    final wash = Paint()..color = color.withValues(alpha: color.a * 0.55);
+    canvas.saveLayer(Offset.zero & size, Paint());
+    canvas.drawPath(leftCircle, wash);
+    canvas.drawPath(rightCircle, wash);
+    canvas.restore();
 
-    void arc(double radiusFactor, double alpha) => canvas.drawArc(
-      Rect.fromCircle(center: centre, radius: size.width * radiusFactor),
-      -58 * _degree,
-      116 * _degree,
-      false,
-      strokeAt(alpha),
+    canvas.drawPath(
+      Path.combine(PathOperation.intersect, leftCircle, rightCircle),
+      Paint()..color = color,
     );
-
-    arc(0.38, 0.45);
-    arc(0.20, 1);
   }
 
   @override

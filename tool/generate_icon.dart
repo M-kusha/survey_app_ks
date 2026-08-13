@@ -11,7 +11,7 @@ void main() {
   const deep = Color(0xFF00306B);
   const bright = Color(0xFF1E7BE0);
 
-  const chosen = _Mark.echo;
+  const chosen = _Mark.overlap;
 
   test('generates the icon sources', () async {
     await _write('assets/icon/icon.png', size, (canvas) {
