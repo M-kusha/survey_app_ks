@@ -1,7 +1,9 @@
-# Echomeet
+# EchoMeet
+
+**Live: https://echomeet-app.web.app** · [Privacy policy](https://echomeet-app.web.app/privacy-policy) · [Account deletion](https://echomeet-app.web.app/account-deletion)
 
 A Flutter and Firebase app for small companies: shared **notes**, **meeting
-scheduling** by availability poll, and **surveys and graded tests** with
+scheduling** by availability poll, and **surveys and graded quizzes** with
 scoring, review and PDF export.
 
 Built solo in 2023–24 and rebuilt from the ground up in 2026: a hardened
@@ -51,12 +53,12 @@ deliberate: a scheduling poll asks "when can you make it", and that answer
 genuinely changes. Locking the first response gets you a wrong meeting time plus
 a message asking you to fix it by hand.
 
-### Surveys and tests
+### Surveys and quizzes
 
 Two things behind one authoring flow:
 
 - a **survey** collects opinions and has no right answers
-- a **test** is graded, has a pass mark, and can be timed per question
+- a **quiz** is graded, has a pass mark, and can be timed per question
 
 Question types are single choice, multiple choice and free text. Multiple choice
 is scored proportionally — right options earn, wrong ones subtract, floored at
@@ -66,7 +68,7 @@ Free-text answers are marked by an admin afterwards, as **correct / incorrect /
 not yet reviewed**, which are three distinct facts about somebody's paper.
 Marking one re-grades the whole submission rather than adjusting a stored total.
 
-Leaving a timed test submits what you have. It does not discard the attempt and
+Leaving a timed quiz submits what you have. It does not discard the attempt and
 let you start again, and the security rules only permit `create` on a response,
 never `update` — so a second attempt is refused by the server even if the UI is
 bypassed.
@@ -90,7 +92,7 @@ that mattered lived in the UI, and the UI is a suggestion. Now:
 - Company isolation: one company's data is unreachable from another
 - Two levels of privilege enforced in rules, not just hidden in the interface
 - `superadmin` grantable only at company creation, never afterwards, by anyone
-- One attempt per graded test, enforced server-side — a response allows `create`
+- One attempt per graded quiz, enforced server-side — a response allows `create`
   and never `update`, so a score cannot be rewritten by the person who earned it
 - Ordered cascading deletes, so removing a survey or a company cannot strand its
   subcollections
@@ -109,7 +111,7 @@ that mattered lived in the UI, and the UI is a suggestion. Now:
 - **PDF export** for individuals, filtered groups and survey analytics
 - **Proportional scoring** for multiple choice — right options earn, wrong ones
   subtract, floored at zero
-- **Three languages**, 546 keys each, with locale-correct dates everywhere
+- **Three languages**, 747 keys each, with locale-correct dates everywhere
   including inside generated PDFs
 
 ### Redesigned
@@ -238,7 +240,7 @@ lib/
 └── settings/
 ```
 
-121 files, ~20,000 lines.
+146 files, ~30,800 lines.
 
 **State** is Provider plus local `setState`. Deliberately not Riverpod or Bloc:
 the app has three data domains and no cross-screen shared mutable state worth
@@ -253,7 +255,7 @@ they encode are tested directly instead of by driving a screen.
 navigation rail on tablets, an extended rail with labels on desktops. Content is
 width-capped per screen rather than stretched across a monitor.
 
-**Three languages** — English, German, Albanian — with 546 keys each. Dates go
+**Three languages** — English, German, Albanian — with 747 keys each. Dates go
 through `DateFormat` with an explicit locale, including inside generated PDFs,
 where there is no `BuildContext` left to read one from.
 
@@ -263,21 +265,18 @@ where there is no `BuildContext` left to read one from.
 
 | Suite | Count | What it covers |
 | --- | --- | --- |
-| `rules-tests/` | 100+ cases | Firestore and Storage rules, against the emulators |
-| `test/unit/` | 8 files | Pure logic — scoring, tallies, queries, deadlines |
-| `test/widget/` | 6 files | Layout geometry and interaction |
-| `test/golden/` | 8 files | Design system and signed-out screens |
+| `rules-tests/` | 155 cases | Firestore and Storage rules, against the emulators |
+| `test/unit/` | 50 files | Pure logic — scoring, tallies, queries, deadlines, codecs |
+| `test/widget/` | 14 files | Layout geometry and interaction |
+| `test/golden/` | 7 files | Design system, navigation and signed-out screens |
+| `functions/test/` | 141 cases | Trusted callables, triggers and the activity log |
+
+470 Dart tests and 141 function tests, with the analyzer clean.
 
 ```bash
 flutter test                       # Dart
 cd rules-tests && npm test         # rules (needs Java for the emulator)
 ```
-
-> The golden baselines predate the most recent chrome changes — the navigation
-> rail gained a control and the form action bar changed shape — so some will
-> report a diff until they are regenerated with
-> `flutter test test/golden --update-goldens`. The logic, widget and rules
-> suites are green.
 
 **The rules tests are the ones that matter most.** They cover what is invisible
 from inside the app: that a colleague at another company cannot read your
@@ -309,7 +308,7 @@ Notifications are one part of the 16 Functions exported from `functions/`:
 
 | Trigger | Who hears |
 | --- | --- |
-| Survey or test created | active members, **except the author** |
+| Survey or quiz created | active members, **except the author** |
 | Meeting created | active members, except the author |
 | Time slot confirmed | everyone who voted, plus everyone who was asked |
 | Someone asks to join | admins and the owner, never moderators |
@@ -356,18 +355,29 @@ firebase deploy --only firestore:rules,firestore:indexes,storage --project echom
 
 ## Deploying
 
-Production rollout is ordered because the privacy projections, private survey
-keys, appointment timestamps/caches, and canonical avatars require guarded
-migrations between specific backend and client releases. Follow
+The web app is live at **https://echomeet-app.web.app**, with the privacy policy
+and account-deletion instructions served from the same host.
+
+```bash
+flutter build web --release --csp --no-web-resources-cdn   --dart-define=FIREBASE_APP_CHECK_WEB_KEY=<reCAPTCHA v3 site key>
+npx firebase deploy --only hosting
+```
+
+Both flags are load-bearing and the reasons are in
+[docs/deploy-web.md](docs/deploy-web.md), along with the Content-Security-Policy
+the app has to satisfy — including one deliberate weakening (`'unsafe-inline'`
+on `script-src`) that the Firebase web SDK forces, and the route to removing it.
+Every failure that document records was invisible locally and only appeared in a
+release build.
+
+Backend rollout is ordered, because the privacy projections, private survey
+keys, appointment timestamps and canonical avatars need guarded migrations
+between specific backend and client releases. Follow
 [docs/release-runbook.md](docs/release-runbook.md) from Gate 0; do not deploy
-individual rules, Functions, or clients out of sequence.
+individual rules, Functions or clients out of sequence.
 
 Android release builds fail closed until `android/key.properties` points to a
 real upload keystore. See [docs/release-signing.md](docs/release-signing.md).
-
-The public account-deletion instructions are available at
-`https://echomeet-app.web.app/#/account-deletion`. The route is part of the app;
-publishing it still requires the hosting deployment above.
 
 ---
 
@@ -379,9 +389,10 @@ What comes next, in rough priority order:
   is missing. The private Android keystore, Apple team/provisioning, APNs key,
   web VAPID key and App Check provider keys remain release-environment inputs
   and must never enter this repository.
-- **Firebase App Check enforcement rollout.** Client integration is complete and
-  the safe rollout is documented in `docs/app-check.md`. Provider registration,
-  metrics review and gradual console enforcement remain release-console tasks.
+- **Firebase App Check enforcement.** The web app attests with reCAPTCHA v3 and
+  every callable sets `enforceAppCheck`. Enforcement for Firestore itself is a
+  console setting and is not yet on, so a stolen ID token can still reach the
+  database directly — the rules remain the real boundary either way.
 - **Roles as custom claims** rather than Firestore fields. Every rule that
   checks a role currently costs a document read; claims are cheaper and cannot
   be reached by a client at all. Needs a function to set them.

@@ -21,6 +21,9 @@ Severity is about what a user or a reviewer would actually experience:
 
 ### 1. The first person to register as a plain user reaches a dead end
 
+**Fixed in `1176fba`** — there is now a *Continue without a company* action, and
+the account lands in the companyless state the app already modelled.
+
 `lib/register/register_4step.dart:110`
 
 ```dart
@@ -49,6 +52,9 @@ account (`CompanyGate`), so the second is cheap.
 
 ### 2. Automatic push re-registration fails silently
 
+**Fixed in `1176fba`** — the outcome is recorded and the notifications row says
+so, with a way to retry.
+
 `lib/core/notifications/push_service.dart:119`
 
 ```dart
@@ -76,6 +82,8 @@ row ("Notifications may not be working — retry"), and `debugPrint` in debug.
 
 ### 3. Deleting a survey reads every response to show a number
 
+**Fixed in `1176fba`** — replaced with a `count()` aggregation.
+
 `lib/survey_pages/main_sruvey/survey_list.dart:209` and `:267`
 
 ```dart
@@ -93,6 +101,8 @@ or keep a counter on the parent (the `responsesRevision` field already proves
 the trigger can maintain one).
 
 ### 4. Two providers can notify after disposal
+
+**Fixed in `1176fba`** — both now carry the guard the other five already had.
 
 `lib/login/session_access.dart:47` and `lib/settings/font_size_provider.dart:25`
 
@@ -146,6 +156,11 @@ enforcement state. Turn it on *after* the debug tokens are removed, or the app
 stops working on your own devices.
 
 ### 7. Two debug tokens still bypass attestation
+
+**Partly closed** — the web app now attests with a real reCAPTCHA v3 key, so the
+web token is redundant and can be deleted. The Android token has to stay until a
+Play-signed release build exists, because the sideloaded debug APKs on the
+author's phone and tablet authenticate with it.
 
 - web `6e7b913a-959f-41bb-ae39-a0450c2514d6`
 - Android `ce7c4706-b0db-482e-879c-18f74b7e95f0`
@@ -216,8 +231,9 @@ Not bugs, but gaps a reviewer might notice:
    Actions file is half an hour and makes the discipline visible.
 3. **Nothing is deployed.** Firebase Hosting is configured and has never been
    run. Until it is, the app cannot be looked at without a laptop and a phone.
-4. **Notifications are unproven end to end.** They have never been observed
-   arriving on a device, and finding 2 explains why a failure would be invisible.
+4. ~~**Notifications are unproven end to end.**~~ **Confirmed working** on a
+   real device by the author. Finding 2 is fixed regardless, so a future failure
+   announces itself instead of looking like silence.
 
 ---
 
