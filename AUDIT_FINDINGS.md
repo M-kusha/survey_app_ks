@@ -172,15 +172,29 @@ reCAPTCHA v3 key to replace the web one.
 
 ### 8. Two golden tests hang rather than fail
 
+**Fixed** — and the diagnosis in this entry was wrong. See below.
+
 `test/golden/auth_screens_test.dart` — the `de` and `sq` localisation cases are
 `skip: true`. They do not fail; they time out after ~7 minutes each, verified
 against a clean checkout, so they were costing 14 minutes of every full run
 before being skipped.
 
-The cause is the trap the file's own setup describes: with a non-English locale
-the `Localizations` delegates cannot resolve and `pumpAndSettle` never settles.
-Skipping stopped the bleeding; the German and Albanian auth screens are now
-**untested**.
+The delegate theory was wrong: those tests leave `MaterialApp.locale` on `en`
+and only swap the translation table, so the delegates were never asked for
+anything they could not resolve.
+
+The real cause was `loadAppTranslations()` being called *inside* the
+`testWidgets` body. It reads the translation file from disk, and a widget test
+runs in a fake-async zone where real I/O never completes — so it hung before
+reaching the first `pump`. The English cases were fine only because `setUpAll`
+loads that table outside the zone. Wrapping the call in `tester.runAsync` fixes
+it: both now run in about five seconds.
+
+With the hang gone, an assertion underneath it turned out to be wrong too — it
+looked for `Meeting` where `_CardLabel` renders `MEETING`. That had been hidden
+behind the timeout the whole time.
+
+The suite now runs with **nothing skipped**.
 
 ### 9. Two files are past the size where they can be read in one sitting
 

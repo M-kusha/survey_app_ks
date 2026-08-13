@@ -151,10 +151,8 @@ void main() {
     tearDown(() => loadAppTranslations());
 
     for (final code in ['de', 'sq']) {
-      testWidgets('$code translates the product art too', skip: true, (
-        tester,
-      ) async {
-        await loadAppTranslations(locale: code);
+      testWidgets('$code translates the product art too', (tester) async {
+        await tester.runAsync(() => loadAppTranslations(locale: code));
 
         await _pump(
           tester,
@@ -163,8 +161,15 @@ void main() {
           size: const Size(1280, 800),
         );
 
-        expect(find.text('showcase_meeting_label'.tr()), findsOneWidget);
-        expect(find.text('showcase_attending_label'.tr()), findsOneWidget);
+        expect(
+          find.text('showcase_meeting_label'.tr().toUpperCase()),
+          findsOneWidget,
+          reason: 'the showcase card labels render uppercased',
+        );
+        expect(
+          find.text('showcase_attending_label'.tr().toUpperCase()),
+          findsOneWidget,
+        );
         expect(find.text('login_headline'.tr()), findsOneWidget);
       });
     }
