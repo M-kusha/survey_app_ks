@@ -88,4 +88,20 @@ void main() {
     );
     expect(rail.bottom - footer.bottom, lessThan(80));
   });
+
+  testWidgets('a phone in landscape drops the rail footer controls', (
+    tester,
+  ) async {
+    await _pumpShell(tester, const Size(832, 384));
+
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byType(SignOutButton),
+      findsNothing,
+      reason:
+          'theme, language and sign-out do not fit beside four destinations in '
+          'a 384px viewport, and stay reachable from Settings',
+    );
+    expect(find.byType(NavigationRail), findsOneWidget);
+  });
 }

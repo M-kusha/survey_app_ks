@@ -12,7 +12,7 @@ class FontSizeProvider with ChangeNotifier {
 
   static const _key = 'font_size';
 
-  double _fontSize = fontMediumSize;
+  double _fontSize = fontMinSize;
   double get fontSize => _fontSize;
 
   double get textScale => _fontSize / fontMediumSize;

@@ -20,6 +20,8 @@ const double _extendedRailWidth = 256;
 
 const Key bottomNavigationBarKey = Key('echomeet.bottomNavigationBar');
 
+const double _compactRailHeight = 500;
+
 class _Destination {
   const _Destination(
     this.icon,
@@ -173,69 +175,81 @@ class _BottomNavigationState extends State<BottomNavigation> {
   }
 
   Widget _buildRail(BuildContext context, {required bool extended}) {
+    return SafeArea(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final short =
+              constraints.maxHeight.isFinite &&
+              constraints.maxHeight < _compactRailHeight;
+          return _cappedScale(
+            context: context,
+            child: _rail(context, extended: extended, short: short),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _rail(
+    BuildContext context, {
+    required bool extended,
+    required bool short,
+  }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return SafeArea(
-      child: _cappedScale(
-        context: context,
-        child: NavigationRail(
-          selectedIndex: _currentIndex,
-          onDestinationSelected: _onDestinationSelected,
-          extended: extended,
-
-          scrollable: true,
-
-          labelType: extended
-              ? NavigationRailLabelType.none
-              : NavigationRailLabelType.all,
-
-          minExtendedWidth: _extendedRailWidth,
-          leading: SizedBox(
-            width: extended ? _extendedRailWidth : null,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                Spacing.sm,
-                Spacing.lg,
-                Spacing.sm,
-                Spacing.lg,
-              ),
-              child: _RailProfile(
-                extended: extended,
-                onTap: () => _onDestinationSelected(_destinations.length - 1),
-              ),
-            ),
+    return NavigationRail(
+      selectedIndex: _currentIndex,
+      onDestinationSelected: _onDestinationSelected,
+      extended: extended,
+      scrollable: true,
+      labelType: extended
+          ? NavigationRailLabelType.none
+          : NavigationRailLabelType.all,
+      minExtendedWidth: _extendedRailWidth,
+      leading: SizedBox(
+        width: extended ? _extendedRailWidth : null,
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            Spacing.sm,
+            short ? Spacing.sm : Spacing.lg,
+            Spacing.sm,
+            short ? Spacing.sm : Spacing.lg,
           ),
-          destinations: [
-            for (final destination in _destinations)
-              NavigationRailDestination(
-                icon: Icon(destination.icon),
-                selectedIcon: Icon(destination.selectedIcon),
-
-                label: Text(
-                  destination.labelKey.tr(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                ),
-              ),
-          ],
-
-          trailingAtBottom: true,
-          trailing: Padding(
-            padding: const EdgeInsets.only(bottom: Spacing.lg),
-            child: _RailFooter(extended: extended),
-          ),
-
-          indicatorColor: scheme.secondaryContainer,
-          selectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
-            color: scheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
-            color: scheme.onSurfaceVariant,
+          child: _RailProfile(
+            extended: extended,
+            compact: short,
+            onTap: () => _onDestinationSelected(_destinations.length - 1),
           ),
         ),
+      ),
+      destinations: [
+        for (final destination in _destinations)
+          NavigationRailDestination(
+            icon: Icon(destination.icon),
+            selectedIcon: Icon(destination.selectedIcon),
+            label: Text(
+              destination.labelKey.tr(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+            ),
+          ),
+      ],
+      trailingAtBottom: true,
+      trailing: short
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.only(bottom: Spacing.lg),
+              child: _RailFooter(extended: extended),
+            ),
+      indicatorColor: scheme.secondaryContainer,
+      selectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
+        color: scheme.onSurface,
+        fontWeight: FontWeight.w600,
+      ),
+      unselectedLabelTextStyle: theme.textTheme.labelMedium?.copyWith(
+        color: scheme.onSurfaceVariant,
       ),
     );
   }
@@ -299,10 +313,15 @@ class _RailFooter extends StatelessWidget {
 }
 
 class _RailProfile extends StatelessWidget {
-  const _RailProfile({required this.extended, required this.onTap});
+  const _RailProfile({
+    required this.extended,
+    required this.onTap,
+    this.compact = false,
+  });
 
   final bool extended;
   final VoidCallback onTap;
+  final bool compact;
 
   static String _initials(String? name) {
     final parts = (name ?? '')
@@ -324,10 +343,12 @@ class _RailProfile extends StatelessWidget {
     final user = context.watch<UserDataProvider?>()?.currentUser;
     final membership = context.watch<MembershipProvider?>()?.membership;
 
+    final diameter = compact ? 28.0 : 36.0;
+
     final avatar = ClipOval(
       child: Container(
-        height: 36,
-        width: 36,
+        height: diameter,
+        width: diameter,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
