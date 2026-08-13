@@ -210,7 +210,7 @@ class _Wordmark extends StatelessWidget {
               colors: [scheme.primary, scheme.tertiary],
             ),
           ),
-          child: Center(child: BrandMark(size: 20, color: scheme.onPrimary)),
+          child: Center(child: BrandMark(size: 26, color: scheme.onPrimary)),
         ),
         const SizedBox(width: Spacing.md),
         Text(

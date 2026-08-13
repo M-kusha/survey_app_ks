@@ -28,10 +28,10 @@ class _MarkPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final radius = size.width * 0.225;
+    final radius = size.width * 0.305;
     final centre = Offset(size.width / 2, size.height / 2);
-    final left = centre.translate(-size.width * 0.105, 0);
-    final right = centre.translate(size.width * 0.105, 0);
+    final left = centre.translate(-size.width * 0.145, 0);
+    final right = centre.translate(size.width * 0.145, 0);
 
     final leftCircle = Path()
       ..addOval(Rect.fromCircle(center: left, radius: radius));

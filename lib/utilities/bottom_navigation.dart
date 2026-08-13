@@ -411,12 +411,12 @@ class _RailBrand extends StatelessWidget {
     final theme = Theme.of(context);
     final muted = theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.75);
 
-    if (!extended) return BrandMark(size: 20, color: muted);
+    if (!extended) return BrandMark(size: 24, color: muted);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        BrandMark(size: 18, color: muted),
+        BrandMark(size: 22, color: muted),
         const SizedBox(width: Spacing.sm),
         Text(
           'app_title'.tr(),
