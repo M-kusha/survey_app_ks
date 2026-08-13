@@ -264,9 +264,8 @@ class _AdminButton extends StatelessWidget {
     final provider = Provider.of<SurveyDataProvider>(context, listen: false);
     final messenger = ScaffoldMessenger.of(context);
 
-    await provider.loadParticipants(survey.id);
+    final responses = await provider.countResponses(survey.id);
     if (!context.mounted) return;
-    final responses = provider.participants?.length ?? 0;
 
     final confirmed = await showDialog<bool>(
       context: context,

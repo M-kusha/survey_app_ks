@@ -52,10 +52,27 @@ class SurveyAnalyticsPage extends StatefulWidget {
 }
 
 class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
+  final _searchController = TextEditingController();
+
   late final List<List<int>> _counts = countAnswers(
     widget.survey.questions,
     widget.participants,
   );
+
+  @override
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,11 +130,72 @@ class SurveyAnalyticsPageState extends State<SurveyAnalyticsPage> {
                           responded: responded,
                         ),
                       ),
+                    _Respondents(
+                      participants: participants,
+                      controller: _searchController,
+                    ),
                     const SizedBox(height: Spacing.xxl),
                   ],
                 ),
               ),
       ),
+    );
+  }
+}
+
+class _Respondents extends StatelessWidget {
+  const _Respondents({required this.participants, required this.controller});
+
+  final List<Participant> participants;
+  final TextEditingController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final query = controller.text.trim().toLowerCase();
+    final names =
+        participants
+            .map((participant) => participant.name.trim())
+            .where((name) => name.isNotEmpty)
+            .toList()
+          ..sort();
+    final matching = query.isEmpty
+        ? names
+        : names.where((name) => name.toLowerCase().contains(query)).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: Spacing.lg),
+        SectionLabel(label: 'who_responded'.tr(), count: names.length),
+        Padding(
+          padding: const EdgeInsets.only(bottom: Spacing.sm),
+          child: SearchPill(
+            controller: controller,
+            hint: 'search_participants'.tr(),
+          ),
+        ),
+        if (matching.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.lg),
+            child: Text(
+              'no_search_results'.tr(),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: Spacing.sm,
+            runSpacing: Spacing.sm,
+            children: [
+              for (final name in matching)
+                MetaChip(icon: Icons.check_rounded, label: name),
+            ],
+          ),
+      ],
     );
   }
 }

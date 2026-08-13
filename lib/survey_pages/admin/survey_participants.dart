@@ -62,6 +62,8 @@ class SurveyParticipantsPage extends StatefulWidget {
 }
 
 class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
+  final _searchController = TextEditingController();
+
   ParticipantFilter _filter = ParticipantFilter.all;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _membersSubscription;
   Map<String, ({String storedReference, int revision})> _memberAvatars =
@@ -71,6 +73,9 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _watchMemberAvatars(widget.survey.companyId);
   }
 
@@ -116,6 +121,7 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   @override
   void dispose() {
     ++_memberGeneration;
+    _searchController.dispose();
     unawaited(_membersSubscription?.cancel());
     super.dispose();
   }
@@ -140,6 +146,13 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
   }
 
   List<Participant> _visible(List<Participant> participants) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      participants = participants
+          .where((participant) => participant.name.toLowerCase().contains(query))
+          .toList();
+    }
+
     final result = switch (_filter) {
       ParticipantFilter.all => [...participants],
       ParticipantFilter.passed => participants.where(_hasPassed).toList(),
@@ -230,6 +243,11 @@ class SurveyParticipantsPageState extends State<SurveyParticipantsPage> {
                         .length,
                   },
                   onChanged: (filter) => setState(() => _filter = filter),
+                ),
+                const SizedBox(height: Spacing.sm),
+                SearchPill(
+                  controller: _searchController,
+                  hint: 'search_participants'.tr(),
                 ),
                 const SizedBox(height: Spacing.md),
                 Expanded(child: _buildList(_visible(participants))),

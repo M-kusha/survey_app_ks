@@ -76,13 +76,13 @@ class Register4stepState extends State<Register4step> {
         .toList();
   }
 
-  Future<void> _finish() async {
+  Future<void> _finish({bool withoutCompany = false}) async {
     setState(() => _saving = true);
 
     try {
       await widget.registerLogic.registerUser(
         profileType: ProfileType.user,
-        existingCompanyId: _selectedId,
+        existingCompanyId: withoutCompany ? null : _selectedId,
       );
       if (!mounted) return;
       Navigator.pushAndRemoveUntil(
@@ -126,6 +126,18 @@ class Register4stepState extends State<Register4step> {
           ),
           const SizedBox(height: Spacing.sm),
           _buildList(),
+          const SizedBox(height: Spacing.md),
+          TextButton(
+            onPressed: _saving ? null : () => _finish(withoutCompany: true),
+            child: Text('continue_without_company'.tr()),
+          ),
+          Text(
+            'join_company_later_hint'.tr(),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );

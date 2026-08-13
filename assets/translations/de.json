@@ -740,5 +740,10 @@
   "vote_short_yes": "Ja",
   "vote_short_maybe": "Vielleicht",
   "vote_short_no": "Nein",
-  "attending": "Nimmt teil"
+  "attending": "Nimmt teil",
+  "continue_without_company": "Ohne Unternehmen fortfahren",
+  "join_company_later_hint": "Sie können später in den Einstellungen beitreten oder eines erstellen.",
+  "notifications_not_registered": "Aktiv, aber dieses Gerät wurde nicht registriert. Aus- und wieder einschalten, um es erneut zu versuchen.",
+  "search_participants": "Personen suchen",
+  "who_responded": "Wer geantwortet hat"
 }

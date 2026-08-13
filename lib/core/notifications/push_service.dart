@@ -116,9 +116,37 @@ class PushService {
     final current = _auth.currentUser;
     if (current?.uid == observedUser?.uid && current?.emailVerified == true) {
       try {
-        await startIfEnabled(expectedUid: current!.uid);
-      } catch (_) {}
+        final result = await startIfEnabled(expectedUid: current!.uid);
+        _recordStartOutcome(result == PushStartResult.registered ? null : result);
+      } catch (error) {
+        _recordStartOutcome(PushStartResult.unavailable, error);
+      }
     }
+  }
+
+  static PushStartResult? _lastAutomaticFailure;
+  static Object? _lastAutomaticError;
+
+  static PushStartResult? get lastAutomaticFailure => _lastAutomaticFailure;
+
+  static Object? get lastAutomaticError => _lastAutomaticError;
+
+  static void clearLastAutomaticFailure() {
+    _lastAutomaticFailure = null;
+    _lastAutomaticError = null;
+  }
+
+  void _recordStartOutcome(PushStartResult? failure, [Object? error]) {
+    _lastAutomaticFailure = failure;
+    _lastAutomaticError = failure == null ? null : error;
+    if (failure == null) return;
+    assert(() {
+      debugPrint(
+        'EchoMeet: automatic push registration did not complete '
+        '($failure${error == null ? '' : ' - $error'})',
+      );
+      return true;
+    }());
   }
 
   Future<PushStartResult> startIfEnabled({String? expectedUid}) async {

@@ -188,6 +188,20 @@ class SurveyDataProvider extends ChangeNotifier {
     await firstSnapshot.future;
   }
 
+  Future<int> countResponses(String surveyId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('surveys')
+          .doc(surveyId)
+          .collection('participants')
+          .count()
+          .get();
+      return snapshot.count ?? 0;
+    } catch (_) {
+      return _participantsSurveyId == surveyId ? (_participants?.length ?? 0) : 0;
+    }
+  }
+
   Future<void> loadParticipants(String surveyId) async {
     if (_participantsSurveyId == surveyId &&
         _participantsSubscription != null &&

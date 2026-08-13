@@ -740,5 +740,10 @@
   "vote_short_yes": "Yes",
   "vote_short_maybe": "Maybe",
   "vote_short_no": "No",
-  "attending": "Attending"
+  "attending": "Attending",
+  "continue_without_company": "Continue without a company",
+  "join_company_later_hint": "You can join or create one later from Settings.",
+  "notifications_not_registered": "On, but this device did not register. Turn it off and on again to retry.",
+  "search_participants": "Search people",
+  "who_responded": "Who responded"
 }

@@ -107,13 +107,21 @@ class _NotificationsOptionsState extends State<NotificationsOptions> {
     }
   }
 
+  String? _subtitle() {
+    if (!_notificationsEnabled) return 'notifications_hint'.tr();
+    if (PushService.lastAutomaticFailure != null) {
+      return 'notifications_not_registered'.tr();
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SettingsSwitchTile(
       icon: widget.icon,
       title: widget.title,
 
-      subtitle: _notificationsEnabled ? null : 'notifications_hint'.tr(),
+      subtitle: _subtitle(),
       value: _notificationsEnabled,
       onChanged: _updating ? null : _updateNotificationSetting,
     );

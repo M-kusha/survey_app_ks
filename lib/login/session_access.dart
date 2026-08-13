@@ -33,6 +33,7 @@ class SessionAccess extends ChangeNotifier {
   String? _userId;
   bool _isUnlocked = false;
   bool _handledInitialAuthState = false;
+  bool _disposed = false;
 
   bool get isUnlocked => _isUnlocked;
 
@@ -45,13 +46,14 @@ class SessionAccess extends ChangeNotifier {
   }
 
   void _setUnlocked(bool value) {
-    if (_isUnlocked == value) return;
+    if (_disposed || _isUnlocked == value) return;
     _isUnlocked = value;
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _authSubscription?.cancel();
     super.dispose();
   }

@@ -189,13 +189,12 @@ class RegisterLogic {
         });
       } else {
         final companyId = (existingCompanyId ?? '').trim();
-        if (companyId.isEmpty) {
-          throw StateError('A company must be selected.');
+        if (companyId.isNotEmpty) {
+          profile.addAll({
+            'pendingOnboardingType': 'joinCompany',
+            'pendingCompanyId': companyId,
+          });
         }
-        profile.addAll({
-          'pendingOnboardingType': 'joinCompany',
-          'pendingCompanyId': companyId,
-        });
       }
 
       await FirebaseFirestore.instance

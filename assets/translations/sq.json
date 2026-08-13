@@ -740,5 +740,10 @@
   "vote_short_yes": "Po",
   "vote_short_maybe": "Ndoshta",
   "vote_short_no": "Jo",
-  "attending": "Marrin pjesë"
+  "attending": "Marrin pjesë",
+  "continue_without_company": "Vazhdo pa kompani",
+  "join_company_later_hint": "Mund të bashkoheni ose të krijoni një më vonë te Cilësimet.",
+  "notifications_not_registered": "Aktive, por kjo pajisje nuk u regjistrua. Fikeni dhe ndizeni përsëri për të riprovuar.",
+  "search_participants": "Kërko persona",
+  "who_responded": "Kush u përgjigj"
 }

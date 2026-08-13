@@ -28,6 +28,7 @@ class AppointmentParticipantsPage extends StatefulWidget {
 class _AppointmentParticipantsPageState
     extends State<AppointmentParticipantsPage> {
   final _service = AppointmentService();
+  final _searchController = TextEditingController();
 
   List<AppointmentParticipants>? _votes;
   Map<String, String>? _memberNames;
@@ -39,11 +40,15 @@ class _AppointmentParticipantsPageState
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(() {
+      if (mounted) setState(() {});
+    });
     _listen();
   }
 
   @override
   void dispose() {
+    _searchController.dispose();
     unawaited(_votesSubscription?.cancel());
     unawaited(_membersSubscription?.cancel());
     super.dispose();
@@ -161,6 +166,14 @@ class _AppointmentParticipantsPageState
     );
   }
 
+  List<ParticipantRow> _matching(ParticipantOverview overview) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return overview.rows;
+    return overview.rows
+        .where((row) => row.name.toLowerCase().contains(query))
+        .toList();
+  }
+
   Widget _buildBody(ParticipantOverview? overview) {
     if (_failed) {
       return EmptyState(
@@ -199,11 +212,30 @@ class _AppointmentParticipantsPageState
               totals: overview.totalsBySlotId[slot.slotId],
             ),
           SectionLabel(label: 'participants'.tr(), count: overview.rows.length),
-          for (final row in overview.rows)
-            Padding(
-              padding: const EdgeInsets.only(bottom: Spacing.sm),
-              child: _ParticipantCard(row: row, slots: slots),
+          Padding(
+            padding: const EdgeInsets.only(bottom: Spacing.sm),
+            child: SearchPill(
+              controller: _searchController,
+              hint: 'search_participants'.tr(),
             ),
+          ),
+          if (_matching(overview).isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: Spacing.xl),
+              child: Text(
+                'no_search_results'.tr(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            for (final row in _matching(overview))
+              Padding(
+                padding: const EdgeInsets.only(bottom: Spacing.sm),
+                child: _ParticipantCard(row: row, slots: slots),
+              ),
           const SizedBox(height: Spacing.xxl),
         ],
       ),
